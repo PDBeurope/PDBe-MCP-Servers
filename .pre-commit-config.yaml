@@ -1,0 +1,31 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: detect-private-key
+      - id: trailing-whitespace
+      - id: fix-byte-order-marker
+      - id: end-of-file-fixer
+        # args: ["--maxkb=3000"]
+      - id: check-ast
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.5 # Ruff version.
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/dzhu/rstfmt
+    rev: v0.0.14
+    hooks:
+      - id: rstfmt
+        name: rST Formatter
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        name: isort (python)
+        args: ["--profile", "black"]

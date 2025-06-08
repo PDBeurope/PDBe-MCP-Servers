@@ -1,0 +1,44 @@
+[project]
+name = "pdbe-mcp-server"
+version = "0.1.0"
+description = "A simple MCP server"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Sreenath Sasidharan Nair", email = "sreenath@ebi.ac.uk" }]
+keywords = ["mcp", "llm", "automation", "web", "fetch", "http", "streamable", "stateless"]
+license = { text = "Apache-2.0" }
+dependencies = [
+    "anyio>=4.5",
+    "click>=8.1.0",
+    "httpx>=0.27",
+    "mcp",
+    "requests>=2.32.3",
+    "starlette",
+    "uvicorn",
+]
+
+[project.scripts]
+pdbe-mcp-server = "pdbe_mcp_server.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pdbe_mcp_server"]
+
+[tool.pyright]
+include = ["pdbe_mcp_server"]
+venvPath = "."
+venv = ".venv"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = []
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.uv]
+dev-dependencies = ["pyright>=1.1.378", "pytest>=8.3.3", "ruff>=0.6.9"]
