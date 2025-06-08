@@ -18,7 +18,12 @@ A set of Model Context Protocol (MCP) servers that provides seamless access to t
    cd pdbe-mcp-server
    ```
 
-2. **Install with uv:**
+2. **Create a virtual environment:**
+   ```bash
+   uv venv
+   ```
+
+3. **Install with uv:**
    ```bash
    uv pip install .
    ```
