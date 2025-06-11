@@ -14,7 +14,7 @@ A set of Model Context Protocol (MCP) servers that provides seamless access to t
 1. **Clone and navigate to the repository:**
    ```bash
    git clone https://github.com/PDBeurope/PDBe-MCP-Servers.git
-   cd pdbe-mcp-server
+   cd PDBe-MCP-Servers
    ```
 
 2. **Create a virtual environment:**
@@ -45,7 +45,7 @@ A set of Model Context Protocol (MCP) servers that provides seamless access to t
          "args": [
            "run",
            "--directory",
-           "/path/to/your/pdbe-mcp-server",
+           "/path/to/your/PDBe-MCP-Servers",
            "pdbe-mcp-server",
            "--server-type",
            "pdbe_api_server"
@@ -56,7 +56,7 @@ A set of Model Context Protocol (MCP) servers that provides seamless access to t
          "args": [
            "run",
            "--directory",
-           "/path/to/your/pdbe-mcp-server",
+           "/path/to/your/PDBe-MCP-Servers",
            "pdbe-mcp-server",
            "--server-type",
            "pdbe_graph_server"
@@ -66,8 +66,8 @@ A set of Model Context Protocol (MCP) servers that provides seamless access to t
    }
    ```
 
-  > **Note:**  
-  > Before proceeding, ensure that `uv` is installed and available in your system's PATH. If `uv` is installed in a non-standard location, update the path accordingly by using `which uv`. Also, double-check that the `/path/to/your/pdbe-mcp-server` in the configuration matches the actual directory where you cloned the repository.
+  > **Note:**
+  > Before proceeding, ensure that `uv` is installed and available in your system's PATH. If `uv` is installed in a non-standard location, update the path accordingly by using `which uv`. Also, double-check that the `/path/to/your/PDBe-MCP-Servers` in the configuration matches the actual directory where you cloned the repository.
 
 3. **Restart Claude Desktop** to load the new configuration.
 
