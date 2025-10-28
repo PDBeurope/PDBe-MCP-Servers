@@ -11,6 +11,17 @@ A set of Model Context Protocol (MCP) servers that provides seamless access to t
 
 ### Quick Start
 
+**Install directly as a uv tool:**
+```bash
+uv tool install git+https://github.com/PDBeurope/PDBe-MCP-Servers.git
+```
+
+This installs `pdbe-mcp-server` as a global tool that can be used directly with `uvx`.
+
+### Alternative: Local Development Installation
+
+For development work or customization:
+
 1. **Clone and navigate to the repository:**
    ```bash
    git clone https://github.com/PDBeurope/PDBe-MCP-Servers.git
@@ -37,6 +48,32 @@ A set of Model Context Protocol (MCP) servers that provides seamless access to t
    - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
 2. **Add the PDBe MCP server configuration:**
+   
+   **For tool installation (recommended):**
+   ```json
+   {
+     "mcpServers": {
+       "PDBe API Server": {
+         "command": "uvx",
+         "args": [
+           "pdbe-mcp-server",
+           "--server-type",
+           "pdbe_api_server"
+         ]
+       },
+       "PDBe Graph Server": {
+         "command": "uvx",
+         "args": [
+           "pdbe-mcp-server",
+           "--server-type",
+           "pdbe_graph_server"
+         ]
+       }
+     }
+   }
+   ```
+
+   **For local development installation:**
    ```json
    {
      "mcpServers": {
@@ -67,7 +104,8 @@ A set of Model Context Protocol (MCP) servers that provides seamless access to t
    ```
 
   > **Note:**
-  > Before proceeding, ensure that `uv` is installed and available in your system's PATH. If `uv` is installed in a non-standard location, update the path accordingly by using `which uv`. Also, double-check that the `/path/to/your/PDBe-MCP-Servers` in the configuration matches the actual directory where you cloned the repository.
+  > - For the tool installation method, ensure `uvx` is available in your PATH (this comes with uv)
+  > - For local development, ensure that `uv` is installed and the `/path/to/your/PDBe-MCP-Servers` matches your actual directory
 
 3. **Restart Claude Desktop** to load the new configuration.
 
@@ -89,8 +127,10 @@ The tools will appear in Claude's "Search and tools" interface, where you can en
 
 ### Development Installation
 
-For contributing or development work:
+For contributing or development work, first clone the repository and then install in editable mode:
 ```bash
+git clone https://github.com/PDBeurope/PDBe-MCP-Servers.git
+cd PDBe-MCP-Servers
 uv pip install -e ".[dev]"
 ```
 
@@ -102,12 +142,26 @@ Choose between two server types based on your needs:
 
 #### PDBe API Server
 Provides access to core PDBe REST API endpoints:
+
+**Using tool installation:**
+```bash
+uvx pdbe-mcp-server --server-type pdbe_api_server --transport sse
+```
+
+**Using local development:**
 ```bash
 uv run pdbe-mcp-server --server-type pdbe_api_server --transport sse
 ```
 
 #### PDBe Graph Database Server
 Enables complex relationship queries and network analysis:
+
+**Using tool installation:**
+```bash
+uvx pdbe-mcp-server --server-type pdbe_graph_server --transport sse
+```
+
+**Using local development:**
 ```bash
 uv run pdbe-mcp-server --server-type pdbe_graph_server --transport sse
 ```
