@@ -1,0 +1,8 @@
+api:
+  openapi_url: "https://www.ebi.ac.uk/pdbe/api/v2/openapi.json"
+  base_url: "https://www.ebi.ac.uk/pdbe/api/v2/"
+graph:
+  schema_url: "https://www.ebi.ac.uk/pdbe/static/files/graph_schema.json"
+search:
+  schema_url: "https://www.ebi.ac.uk/pdbe/static/files/search_schema.json"
+  search_api: "https://www.ebi.ac.uk/pdbe/search/pdb/select?wt=json"

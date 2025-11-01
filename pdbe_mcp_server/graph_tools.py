@@ -1,9 +1,12 @@
-import functools
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-import requests
+import mcp.types as types
+from omegaconf import DictConfig
 
-from pdbe_mcp_server.utils import HTMLStripper
+from pdbe_mcp_server import get_config
+from pdbe_mcp_server.utils import HTMLStripper, HTTPClient
+
+conf: DictConfig = get_config()
 
 
 class GraphTools:
@@ -15,22 +18,92 @@ class GraphTools:
         """
         Initialize the GraphTools object, load the graph schema, and prepare node and edge lists.
         """
-        self.graph_schema: Dict[str, Any] = self._get_graph_schema()
-        self.node_dict: Dict[Any, str] = {}
-        self.nodes: List[Dict[str, Any]] = self.get_nodes()
-        self.edges: List[Dict[str, Any]] = self.get_edges()
+        self.graph_schema: dict[str, Any] = self._get_graph_schema()
+        self.node_dict: dict[Any, str] = {}
+        self.nodes: list[dict[str, Any]] = self.get_nodes()
+        self.edges: list[dict[str, Any]] = self.get_edges()
 
-    @functools.lru_cache(maxsize=None)
-    def _get_graph_schema(self) -> Dict[str, Any]:
+    def get_pdbe_graph_nodes_tool(self) -> types.Tool:
+        return types.Tool(
+            name="pdbe_graph_nodes",
+            description="""
+    Retrieves metadata about all node types (also known as "labels") defined in the PDBe (PDBe-KB) graph database schema.
+    This tool can be used to understand the different types of entities represented in the PDBe graph database, along with
+    their properties and descriptions and then can be used to explore the graph more effectively by writing Cypher queries.
+    This tool returns detailed information about each node label in the graph database. For every node label, it includes:
+    - The label name (e.g., 'ValAngleOutlier', 'Antibody', 'Atom')
+    - A human-readable description of the node type
+    - A list of properties/parameters associated with this node type
+    - For each property: the name and a brief description
+
+    Expected Output Format (text):
+    Label: ValAngleOutlier
+    Description: Bond angle outliers based on wwPDB validation data.
+    Properties:
+      - ATOM0/1/2/3: Names of atoms involved in the angle which is an outlier.
+      - MEAN: The ideal value of the bond angle.
+      - OBS: The observed value of the bond angle.
+
+    (Additional node labels follow the same format...)
+    """,
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+            annotations=types.ToolAnnotations(
+                title="Get PDBe Graph Nodes",
+                destructiveHint=False,
+                readOnlyHint=True,
+                idempotentHint=True,
+            ),
+        )
+
+    def get_pdbe_graph_edges_tool(self) -> types.Tool:
+        return types.Tool(
+            name="pdbe_graph_edges",
+            description="""
+    Retrieves metadata about all relationship types (edges) defined in the PDBe (PDBe-KB) graph database schema.
+    This tool can be used to understand the different types of relationships represented in the PDBe graph database, along with
+    their start and end nodes, properties and descriptions and then can be used to explore the graph more effectively by writing Cypher queries.
+    This tool returns detailed information about each relationship (edge) in the graph. For every relationship type, it includes:
+    - The relationship label (e.g., 'HAS_OUTLIER', 'CONNECTS_TO')
+    - A human-readable description of the relationship
+    - The 'from' node label and 'to' node label, defining the direction and connectivity
+    - A list of properties associated with the relationship
+    - For each property: the name and a brief description
+
+    Expected Output Format (text):
+    Label: HAS_OUTLIER
+    Description: Indicates a structure has validation outliers
+    From: Structure
+    To: ValAngleOutlier
+    Properties:
+      - since: The date when the outlier was detected
+      - severity: The severity level of the outlier
+
+    (Additional relationship types follow the same format...)
+    """,
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+            annotations=types.ToolAnnotations(
+                title="Get PDBe Graph Edges",
+                destructiveHint=False,
+                readOnlyHint=True,
+                idempotentHint=True,
+            ),
+        )
+
+    def _get_graph_schema(self) -> dict[str, Any]:
         """
         Retrieve the PDBe graph schema from the remote server and return it as a dictionary.
-        Uses LRU cache to avoid repeated downloads.
         """
-        r = requests.get("https://www.ebi.ac.uk/pdbe/static/files/graph_schema.json")
-        r.raise_for_status()
-        return r.json()
+        return HTTPClient.get(str(conf.graph.schema_url))
 
-    def get_nodes(self) -> List[Dict[str, Any]]:
+    def get_nodes(self) -> list[dict[str, Any]]:
         """
         Get the nodes from the graph schema, clean up their descriptions and titles, and store them in a list.
         Also populates the node_dict for quick label lookup.
@@ -52,7 +125,7 @@ class GraphTools:
 
         return nodes
 
-    def get_edges(self) -> List[Dict[str, Any]]:
+    def get_edges(self) -> list[dict[str, Any]]:
         """
         Get the edges from the graph schema, clean up their descriptions and titles, and store them in a list.
 
@@ -115,7 +188,7 @@ class GraphTools:
             for edge in self.edges
         )
 
-    def get_node_by_label(self, node_label: str) -> Optional[str]:
+    def get_node_by_label(self, node_label: str) -> str | None:
         """
         Get a formatted string for a node by its label.
 
@@ -135,7 +208,7 @@ class GraphTools:
 
         return None
 
-    def get_edge_by_label(self, edge_label: str) -> Optional[Dict[str, Any]]:
+    def get_edge_by_label(self, edge_label: str) -> dict[str, Any] | None:
         """
         Get an edge dictionary by its label.
 
