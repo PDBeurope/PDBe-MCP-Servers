@@ -1,7 +1,7 @@
 [project]
 name = "pdbe-mcp-server"
 version = "0.1.0"
-description = "A simple MCP server"
+description = "A Model Context Protocol (MCP) server for accessing PDBe (Protein Data Bank in Europe) structural biology data and services"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Sreenath Sasidharan Nair", email = "sreenath@ebi.ac.uk" }]
