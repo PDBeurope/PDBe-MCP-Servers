@@ -1,6 +1,11 @@
 # PDBe MCP Servers
 
-A set of Model Context Protocol (MCP) servers that provides seamless access to the Protein Data Bank in Europe (PDBe) API and [PDBe Graph Database](https://www.ebi.ac.uk/pdbe/pdbe-kb/graph). This server exposes PDBe's comprehensive structural biology data as MCP tools, enabling direct integration with Claude Desktop and other AI-powered applications.
+A set of Model Context Protocol (MCP) servers that provides seamless access to the Protein Data Bank in Europe (PDBe) API, [PDBe Graph Database](https://www.ebi.ac.uk/pdbe/pdbe-kb/graph), and PDBe Search. This server exposes PDBe's comprehensive structural biology data as MCP tools, enabling direct integration with Claude Desktop and other AI-powered applications.
+
+**Features:**
+- **PDBe API Server**: Access core structural data through REST API endpoints
+- **PDBe Graph Server**: Query complex relationships and molecular interactions
+- **PDBe Search Server**: Perform advanced Solr-based searches across structural data
 
 ## Prerequisites
 
@@ -68,6 +73,14 @@ For development work or customization:
            "--server-type",
            "pdbe_graph_server"
          ]
+       },
+       "PDBe Search Server": {
+         "command": "uvx",
+         "args": [
+           "pdbe-mcp-server",
+           "--server-type",
+           "pdbe_search_server"
+         ]
        }
      }
    }
@@ -98,6 +111,18 @@ For development work or customization:
            "--server-type",
            "pdbe_graph_server"
          ]
+       },
+       "PDBe Search": {
+         "command": "/usr/local/bin/uv",
+         "args": [
+           "run",
+           "--directory",
+           "/path/to/your/PDBe-MCP-Servers",
+           "pdbe-mcp-server",
+           "--server-type",
+           "pdbe_search_server"
+         ]
+       }
        }
      }
    }
@@ -114,14 +139,63 @@ For development work or customization:
 Once configured, you can access PDBe tools directly in your Claude conversations:
 
 - **Search for protein structures**: "Find structures for UniProt accession P12345"
+- **Query structure releases**: "Show me all structures released this month grouped by experimental method"
 - **Explore molecular interactions**: "Show me ligand binding sites for this protein"
+- **Advanced search queries**: "Find all X-ray crystal structures with resolution better than 2.0 Å from 2024"
 
 The tools will appear in Claude's "Search and tools" interface, where you can enable or disable them as needed.
 
 ### Server Types
 
 - **`pdbe_api_server`**: Core PDBe REST API access with essential structural data
-- **`pdbe_graph_server`**: Know more about the PDBe Graph Database and generate Cypher queries for accessing complex relationships and interactions.
+- **`pdbe_graph_server`**: Know more about the PDBe Graph Database and generate Cypher queries for accessing complex relationships and interactions
+- **`pdbe_search_server`**: Advanced Solr-based search capabilities for complex structural queries and data analysis
+
+## Search Server Features
+
+The PDBe Search Server provides powerful querying capabilities through the PDBe Solr search interface:
+
+### Available Tools
+
+#### `get_search_schema`
+Retrieves the complete Solr search schema showing all available fields, data types, and descriptions. Use this to understand what fields you can search and filter on.
+
+**Example usage:**
+```
+"Show me the search schema for PDBe structures"
+```
+
+#### `run_search_query`
+Execute advanced search queries with flexible filtering, sorting, and pagination options.
+
+**Parameters:**
+- `query` (required): Solr query string (e.g., `pdb_id:1cbs`, `experimental_method:"X-ray diffraction"`)
+- `filters` (optional): Array of field names to include in results
+- `sort` (optional): Sort criteria (e.g., `release_date desc`, `resolution asc`)
+- `start` (optional): Starting index for pagination (default: 0)
+- `rows` (optional): Number of results to return (default: 10)
+
+**Example queries:**
+```
+"Find all structures released in October 2025 grouped by experimental method"
+"Search for all X-ray crystal structures with resolution better than 2.0 Å"
+"Show me the latest 20 cryo-EM structures sorted by release date"
+"Find structures containing ligand 'ATP' with specific binding sites"
+```
+
+### Search Field Examples
+
+Common searchable fields include:
+- `pdb_id`: PDB entry identifier
+- `experimental_method`: Structure determination method
+- `release_date`: Structure release date
+- `resolution`: Structure resolution (Å)
+- `molecule_type`: Type of molecule (protein, DNA, RNA, etc.)
+- `organism_scientific_name`: Source organism
+- `ligand_name`: Bound ligands
+- `title`: Structure title/description
+
+Use `get_search_schema` to discover all available fields and their descriptions.
 
 ## Development and Advanced Usage
 
@@ -164,6 +238,19 @@ uvx pdbe-mcp-server --server-type pdbe_graph_server --transport sse
 **Using local development:**
 ```bash
 uv run pdbe-mcp-server --server-type pdbe_graph_server --transport sse
+```
+
+#### PDBe Search Server
+Provides advanced Solr-based search and analytics capabilities:
+
+**Using tool installation:**
+```bash
+uvx pdbe-mcp-server --server-type pdbe_search_server --transport sse
+```
+
+**Using local development:**
+```bash
+uv run pdbe-mcp-server --server-type pdbe_search_server --transport sse
 ```
 
 The server will start at `http://localhost:8000/sse` by default.
