@@ -29,7 +29,7 @@ class GraphTools:
             description="""
     Retrieves metadata about all node types (also known as "labels") defined in the PDBe (PDBe-KB) graph database schema.
     This tool can be used to understand the different types of entities represented in the PDBe graph database, along with
-    their properties and descriptions and then can be used to explore the graph more effectively by writiing Cypher queries.
+    their properties and descriptions and then can be used to explore the graph more effectively by writing Cypher queries.
     This tool returns detailed information about each node label in the graph database. For every node label, it includes:
     - The label name (e.g., 'ValAngleOutlier', 'Antibody', 'Atom')
     - A human-readable description of the node type
