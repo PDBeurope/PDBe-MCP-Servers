@@ -1,11 +1,20 @@
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Sequence
 
 import anyio
 import click
 import mcp.types as types
 from mcp.server.lowlevel import Server
+from omegaconf import DictConfig
 
+from pdbe_mcp_server import get_config
 from pdbe_mcp_server.api_tools import create_mcp_tools_from_openapi
+from pdbe_mcp_server.graph_tools import GraphTools
+from pdbe_mcp_server.search_tools import SearchTools
+
+search_tools: SearchTools = SearchTools()
+graph_tools: GraphTools = GraphTools()
+
+conf: DictConfig = get_config()
 
 
 class MCPServerFactory:
@@ -14,17 +23,17 @@ class MCPServerFactory:
     """
 
     def __init__(self) -> None:
-        self._builders: Dict[str, Callable[[], Any]] = {}
+        self._builders: dict[str, Callable[[], Server]] = {}
 
-    def register(self, name: str, builder_func: Callable[[], Any]) -> None:
+    def register(self, name: str, builder_func: Callable[[], Server]) -> None:
         self._builders[name] = builder_func
 
-    def create(self, name: str) -> Any:
+    def create(self, name: str) -> Server:
         if name not in self._builders:
             raise ValueError(f"No builder registered for {name}")
         return self._builders[name]()
 
-    def available_types(self) -> List[str]:
+    def available_types(self) -> list[str]:
         return list(self._builders.keys())
 
 
@@ -34,8 +43,7 @@ factory = MCPServerFactory()
 
 def build_pdbe_api_server() -> Server:
     api_server = Server("pdbe-api-server")
-    openapi_url = "https://www.ebi.ac.uk/pdbe/api/v2/openapi.json"
-    generator, available_tools = create_mcp_tools_from_openapi(openapi_url)
+    generator, available_tools = create_mcp_tools_from_openapi(conf.api.openapi_url)
 
     @api_server.list_tools()
     async def list_tools() -> list[types.Tool]:
@@ -43,26 +51,11 @@ def build_pdbe_api_server() -> Server:
 
     @api_server.call_tool()
     async def call_tool(
-        name: str, arguments: dict
-    ) -> List[
-        types.TextContent
-        | types.ImageContent
-        | types.EmbeddedResource
-        | types.CallToolResult
-    ]:
-        try:
-            if arguments is None:
-                arguments = {}
-            return generator.call_tool(name, arguments)
-        except Exception as error:
-            return [
-                types.CallToolResult(
-                    isError=True,
-                    content=[
-                        types.TextContent(type="text", text=f"Error: {str(error)}")
-                    ],
-                )
-            ]
+        name: str, arguments: dict[str, Any]
+    ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+        if arguments is None:
+            arguments = {}
+        return generator.call_tool(name, arguments)
 
     return api_server
 
@@ -73,130 +66,65 @@ def build_graph_server() -> Server:
     @graph_server.list_tools()
     async def list_tools() -> list[types.Tool]:
         return [
-            types.Tool(
-                name="pdbe_graph_nodes",
-                description="""
-Retrieves metadata about all node types (also known as "labels") defined in the PDBe (PDBe-KB) graph database schema.
-
-This tool returns detailed information about each node label in the graph database. For every node label, it includes:
-- The label name (e.g., 'Person', 'Product')
-- A human-readable description of the node type
-- A list of parameters (i.e., properties/attributes) associated with this node
-- For each parameter:
-  - The name of the property
-  - A brief description of the property
-
-Expected Output Format:
-[
-  {
-    "label": "Person",
-    "description": "Represents an individual in the network",
-    "parameters": [
-      {
-        "name": "name",
-        "description": "The full name of the person"
-      },
-      {
-        "name": "birthdate",
-        "description": "The date of birth of the person"
-      }
-    ]
-  },
-  ...
-]
-""",
-                inputSchema={
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
-                },
-                annotations=types.ToolAnnotations(
-                    title="Get PDBe Graph Nodes",
-                    destructiveHint=False,
-                    readOnlyHint=True,
-                    idempotentHint=True,
-                ),
-            ),
-            types.Tool(
-                name="pdbe_graph_edges",
-                description="""
-Retrieves metadata about all relationship types (edges) defined in the PDBe (PDBe-KB) graph database schema.
-
-This tool returns detailed information about each relationship (edge) in the graph. For every relationship type, it includes:
-- The relationship label (e.g., 'FRIEND_OF', 'PURCHASED')
-- A human-readable description of the relationship
-- The 'from' node label and 'to' node label, defining the direction and connectivity
-- A list of properties associated with the relationship
-- For each property:
-  - The name of the property
-  - A brief description of the property
-
-Expected Output Format:
-[
-  {
-    "label": "FRIEND_OF",
-    "description": "Indicates a friendship between two people",
-    "from": "Person",
-    "to": "Person",
-    "properties": [
-      {
-        "name": "since",
-        "description": "The date when the friendship started"
-      }
-    ]
-  },
-  ...
-]
-""",
-                inputSchema={
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
-                },
-                annotations=types.ToolAnnotations(
-                    title="Get PDBe Graph Edges",
-                    destructiveHint=False,
-                    readOnlyHint=True,
-                    idempotentHint=True,
-                ),
-            ),
+            graph_tools.get_pdbe_graph_nodes_tool(),
+            graph_tools.get_pdbe_graph_edges_tool(),
         ]
 
     @graph_server.call_tool()
     async def call_tool(
-        name: str, arguments: dict
-    ) -> List[
-        types.TextContent
-        | types.ImageContent
-        | types.EmbeddedResource
-        | types.CallToolResult
-    ]:
-        from pdbe_mcp_server.graph_tools import GraphTools
-
-        graph_tools = GraphTools()
-
-        try:
-            if name == "pdbe_graph_nodes":
-                return [types.TextContent(text=graph_tools.format_nodes(), type="text")]
-            elif name == "pdbe_graph_edges":
-                return [types.TextContent(text=graph_tools.format_edges(), type="text")]
-            else:
-                raise Exception(f"Unknown tool name: {name}")
-        except Exception as error:
-            return [
-                types.CallToolResult(
-                    isError=True,
-                    content=[
-                        types.TextContent(type="text", text=f"Error: {str(error)}")
-                    ],
-                )
-            ]
+        name: str, arguments: dict[str, Any]
+    ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+        if name == "pdbe_graph_nodes":
+            return [types.TextContent(text=graph_tools.format_nodes(), type="text")]
+        elif name == "pdbe_graph_edges":
+            return [types.TextContent(text=graph_tools.format_edges(), type="text")]
+        else:
+            raise ValueError(f"Unknown tool name: {name}")
 
     return graph_server
 
 
+def build_pdbe_search_server() -> Server:
+    search_server = Server(
+        name="pdbe-search-server",
+        instructions="""
+You are a PDBe search assistant. You have access to tools that allow you to retrieve the Solr search schema
+and execute search queries against the PDBe database. Use these tools to help users find relevant information
+in the PDBe database. Always make sure to understand the search schema before constructing queries.
+        """,
+    )
+
+    @search_server.list_tools()
+    async def list_tools() -> list[types.Tool]:
+        return [
+            search_tools.get_search_schema_tool(),
+            search_tools.get_run_search_query_tool(),
+        ]
+
+    @search_server.call_tool()
+    async def call_tool(
+        name: str, arguments: dict[str, Any]
+    ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+        if name == "get_search_schema":
+            return [
+                types.TextContent(type="text", text=search_tools.get_search_schema())
+            ]
+        elif name == "run_search_query":
+            return [
+                types.TextContent(
+                    type="text",
+                    text=search_tools.run_search_query(arguments),
+                )
+            ]
+        else:
+            raise ValueError(f"Unknown tool name: {name}")
+
+    return search_server
+
+
 factory.register("pdbe_graph_server", build_graph_server)
 factory.register("pdbe_api_server", build_pdbe_api_server)
+factory.register("pdbe_search_server", build_pdbe_search_server)
 
 
 @click.command()

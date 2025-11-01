@@ -1,7 +1,7 @@
-from typing import Any, Dict
+from typing import Any
 
 
-def format_graph_info(graph_data: Dict[str, Any]) -> str:
+def format_graph_info(graph_data: dict[str, Any]) -> str:
     output = []
 
     # Format Nodes

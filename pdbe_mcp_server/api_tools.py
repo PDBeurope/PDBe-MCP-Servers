@@ -1,9 +1,15 @@
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any
 from urllib.parse import urljoin
 
 import mcp.types as types
 import requests
+from omegaconf import DictConfig
+
+from pdbe_mcp_server import get_config
+from pdbe_mcp_server.utils import HTTPClient
+
+conf: DictConfig = get_config()
 
 
 class OpenAPIToMCPGenerator:
@@ -14,12 +20,12 @@ class OpenAPIToMCPGenerator:
         Args:
             openapi_url: URL to the OpenAPI JSON specification
         """
-        self.openapi_url = openapi_url
-        self.openapi_spec = None
-        self.base_url = "https://www.ebi.ac.uk/pdbe/api/v2/"
-        self.tools = []
+        self.openapi_url: str = openapi_url
+        self.openapi_spec: dict[str, Any] = {}
+        self.base_url: str = str(conf.api.base_url)
+        self.tools: list[dict[str, Any]] = []
 
-    def load_openapi_spec(self) -> Dict[str, Any]:
+    def load_openapi_spec(self) -> dict[str, Any]:
         """
         Load the OpenAPI specification from the remote URL.
 
@@ -27,20 +33,18 @@ class OpenAPIToMCPGenerator:
             The parsed OpenAPI specification as a dictionary
         """
         try:
-            response = requests.get(self.openapi_url)
-            response.raise_for_status()
-            self.openapi_spec = response.json()
+            spec = HTTPClient.get(self.openapi_url)
+            self.openapi_spec = spec
+            return spec
 
-            return self.openapi_spec
-
-        except requests.RequestException as e:
-            raise Exception(f"Failed to load OpenAPI spec from {self.openapi_url}: {e}")
-        except json.JSONDecodeError as e:
-            raise Exception(f"Failed to parse OpenAPI JSON: {e}")
+        except requests.HTTPError as e:
+            raise Exception(
+                f"Failed to load OpenAPI spec from {self.openapi_url}: {e}"
+            ) from e
 
     def _convert_openapi_type_to_json_schema(
-        self, param_schema: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, param_schema: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Convert OpenAPI parameter schema to JSON Schema format.
 
@@ -77,8 +81,8 @@ class OpenAPIToMCPGenerator:
         return json_schema
 
     def _extract_parameters(
-        self, path_params: List[Dict[str, Any]], query_params: List[Dict[str, Any]]
-    ) -> Tuple[Dict[str, Any], List[str]]:
+        self, path_params: list[dict[str, Any]], query_params: list[dict[str, Any]]
+    ) -> tuple[dict[str, Any], list[str]]:
         """
         Extract and convert parameters to JSON Schema format.
 
@@ -120,7 +124,7 @@ class OpenAPIToMCPGenerator:
 
         return properties, required
 
-    def list_tools(self) -> List[types.Tool]:
+    def list_tools(self) -> list[types.Tool]:
         """
         Generate MCP tools from the OpenAPI specification.
 
@@ -209,13 +213,8 @@ class OpenAPIToMCPGenerator:
         return tools
 
     def call_tool(
-        self, name: str, arguments: Dict[str, Any]
-    ) -> List[
-        types.TextContent
-        | types.ImageContent
-        | types.EmbeddedResource
-        | types.CallToolResult
-    ]:
+        self, name: str, arguments: dict[str, Any]
+    ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
         """
         Execute a tool call by making the appropriate API request.
 
@@ -256,25 +255,14 @@ class OpenAPIToMCPGenerator:
 
         try:
             if tool_info["method"] == "GET":
-                response = requests.get(full_url)
-            elif tool_info["method"] == "DELETE":
-                response = requests.delete(full_url)
-            elif tool_info["method"] == "PUT":
-                response = requests.put(full_url)
-            elif tool_info["method"] == "PATCH":
-                response = requests.patch(full_url)
+                data = HTTPClient.get(full_url)
+            elif tool_info["method"] == "POST":
+                data = HTTPClient.post(full_url)
             else:
-                response = requests.request(tool_info["method"], full_url)
+                # unsupported method, raise an error
+                raise ValueError(f"Unsupported method: {tool_info['method']}")
 
-            response.raise_for_status()
-
-            # Try to parse as JSON, fallback to text
-            try:
-                data = response.json()
-                result_text = json.dumps(data, indent=2)
-            except json.JSONDecodeError:
-                result_text = response.text
-
+            result_text = json.dumps(data, indent=2)
             return [types.TextContent(type="text", text=result_text)]
 
         except requests.RequestException as e:
@@ -288,7 +276,7 @@ class OpenAPIToMCPGenerator:
 
 def create_mcp_tools_from_openapi(
     openapi_url: str,
-) -> Tuple[OpenAPIToMCPGenerator, List[types.Tool]]:
+) -> tuple[OpenAPIToMCPGenerator, list[types.Tool]]:
     """
     Main function to create MCP tools from an OpenAPI specification.
 

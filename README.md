@@ -48,7 +48,7 @@ For development work or customization:
    - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
 2. **Add the PDBe MCP server configuration:**
-   
+
    **For tool installation (recommended):**
    ```json
    {
