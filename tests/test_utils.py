@@ -51,6 +51,27 @@ class TestHTMLStripper:
 class TestHTTPClient:
     """Tests for HTTPClient class."""
 
+    def setup_method(self) -> None:
+        """Setup method to ensure clean session state for each test."""
+        HTTPClient.close_session()
+
+    def teardown_method(self) -> None:
+        """Teardown method to clean up session after each test."""
+        HTTPClient.close_session()
+
+    def test_session_singleton(self) -> None:
+        """Test that the same session instance is reused."""
+        session1 = HTTPClient._get_session()
+        session2 = HTTPClient._get_session()
+        assert session1 is session2
+
+    def test_close_session(self) -> None:
+        """Test that close_session properly resets the singleton."""
+        session1 = HTTPClient._get_session()
+        HTTPClient.close_session()
+        session2 = HTTPClient._get_session()
+        assert session1 is not session2
+
     def test_get_json_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test successful JSON GET request."""
         mock_response = MagicMock()
@@ -60,7 +81,7 @@ class TestHTTPClient:
         mock_session = MagicMock()
         mock_session.get.return_value = mock_response
 
-        with patch("requests.Session", return_value=mock_session):
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             result = HTTPClient.get("https://example.com", response_type="json")
             assert result == {"key": "value"}
             mock_session.get.assert_called_once()
@@ -74,7 +95,7 @@ class TestHTTPClient:
         mock_session = MagicMock()
         mock_session.get.return_value = mock_response
 
-        with patch("requests.Session", return_value=mock_session):
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             result = HTTPClient.get("https://example.com", response_type="text")
             assert result == "response text"
 
@@ -87,7 +108,7 @@ class TestHTTPClient:
         mock_session = MagicMock()
         mock_session.get.return_value = mock_response
 
-        with patch("requests.Session", return_value=mock_session):
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             result = HTTPClient.get("https://example.com", response_type="xml")
             assert result == "<xml>data</xml>"
 
@@ -102,7 +123,7 @@ class TestHTTPClient:
 
         params = {"key1": "value1", "key2": "value2"}
 
-        with patch("requests.Session", return_value=mock_session):
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             result = HTTPClient.get("https://example.com", params=params)
             assert result == {"result": "data"}
             mock_session.get.assert_called_once_with(
@@ -118,7 +139,7 @@ class TestHTTPClient:
         mock_session = MagicMock()
         mock_session.get.return_value = mock_response
 
-        with patch("requests.Session", return_value=mock_session):
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             with pytest.raises(requests.HTTPError):
                 HTTPClient.get("https://example.com")
 
@@ -133,7 +154,7 @@ class TestHTTPClient:
 
         json_data = {"field": "value"}
 
-        with patch("requests.Session", return_value=mock_session):
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             result = HTTPClient.post("https://example.com", json=json_data)
             assert result == {"status": "created"}
             mock_session.post.assert_called_once_with(
@@ -151,7 +172,7 @@ class TestHTTPClient:
 
         form_data = {"field1": "value1", "field2": "value2"}
 
-        with patch("requests.Session", return_value=mock_session):
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             result = HTTPClient.post("https://example.com", data=form_data)
             assert result == {"status": "ok"}
             mock_session.post.assert_called_once_with(
@@ -169,7 +190,7 @@ class TestHTTPClient:
         mock_session = MagicMock()
         mock_session.post.return_value = mock_response
 
-        with patch("requests.Session", return_value=mock_session):
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             with pytest.raises(requests.HTTPError):
                 HTTPClient.post("https://example.com")
 
@@ -182,14 +203,47 @@ class TestHTTPClient:
         mock_session = MagicMock()
         mock_session.get.return_value = mock_response
 
-        with patch("requests.Session", return_value=mock_session):
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             HTTPClient.get("https://example.com", timeout=60)
             mock_session.get.assert_called_once_with(
                 "https://example.com", params=None, timeout=60
             )
 
-    def test_retry_configuration(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test that retry strategy is properly configured."""
+    def test_custom_retry_parameters(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that custom retry parameters create a temporary session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {}
+
+        mock_temp_session = MagicMock()
+        mock_temp_session.get.return_value = mock_response
+
+        # Mock the singleton session to ensure we're not using it
+        mock_singleton_session = MagicMock()
+
+        with (
+            patch.object(HTTPClient, "_create_session", return_value=mock_temp_session),
+            patch.object(
+                HTTPClient, "_get_session", return_value=mock_singleton_session
+            ),
+        ):
+            HTTPClient.get("https://example.com", max_retries=5, retry_delay=2.0)
+            # Verify that the temporary session was used, not the singleton
+            mock_temp_session.get.assert_called_once()
+            mock_singleton_session.get.assert_not_called()
+
+    def test_create_session_method(self) -> None:
+        """Test the _create_session helper method."""
+        session = HTTPClient._create_session(max_retries=5, retry_delay=2.0)
+        assert isinstance(session, requests.Session)
+        # The session should have adapters mounted for both http and https
+        assert "http://" in session.adapters
+        assert "https://" in session.adapters
+
+    def test_default_retry_uses_singleton(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that default retry parameters use the singleton session."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {}
@@ -197,7 +251,8 @@ class TestHTTPClient:
         mock_session = MagicMock()
         mock_session.get.return_value = mock_response
 
-        with patch("requests.Session", return_value=mock_session):
-            HTTPClient.get("https://example.com", max_retries=5, retry_delay=2.0)
-            # Verify that mount was called to set up adapters
-            assert mock_session.mount.call_count == 2  # Once for http, once for https
+        with patch.object(HTTPClient, "_get_session", return_value=mock_session):
+            HTTPClient.get("https://example.com", max_retries=3, retry_delay=1.0)
+            mock_session.get.assert_called_once()
+            # Should not call mount on the mocked singleton session
+            mock_session.mount.assert_not_called()
