@@ -16,12 +16,12 @@ A set of Model Context Protocol (MCP) servers that provides seamless access to t
 
 ### Quick Start
 
-**Install directly as a uv tool:**
+**Install directly from PyPI:**
 ```bash
-uv tool install git+https://github.com/PDBeurope/PDBe-MCP-Servers.git
+uvx pdbe-mcp-server
 ```
 
-This installs `pdbe-mcp-server` as a global tool that can be used directly with `uvx`.
+The tool is available on PyPI and can be run directly with `uvx` without any installation step.
 
 ### Alternative: Local Development Installation
 
@@ -54,7 +54,7 @@ For development work or customization:
 
 2. **Add the PDBe MCP server configuration:**
 
-   **For tool installation (recommended):**
+   **For PyPI installation (recommended):**
    ```json
    {
      "mcpServers": {
@@ -123,13 +123,12 @@ For development work or customization:
            "pdbe_search_server"
          ]
        }
-       }
      }
    }
    ```
 
   > **Note:**
-  > - For the tool installation method, ensure `uvx` is available in your PATH (this comes with uv)
+  > - For the PyPI installation method, ensure `uvx` is available in your PATH (this comes with uv)
   > - For local development, ensure that `uv` is installed and the `/path/to/your/PDBe-MCP-Servers` matches your actual directory
 
 3. **Restart Claude Desktop** to load the new configuration.
@@ -217,7 +216,7 @@ Choose between two server types based on your needs:
 #### PDBe API Server
 Provides access to core PDBe REST API endpoints:
 
-**Using tool installation:**
+**Using PyPI installation:**
 ```bash
 uvx pdbe-mcp-server --server-type pdbe_api_server --transport sse
 ```
@@ -230,7 +229,7 @@ uv run pdbe-mcp-server --server-type pdbe_api_server --transport sse
 #### PDBe Graph Database Server
 Enables complex relationship queries and network analysis:
 
-**Using tool installation:**
+**Using PyPI installation:**
 ```bash
 uvx pdbe-mcp-server --server-type pdbe_graph_server --transport sse
 ```
@@ -243,7 +242,7 @@ uv run pdbe-mcp-server --server-type pdbe_graph_server --transport sse
 #### PDBe Search Server
 Provides advanced Solr-based search and analytics capabilities:
 
-**Using tool installation:**
+**Using PyPI installation:**
 ```bash
 uvx pdbe-mcp-server --server-type pdbe_search_server --transport sse
 ```
