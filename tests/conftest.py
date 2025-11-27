@@ -84,6 +84,16 @@ def mock_graph_schema() -> dict[str, Any]:
                 "properties": [{"name": "count", "value": "Number of ligands"}],
             }
         ],
+        "examples": [
+            {
+                "query": "Give me all the structures that are released in 2025.",
+                "description": "MATCH (entry:Entry)\n    WHERE entry.PDB_REV_DATE STARTS WITH '2025'\n    RETURN entry.ID as PDB_ID, \n        entry.TITLE as Title,\n        entry.PDB_REV_DATE as Release_Date,\n        entry.RESOLUTION as Resolution,\n        entry.METHOD as Experimental_Method,\n        entry.STATUS_CODE as Status\n    ORDER BY entry.PDB_REV_DATE DESC",
+            },
+            {
+                "query": "Find all residues that are part of a given Pfam domain.",
+                "description": "MATCH (residue:PDBResidue)-[:HAS_PFAM]->(pfam:PFAM)\n    WHERE pfam.ACCESSION = 'PF00069'\n    RETURN residue.AUTH_ASYM_ID as Chain_ID,\n        residue.AUTH_SEQ_ID as Residue_Number,\n        residue.PDB_ID as PDB_ID,\n        pfam.ACCESSION as Pfam_Accession,\n        pfam.NAME as Pfam_Name\n    ORDER BY residue.PDB_ID, residue.AUTH_ASYM_ID, residue.AUTH_SEQ_ID",
+            },
+        ],
     }
 
 

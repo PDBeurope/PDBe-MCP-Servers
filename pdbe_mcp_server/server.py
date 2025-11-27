@@ -68,6 +68,7 @@ def build_graph_server() -> Server:
         return [
             graph_tools.get_pdbe_graph_nodes_tool(),
             graph_tools.get_pdbe_graph_edges_tool(),
+            graph_tools.get_pdbe_graph_example_queries_tool(),
         ]
 
     @graph_server.call_tool()
@@ -78,6 +79,12 @@ def build_graph_server() -> Server:
             return [types.TextContent(text=graph_tools.format_nodes(), type="text")]
         elif name == "pdbe_graph_edges":
             return [types.TextContent(text=graph_tools.format_edges(), type="text")]
+        elif name == "pdbe_graph_example_queries":
+            return [
+                types.TextContent(
+                    text=graph_tools.format_example_queries(), type="text"
+                )
+            ]
         else:
             raise ValueError(f"Unknown tool name: {name}")
 
