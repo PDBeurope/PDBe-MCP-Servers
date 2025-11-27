@@ -97,11 +97,53 @@ class GraphTools:
             ),
         )
 
+    def get_pdbe_graph_example_queries_tool(self) -> types.Tool:
+        return types.Tool(
+            name="pdbe_graph_example_queries",
+            description="""
+    Retrieves example Cypher queries for exploring the PDBe (PDBe-KB) graph database.
+    This tool can be used to get sample queries that demonstrate how to interact with the PDBe graph database using Cypher.
+    The tool returns a list of example queries, each with an question describing the purpose of the query and the corresponding Cypher query string.
+    Expected Output Format (text):
+    Question: Give me all the structures that are released in 2025.
+    Query:
+    MATCH (entry:Entry)
+    WHERE entry.PDB_REV_DATE STARTS WITH '2025'
+    RETURN entry.ID as PDB_ID,
+        entry.TITLE as Title,
+        entry.PDB_REV_DATE as Release_Date,
+        entry.RESOLUTION as Resolution,
+        entry.METHOD as Experimental_Method,
+        entry.STATUS_CODE as Status
+    ORDER BY entry.PDB_REV_DATE DESC
+    (Additional example queries follow the same format...)
+    """,
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+            annotations=types.ToolAnnotations(
+                title="Get PDBe Graph Example Queries",
+                destructiveHint=False,
+                readOnlyHint=True,
+                idempotentHint=True,
+            ),
+        )
+
     def _get_graph_schema(self) -> dict[str, Any]:
         """
         Retrieve the PDBe graph schema from the remote server and return it as a dictionary.
+        Supports both HTTP(S) URLs and local file paths.
         """
-        return HTTPClient.get(str(conf.graph.schema_url))
+        if conf.graph.schema_url.startswith("file://"):
+            file_path = conf.graph.schema_url[len("file://") :]
+            with open(file_path, "r", encoding="utf-8") as f:
+                import json
+
+                return json.load(f)
+        else:
+            return HTTPClient.get(str(conf.graph.schema_url))
 
     def get_nodes(self) -> list[dict[str, Any]]:
         """
@@ -222,3 +264,15 @@ class GraphTools:
             if edge.get("label") == edge_label:
                 return edge
         return None
+
+    def format_example_queries(self) -> str:
+        """
+        Format example queries as a string for LLM or human-readable output.
+
+        Returns:
+            A formatted string listing example queries.
+        """
+        return "\n\n".join(
+            f"Question: {query.get('query', '')}\nQuery:\n{query.get('description', '')}"
+            for query in self.graph_schema.get("examples", [])
+        )

@@ -212,3 +212,72 @@ class TestGraphTools:
         assert "relationship" in tool.description.lower()
         assert tool.inputSchema["type"] == "object"
         assert tool.inputSchema["additionalProperties"] is False
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_example_queries(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test formatting example queries."""
+        schema_with_examples = {
+            **mock_graph_schema,
+            "examples": [
+                {
+                    "query": "Find all structures",
+                    "description": "MATCH (s:Structure) RETURN s",
+                },
+                {
+                    "query": "Find ligands",
+                    "description": "MATCH (l:Ligand) RETURN l",
+                },
+            ],
+        }
+        mock_get.return_value = schema_with_examples
+
+        tools = GraphTools()
+        formatted = tools.format_example_queries()
+
+        assert "Question: Find all structures" in formatted
+        assert "Query:\nMATCH (s:Structure) RETURN s" in formatted
+        assert "Question: Find ligands" in formatted
+        assert "Query:\nMATCH (l:Ligand) RETURN l" in formatted
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_example_queries_empty(self, mock_get: MagicMock) -> None:
+        """Test formatting example queries when no examples exist."""
+        schema = {"nodes": [], "edges": [], "examples": []}
+        mock_get.return_value = schema
+
+        tools = GraphTools()
+        formatted = tools.format_example_queries()
+
+        assert formatted == ""
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_example_queries_no_examples_key(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test formatting example queries when examples key is missing."""
+        mock_get.return_value = {
+            k: v for k, v in mock_graph_schema.items() if k != "examples"
+        }
+
+        tools = GraphTools()
+        formatted = tools.format_example_queries()
+
+        assert formatted == ""
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_get_pdbe_graph_example_queries_tool(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test getting the graph example queries MCP tool."""
+        mock_get.return_value = mock_graph_schema
+
+        tools = GraphTools()
+        tool = tools.get_pdbe_graph_example_queries_tool()
+
+        assert tool.name == "pdbe_graph_example_queries"
+        assert tool.description is not None
+        assert "cypher" in tool.description.lower()
+        assert tool.inputSchema["type"] == "object"
+        assert tool.inputSchema["additionalProperties"] is False
