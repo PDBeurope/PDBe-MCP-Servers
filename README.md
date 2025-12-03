@@ -197,6 +197,21 @@ Common searchable fields include:
 Use `get_search_schema` to discover all available fields and their descriptions.
 
 ## Development and Advanced Usage
+### Docker (single container with Nginx)
+
+Build and run all three MCP servers behind Nginx using the included Dockerfile:
+
+```bash
+docker build -t pdbe-mcp-servers:latest .
+docker run --rm -p 8080:8080 pdbe-mcp-servers:latest
+```
+
+Endpoints:
+- `http://localhost:8080/api/sse` and `http://localhost:8080/api/messages/`
+- `http://localhost:8080/graph/sse` and `http://localhost:8080/graph/messages/`
+- `http://localhost:8080/search/sse` and `http://localhost:8080/search/messages/`
+- Health: `http://localhost:8080/health`
+
 
 ### Development Installation
 

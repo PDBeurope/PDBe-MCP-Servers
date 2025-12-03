@@ -164,6 +164,12 @@ def main(port: int, transport: str, server_type: str) -> int:
 
         sse = SseServerTransport("/messages/")
 
+        root_paths = {
+            "pdbe_api_server": "/api",
+            "pdbe_graph_server": "/graph",
+            "pdbe_search_server": "/search",
+        }
+
         async def handle_sse(request):
             async with sse.connect_sse(
                 request.scope,
@@ -183,7 +189,9 @@ def main(port: int, transport: str, server_type: str) -> int:
             ],
         )
 
-        uvicorn.run(starlette_app, host="0.0.0.0", port=port)
+        uvicorn.run(
+            starlette_app, host="0.0.0.0", port=port, root_path=root_paths[server_type]
+        )
 
     else:
         from mcp.server.stdio import stdio_server
