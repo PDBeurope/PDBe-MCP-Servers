@@ -184,7 +184,7 @@ def main(port: int, transport: str, server_type: str) -> int:
         starlette_app = Starlette(
             debug=True,
             routes=[
-                Route("/sse", endpoint=handle_sse, methods=["GET"]),
+                Route("/sse", endpoint=handle_sse, methods=["GET", "POST"]),
                 Mount("/messages/", app=sse.handle_post_message),
             ],
         )
