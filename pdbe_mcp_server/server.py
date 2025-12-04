@@ -1,3 +1,4 @@
+import os
 from typing import Any, Callable, Sequence
 
 import anyio
@@ -15,6 +16,8 @@ search_tools: SearchTools = SearchTools()
 graph_tools: GraphTools = GraphTools()
 
 conf: DictConfig = get_config()
+
+ROOT_PREFIX = os.getenv("ROOT_PREFIX", "")
 
 
 class MCPServerFactory:
@@ -165,9 +168,9 @@ def main(port: int, transport: str, server_type: str) -> int:
         sse = SseServerTransport("/messages/")
 
         root_paths = {
-            "pdbe_api_server": "/api",
-            "pdbe_graph_server": "/graph",
-            "pdbe_search_server": "/search",
+            "pdbe_api_server": f"{ROOT_PREFIX}/api",
+            "pdbe_graph_server": f"{ROOT_PREFIX}/graph",
+            "pdbe_search_server": f"{ROOT_PREFIX}/search",
         }
 
         async def handle_sse(request):
