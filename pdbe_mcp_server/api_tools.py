@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Any
 from urllib.parse import urljoin
 
@@ -253,25 +254,34 @@ class OpenAPIToMCPGenerator:
             if param_name in arguments:
                 path_params[param_name] = arguments[param_name]
 
-        try:
-            if tool_info["method"] == "GET":
-                data = HTTPClient.get(full_url)
-            elif tool_info["method"] == "POST":
-                data = HTTPClient.post(full_url)
-            else:
-                # unsupported method, raise an error
-                raise ValueError(f"Unsupported method: {tool_info['method']}")
+        last_error: requests.RequestException | None = None
+        data = None
+        for attempt in range(3):
+            try:
+                if tool_info["method"] == "GET":
+                    data = HTTPClient.get(full_url)
+                elif tool_info["method"] == "POST":
+                    data = HTTPClient.post(full_url)
+                else:
+                    # unsupported method, raise an error
+                    raise ValueError(f"Unsupported method: {tool_info['method']}")
+                last_error = None
+                break
+            except requests.RequestException as e:
+                last_error = e
+                if attempt < 2:
+                    time.sleep(0.5)
 
-            result_text = json.dumps(data, indent=2)
-            return [types.TextContent(type="text", text=result_text)]
-
-        except requests.RequestException as e:
-            error_message = f"API request failed: {e}"
-            if hasattr(e, "response") and e.response is not None:
-                error_message += f"\nStatus Code: {e.response.status_code}"
-                error_message += f"\nResponse: {e.response.text}"
+        if last_error is not None:
+            error_message = f"API request failed: {last_error}"
+            if hasattr(last_error, "response") and last_error.response is not None:
+                error_message += f"\nStatus Code: {last_error.response.status_code}"
+                error_message += f"\nResponse: {last_error.response.text}"
 
             return [types.TextContent(type="text", text=error_message)]
+
+        result_text = json.dumps(data, indent=2)
+        return [types.TextContent(type="text", text=result_text)]
 
 
 def create_mcp_tools_from_openapi(
