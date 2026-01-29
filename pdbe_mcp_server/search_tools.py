@@ -1,3 +1,4 @@
+import time
 from typing import Any
 
 import mcp.types as types
@@ -117,9 +118,21 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
         if filters:
             fields["fl"] = ",".join(filters)
 
-        data = HTTPClient.get(conf.search.search_api, params=fields)
+        last_error: Exception | None = None
+        data = None
+        for attempt in range(3):
+            try:
+                data = HTTPClient.get(conf.search.search_api, params=fields)
+                last_error = None
+                break
+            except Exception as exc:
+                last_error = exc
+                if attempt < 2:
+                    time.sleep(0.5)
+        if last_error is not None:
+            raise last_error
 
-        if "response" not in data:
+        if data is None or "response" not in data:
             raise Exception("Invalid response from search service")
         # Extract the relevant information from the response
         response = data["response"]
