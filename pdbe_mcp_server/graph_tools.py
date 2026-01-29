@@ -273,6 +273,6 @@ class GraphTools:
             A formatted string listing example queries.
         """
         return "\n\n".join(
-            f"Question: {query.get('query', '')}\nQuery:\n{query.get('description', '')}"
+            f"Question: {query.get('description', '')}\nQuery:\n{query.get('query', '')}"
             for query in self.graph_schema.get("examples", [])
         )
