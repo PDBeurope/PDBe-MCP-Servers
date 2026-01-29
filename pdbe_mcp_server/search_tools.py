@@ -132,7 +132,7 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
         if last_error is not None:
             raise last_error
 
-        if "response" not in data:
+        if data is None or "response" not in data:
             raise Exception("Invalid response from search service")
         # Extract the relevant information from the response
         response = data["response"]
