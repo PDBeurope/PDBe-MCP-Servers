@@ -222,12 +222,12 @@ class TestGraphTools:
             **mock_graph_schema,
             "examples": [
                 {
-                    "query": "Find all structures",
-                    "description": "MATCH (s:Structure) RETURN s",
+                    "description": "Find all structures",
+                    "query": "MATCH (s:Structure) RETURN s",
                 },
                 {
-                    "query": "Find ligands",
-                    "description": "MATCH (l:Ligand) RETURN l",
+                    "description": "Find ligands",
+                    "query": "MATCH (l:Ligand) RETURN l",
                 },
             ],
         }
