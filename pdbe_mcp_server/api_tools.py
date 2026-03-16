@@ -1,4 +1,6 @@
 import json
+import logging
+import os
 import time
 from typing import Any
 from urllib.parse import urljoin
@@ -10,7 +12,13 @@ from omegaconf import DictConfig
 from pdbe_mcp_server import get_config
 from pdbe_mcp_server.utils import HTTPClient
 
+logger = logging.getLogger(__name__)
+
 conf: DictConfig = get_config()
+
+
+def _toon_enabled() -> bool:
+    return os.getenv("TOON_ENABLED", "false").lower() == "true"
 
 
 class OpenAPIToMCPGenerator:
@@ -280,7 +288,20 @@ class OpenAPIToMCPGenerator:
 
             return [types.TextContent(type="text", text=error_message)]
 
-        result_text = json.dumps(data, indent=2)
+        if _toon_enabled():
+            try:
+                import toon
+
+                result_text = toon.encode(data)
+                if not isinstance(result_text, str):
+                    result_text = str(result_text)
+            except Exception as e:
+                logger.warning("TOON encoding failed, falling back to JSON: %s", e)
+                result_text = "TOON failed; JSON fallback:\n" + json.dumps(
+                    data, indent=2
+                )
+        else:
+            result_text = json.dumps(data, indent=2)
         return [types.TextContent(type="text", text=result_text)]
 
 
