@@ -270,6 +270,15 @@ The MCP Inspector provides an interactive interface to browse tools, test querie
 - **stdio**: Default mode - Optimal for direct client integration like Claude Desktop
 - **SSE (Server-Sent Events)**: `--transport sse` - Best for web-based clients and development
 
+#### Experimental TOON Output
+
+You can enable experimental TOON-formatted output for PDBe API tool responses by setting
+the environment variable `TOON_ENABLED=true`.
+See the TOON format specification at https://toonformat.dev/.
+
+- If TOON encoding fails for any reason, the server falls back to JSON output.
+- This feature is experimental and intended for opt-in usage only.
+
 ## Troubleshooting
 
 ### Common Issues
