@@ -281,3 +281,90 @@ class TestGraphTools:
         assert "cypher" in tool.description.lower()
         assert tool.inputSchema["type"] == "object"
         assert tool.inputSchema["additionalProperties"] is False
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_get_pdbe_run_cypher_query_tool(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test getting the run Cypher query MCP tool."""
+        mock_get.return_value = mock_graph_schema
+
+        tools = GraphTools()
+        tool = tools.get_pdbe_run_cypher_query_tool()
+
+        assert tool.name == "pdbe_run_cypher_query"
+        assert tool.description is not None
+        assert "MATCH" in tool.description or "cypher" in tool.description.lower()
+        assert tool.inputSchema["type"] == "object"
+        assert tool.inputSchema["additionalProperties"] is False
+        assert "cypher_query" in tool.inputSchema.get("properties", {})
+        assert "cypher_query" in tool.inputSchema.get("required", [])
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_validate_cypher_query_valid_match(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test query validation with valid MATCH queries."""
+        from pdbe_mcp_server.graph_tools import _validate_cypher_query
+
+        valid_queries = [
+            "MATCH (s:Structure) RETURN s",
+            "OPTIONAL MATCH (s:Structure) WHERE s.pdb_id = '1abc' RETURN s",
+            "MATCH (s:Structure)-[:HAS_LIGAND]->(l:Ligand) RETURN s, l",
+            "CALL { MATCH (s:Structure) RETURN s } RETURN s",
+        ]
+
+        for query in valid_queries:
+            is_valid, error = _validate_cypher_query(query)
+            assert is_valid, f"Query should be valid: {query}"
+            assert error is None
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_validate_cypher_query_invalid_merge(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test query validation rejects MERGE queries."""
+        from pdbe_mcp_server.graph_tools import _validate_cypher_query
+
+        is_valid, error = _validate_cypher_query("MERGE (s:Structure {id: 1})")
+        assert not is_valid
+        assert error is not None
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_validate_cypher_query_invalid_create(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test query validation rejects CREATE queries."""
+        from pdbe_mcp_server.graph_tools import _validate_cypher_query
+
+        is_valid, error = _validate_cypher_query(
+            "CREATE (s:Structure {id: 1}) RETURN s"
+        )
+        assert not is_valid
+        assert error is not None
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_validate_cypher_query_invalid_delete(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test query validation rejects DELETE queries."""
+        from pdbe_mcp_server.graph_tools import _validate_cypher_query
+
+        is_valid, error = _validate_cypher_query(
+            "MATCH (s:Structure) DELETE s"
+        )
+        assert not is_valid
+        assert error is not None
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_validate_cypher_query_invalid_set(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test query validation rejects SET queries."""
+        from pdbe_mcp_server.graph_tools import _validate_cypher_query
+
+        is_valid, error = _validate_cypher_query(
+            "MATCH (s:Structure) SET s.title = 'New Title'"
+        )
+        assert not is_valid
+        assert error is not None
