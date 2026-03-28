@@ -1,7 +1,7 @@
 import logging
 import os
 import re
-from typing import Any
+from typing import Any, LiteralString
 
 import mcp.types as types
 from omegaconf import DictConfig
@@ -502,7 +502,7 @@ class GraphTools:
         except Exception as e:
             raise RuntimeError(f"Failed to create Neo4j driver: {e}") from e
 
-    def execute_cypher_query(self, query: str) -> str:
+    def execute_cypher_query(self, query: LiteralString) -> str:
         """
         Execute a Cypher query against the Neo4j database.
 
