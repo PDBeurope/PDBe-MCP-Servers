@@ -467,7 +467,7 @@ class GraphTools:
             RuntimeError: If Neo4j is not configured or neo4j driver is not installed.
         """
         try:
-            from neo4j import Driver, GraphDatabase
+            from neo4j import GraphDatabase
 
             config = self._get_neo4j_config()
 
