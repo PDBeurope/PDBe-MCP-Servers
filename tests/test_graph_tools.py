@@ -350,9 +350,7 @@ class TestGraphTools:
         """Test query validation rejects DELETE queries."""
         from pdbe_mcp_server.graph_tools import _validate_cypher_query
 
-        is_valid, error = _validate_cypher_query(
-            "MATCH (s:Structure) DELETE s"
-        )
+        is_valid, error = _validate_cypher_query("MATCH (s:Structure) DELETE s")
         assert not is_valid
         assert error is not None
 
