@@ -156,6 +156,44 @@ The PDBe Search Server provides powerful querying capabilities through the PDBe 
 
 ### Available Tools
 
+#### `pdbe_graph_nodes`
+Retrieves metadata about all node types (labels) defined in the PDBe graph database schema. Use this to understand the different types of entities and their properties.
+
+**Example usage:**
+```
+"Show me all node types in the PDBe graph database"
+```
+
+#### `pdbe_graph_edges`
+Retrieves metadata about all relationship types (edges) defined in the PDBe graph database schema. Use this to understand how entities are connected.
+
+**Example usage:**
+```
+"Show me all relationship types in the PDBe graph database"
+```
+
+#### `pdbe_graph_example_queries`
+Retrieves example Cypher queries that demonstrate how to interact with the PDBe graph database.
+
+**Example usage:**
+```
+"Give me example Cypher queries for exploring the PDBe graph"
+```
+
+#### `pdbe_run_cypher_query`
+Execute custom read-only Cypher queries against a Neo4j graph database. Only available when Neo4j environment variables are configured.
+
+**Parameters:**
+- `cypher_query` (required): The Cypher query to execute. Only MATCH and OPTIONAL MATCH queries are allowed.
+
+**Example usage:**
+```
+"Execute query: MATCH (s:Structure) WHERE s.PDB_ID = '1abc' RETURN s.TITLE as title"
+"Find ligands: MATCH (s:Structure)-[:HAS_LIGAND]->(l:Ligand) WHERE s.PDB_ID = '1abc' RETURN l.name"
+```
+
+> **Note:** Write operations (MERGE, CREATE, DELETE, REMOVE, SET, LOAD CSV, FOREACH) are blocked for safety.
+
 #### `get_search_schema`
 Retrieves the complete Solr search schema showing all available fields, data types, and descriptions. Use this to understand what fields you can search and filter on.
 
@@ -254,6 +292,29 @@ uvx pdbe-mcp-server --server-type pdbe_graph_server --transport sse
 uv run pdbe-mcp-server --server-type pdbe_graph_server --transport sse
 ```
 
+### Neo4j Cypher Query Support
+
+This server supports executing custom Cypher queries against a Neo4j graph database. The `pdbe_run_cypher_query` tool is only available when the following environment variables are set:
+
+- `NEO4J_URL`: The Neo4j database URL (e.g., `bolt://localhost:7687`)
+- `NEO4J_USERNAME`: The Neo4j username
+- `NEO4J_PASSWORD`: The Neo4j password
+- `NEO4J_DATABASE` (optional): The database name. When set, this is passed to the Neo4j driver for Neo4j 4+. For Neo4j 3.5 compatibility, omit this variable to use the default database.
+
+To use this feature, install the neo4j driver:
+```bash
+pip install neo4j
+```
+
+**Security:** Only read-only queries are allowed (MATCH, OPTIONAL MATCH). Write operations (MERGE, CREATE, DELETE, REMOVE, SET, LOAD CSV, FOREACH) are blocked to prevent accidental data modification.
+
+**Example usage:**
+```
+Execute query: MATCH (s:Structure) WHERE s.PDB_ID = '1abc' RETURN s.PDB_ID as id, s.TITLE as title
+```
+
+The tool response is formatted as JSON by default, but can be converted to TOON format by setting `TOON_ENABLED=true`.
+
 #### PDBe Search Server
 Provides advanced Solr-based search and analytics capabilities:
 
@@ -284,6 +345,15 @@ The MCP Inspector provides an interactive interface to browse tools, test querie
 
 - **stdio**: Default mode - Optimal for direct client integration like Claude Desktop
 - **SSE (Server-Sent Events)**: `--transport sse` - Best for web-based clients and development
+
+#### Experimental TOON Output
+
+You can enable experimental TOON-formatted output for PDBe API tool responses by setting
+the environment variable `TOON_ENABLED=true`.
+See the TOON format specification at https://toonformat.dev/.
+
+- If TOON encoding fails for any reason, the server falls back to JSON output.
+- This feature is experimental and intended for opt-in usage only.
 
 ## Troubleshooting
 

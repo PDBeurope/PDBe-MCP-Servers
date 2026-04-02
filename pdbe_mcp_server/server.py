@@ -68,11 +68,19 @@ def build_graph_server() -> Server:
 
     @graph_server.list_tools()
     async def list_tools() -> list[types.Tool]:
-        return [
+        tools = [
             graph_tools.get_pdbe_graph_nodes_tool(),
             graph_tools.get_pdbe_graph_edges_tool(),
             graph_tools.get_pdbe_graph_example_queries_tool(),
         ]
+
+        # Add the cypher query tool only if Neo4j is configured
+        from pdbe_mcp_server.graph_tools import _neo4j_enabled
+
+        if _neo4j_enabled():
+            tools.append(graph_tools.get_pdbe_run_cypher_query_tool())
+
+        return tools
 
     @graph_server.call_tool()
     async def call_tool(
@@ -88,6 +96,30 @@ def build_graph_server() -> Server:
                     text=graph_tools.format_example_queries(), type="text"
                 )
             ]
+        elif name == "pdbe_run_cypher_query":
+            if not graph_tools:
+                return [
+                    types.TextContent(
+                        type="text",
+                        text="Cypher query tool not available: Neo4j configuration is missing",
+                    )
+                ]
+
+            cypher_query = arguments.get("cypher_query", "")
+            if not cypher_query:
+                return [
+                    types.TextContent(
+                        type="text", text="Error: cypher_query parameter is required"
+                    )
+                ]
+
+            try:
+                result = graph_tools.execute_cypher_query(cypher_query)
+                return [types.TextContent(type="text", text=result)]
+            except ValueError as e:
+                return [types.TextContent(type="text", text=str(e))]
+            except RuntimeError as e:
+                return [types.TextContent(type="text", text=str(e))]
         else:
             raise ValueError(f"Unknown tool name: {name}")
 

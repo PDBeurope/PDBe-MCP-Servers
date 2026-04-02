@@ -1,4 +1,7 @@
 import json
+import logging
+import os
+import time
 from typing import Any
 from urllib.parse import urljoin
 
@@ -9,7 +12,13 @@ from omegaconf import DictConfig
 from pdbe_mcp_server import get_config
 from pdbe_mcp_server.utils import HTTPClient
 
+logger = logging.getLogger(__name__)
+
 conf: DictConfig = get_config()
+
+
+def _toon_enabled() -> bool:
+    return os.getenv("TOON_ENABLED", "false").lower() == "true"
 
 
 class OpenAPIToMCPGenerator:
@@ -253,25 +262,47 @@ class OpenAPIToMCPGenerator:
             if param_name in arguments:
                 path_params[param_name] = arguments[param_name]
 
-        try:
-            if tool_info["method"] == "GET":
-                data = HTTPClient.get(full_url)
-            elif tool_info["method"] == "POST":
-                data = HTTPClient.post(full_url)
-            else:
-                # unsupported method, raise an error
-                raise ValueError(f"Unsupported method: {tool_info['method']}")
+        last_error: requests.RequestException | None = None
+        data = None
+        for attempt in range(3):
+            try:
+                if tool_info["method"] == "GET":
+                    data = HTTPClient.get(full_url)
+                elif tool_info["method"] == "POST":
+                    data = HTTPClient.post(full_url)
+                else:
+                    # unsupported method, raise an error
+                    raise ValueError(f"Unsupported method: {tool_info['method']}")
+                last_error = None
+                break
+            except requests.RequestException as e:
+                last_error = e
+                if attempt < 2:
+                    time.sleep(0.5)
 
-            result_text = json.dumps(data, indent=2)
-            return [types.TextContent(type="text", text=result_text)]
-
-        except requests.RequestException as e:
-            error_message = f"API request failed: {e}"
-            if hasattr(e, "response") and e.response is not None:
-                error_message += f"\nStatus Code: {e.response.status_code}"
-                error_message += f"\nResponse: {e.response.text}"
+        if last_error is not None:
+            error_message = f"API request failed: {last_error}"
+            if hasattr(last_error, "response") and last_error.response is not None:
+                error_message += f"\nStatus Code: {last_error.response.status_code}"
+                error_message += f"\nResponse: {last_error.response.text}"
 
             return [types.TextContent(type="text", text=error_message)]
+
+        if _toon_enabled():
+            try:
+                import toon
+
+                result_text = toon.encode(data)
+                if not isinstance(result_text, str):
+                    result_text = str(result_text)
+            except Exception as e:
+                logger.warning("TOON encoding failed, falling back to JSON: %s", e)
+                result_text = "TOON failed; JSON fallback:\n" + json.dumps(
+                    data, indent=2
+                )
+        else:
+            result_text = json.dumps(data, indent=2)
+        return [types.TextContent(type="text", text=result_text)]
 
 
 def create_mcp_tools_from_openapi(

@@ -157,6 +157,53 @@ class TestOpenAPIToMCPGenerator:
         assert "success" in result[0].text
         assert "test_data" in result[0].text
 
+    @patch("toon.encode")
+    @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
+    def test_call_tool_toon_success(
+        self,
+        mock_get: MagicMock,
+        mock_encode: MagicMock,
+        mock_openapi_spec: dict[str, Any],
+    ) -> None:
+        """Test TOON encoding success path."""
+        mock_get.side_effect = [mock_openapi_spec, {"result": "success"}]
+        mock_encode.return_value = "TOON_DATA"
+
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+        generator.list_tools()
+
+        with patch.dict("os.environ", {"TOON_ENABLED": "true"}):
+            result = generator.call_tool("get_test", {"id": "test123"})
+
+        assert len(result) == 1
+        assert result[0].type == "text"
+        assert result[0].text == "TOON_DATA"
+        mock_encode.assert_called_once()
+
+    @patch("toon.encode")
+    @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
+    def test_call_tool_toon_fallback_to_json(
+        self,
+        mock_get: MagicMock,
+        mock_encode: MagicMock,
+        mock_openapi_spec: dict[str, Any],
+    ) -> None:
+        """Test TOON encoding failure falls back to JSON."""
+        mock_get.side_effect = [mock_openapi_spec, {"result": "success"}]
+        mock_encode.side_effect = Exception("TOON failed")
+
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+        generator.list_tools()
+
+        with patch.dict("os.environ", {"TOON_ENABLED": "true"}):
+            result = generator.call_tool("get_test", {"id": "test123"})
+
+        assert len(result) == 1
+        assert result[0].type == "text"
+        assert "TOON failed; JSON fallback" in result[0].text
+        assert '"result": "success"' in result[0].text
+        mock_encode.assert_called_once()
+
     @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
     def test_call_tool_unknown_tool(
         self, mock_get: MagicMock, mock_openapi_spec: dict[str, Any]
@@ -196,7 +243,7 @@ class TestOpenAPIToMCPGenerator:
         error = requests.RequestException("Server Error")
         error.response = mock_response
 
-        mock_get.side_effect = [mock_openapi_spec, error]
+        mock_get.side_effect = [mock_openapi_spec, error, error, error]
 
         generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
         generator.list_tools()
@@ -210,6 +257,7 @@ class TestOpenAPIToMCPGenerator:
         assert isinstance(result[0], TextContent)
         assert "API request failed" in result[0].text
         assert "500" in result[0].text
+        assert mock_get.call_count == 4
 
     def test_extract_parameters(self) -> None:
         """Test parameter extraction."""
