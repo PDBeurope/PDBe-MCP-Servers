@@ -1,7 +1,12 @@
 import logging
 import os
 import re
-from typing import Any, LiteralString
+from typing import Any
+
+try:
+    from typing import LiteralString
+except ImportError:
+    from typing_extensions import LiteralString
 
 import mcp.types as types
 from omegaconf import DictConfig
@@ -12,6 +17,26 @@ from pdbe_mcp_server.utils import HTMLStripper, HTTPClient
 logger = logging.getLogger(__name__)
 
 conf: DictConfig = get_config()
+
+# Pre-compiled regular expressions
+_WRITE_PATTERN = re.compile(
+    r"\b(MERGE|CREATE|DELETE|REMOVE|SET|ADD|LOAD\s+CSV|FOREACH)\b", re.IGNORECASE
+)
+
+_ALLOWED_START_PATTERN = re.compile(
+    r"^(?:MATCH|OPTIONAL\s+MATCH|CALL\s*\{[^}]*\})", re.IGNORECASE
+)
+
+_WRITE_KEYWORDS = [
+    "MERGE",
+    "CREATE",
+    "DELETE",
+    "REMOVE",
+    "SET",
+    "ADD",
+    "LOAD CSV",
+    "FOREACH",
+]
 
 
 def _get_neo4j_config_from_env() -> dict[str, str] | None:
@@ -46,12 +71,12 @@ def _neo4j_enabled() -> bool:
 
 def _toon_enabled() -> bool:
     """Check if TOON output is enabled."""
-    return os.getenv("TOON_ENABLED", "false").lower() == "true"
+    return os.getenv("TOON_ENABLED", "").lower() in ("true", "1", "yes")
 
 
 def _validate_cypher_query(query: str) -> tuple[bool, str | None]:
     """
-    Validate a Cypher query to ensure it is read-only (no write, delete, or update operations).
+    Validate a Cypher query to ensure it is read-only.
 
     Args:
         query: The Cypher query to validate.
@@ -59,70 +84,37 @@ def _validate_cypher_query(query: str) -> tuple[bool, str | None]:
     Returns:
         Tuple of (is_valid, error_message). If valid, error_message is None.
     """
-    # Normalize the query: remove comments, extra whitespace, convert to uppercase for matching
+    # Remove comments and normalize whitespace
+    # //, /* */
     normalized = re.sub(r"/\*.*?\*/", "", query, flags=re.DOTALL)
+    normalized = re.sub(r"//.*$", "", normalized, flags=re.MULTILINE)
     normalized = re.sub(r"--.*$", "", normalized, flags=re.MULTILINE)
-    normalized = " ".join(normalized.upper().split())
+    normalized = " ".join(normalized.split())
 
-    # Cypher keywords that indicate write, delete, or update operations
-    write_patterns = [
-        r"\bMERGE\b",
-        r"\bCREATE\b",
-        r"\bDELETE\b",
-        r"\bREMOVE\b",
-        r"\bSET\b",
-        r"\bADD\b",
-        r"\bREMOVE\b",
-        r"\bSET\b",
-        r"\bSET\s+[A-Za-z_][A-Za-z0-9_]*\s+=",
-        r"\bMATCH\b.*\bMERGE\b",
-        r"\bMERGE\b.*\bSET\b",
-        r"\bCREATE\b.*\bSET\b",
-        r"\bWITH\b.*\bMERGE\b",
-        r"\bWITH\b.*\bCREATE\b",
-        r"\bWITH\b.*\bDELETE\b",
-        r"\bWITH\b.*\bSET\b",
-        r"\bLOAD\s+CSV\b",
-        r"\bFOREACH\b",
-        r"\bREMOVE\b\b",
-    ]
-
-    for pattern in write_patterns:
-        if re.search(pattern, normalized):
-            return (
-                False,
-                f"Query contains potentially destructive operation (detected pattern: {pattern})",
-            )
-
-    # Additional check: allow only MATCH, OPTIONAL MATCH, CALL {MATCH ...}, RETURN
-    # This is a safer approach - only allow queries that start with these read operations
-    allowed_starts = [
-        r"^(?:MATCH|OPTIONAL\s+MATCH|CALL\s*\{[^}]*\})",
-    ]
-
-    # Check if query matches allowed patterns
-    has_allowed_pattern = any(re.search(p, normalized) for p in allowed_starts)
-
-    # Additional check: if query contains write keywords after MATCH, it might be dangerous
-    # This catches patterns like "MATCH ... RETURN ... MERGE"
-    write_keywords = ["MERGE", "CREATE", "DELETE", "REMOVE", "SET"]
-    if has_allowed_pattern:
-        # Check if any write operation appears after the initial MATCH/MATCH+CALL
-        parts = re.split(r"\bRETURN\b", normalized, flags=re.IGNORECASE)
-        if len(parts) > 1:
-            # Everything after RETURN is part of RETURN clause, check the rest
-            pre_return = parts[0]
-            for keyword in write_keywords:
-                if re.search(rf"\b{keyword}\b", pre_return, re.IGNORECASE):
-                    return (
-                        False,
-                        f"Query contains potentially destructive operation ({keyword}) after MATCH",
-                    )
-    elif not has_allowed_pattern:
+    # Check for any write operations
+    if _WRITE_PATTERN.search(normalized):
         return (
             False,
-            "Query does not start with allowed read operation (MATCH, OPTIONAL MATCH, or CALL)",
+            "Query contains potentially destructive operation",
         )
+
+    # Verify query starts with allowed read operation
+    if not _ALLOWED_START_PATTERN.search(normalized):
+        return (
+            False,
+            "Query must start with MATCH, OPTIONAL MATCH, or CALL",
+        )
+
+    # Additional check: ensure no write operations after RETURN
+    if "RETURN" in normalized.upper():
+        return_parts = re.split(r"\bRETURN\b", normalized, flags=re.IGNORECASE)
+        pre_return = return_parts[0]
+        for keyword in _WRITE_KEYWORDS:
+            if re.search(rf"\b{keyword}\b", pre_return, re.IGNORECASE):
+                return (
+                    False,
+                    f"Query contains destructive operation '{keyword}' before RETURN",
+                )
 
     return True, None
 
@@ -132,14 +124,25 @@ class GraphTools:
     A class to handle PDBe graph-related operations.
     """
 
+    WRITE_OPERATIONS = frozenset(_WRITE_KEYWORDS)
+
     def __init__(self) -> None:
         """
         Initialize the GraphTools object, load the graph schema, and prepare node and edge lists.
+        Also initializes the Neo4j driver for reuse across all tool calls.
         """
         self.graph_schema: dict[str, Any] = self._get_graph_schema()
         self.node_dict: dict[Any, str] = {}
         self.nodes: list[dict[str, Any]] = self.get_nodes()
         self.edges: list[dict[str, Any]] = self.get_edges()
+
+        # Initialize Neo4j driver once for reuse
+        self._neo4j_driver: Any = None
+
+    @property
+    def neo4j_enabled(self) -> bool:
+        """Check if Neo4j is configured."""
+        return _neo4j_enabled()
 
     def get_pdbe_graph_nodes_tool(self) -> types.Tool:
         return types.Tool(
@@ -275,7 +278,7 @@ class GraphTools:
                 "properties": {
                     "cypher_query": {
                         "type": "string",
-                        "description": "The Cypher query to execute. Only MATCH and OPTIONAL MATCH queries are allowed. MERGE, CREATE, DELETE, REMOVE, SET, LOAD CSV, and FOREACH operations are not permitted.",
+                        "description": "The Cypher query to execute. Only read-only operations are allowed.",
                     }
                 },
                 "required": ["cypher_query"],
@@ -294,14 +297,16 @@ class GraphTools:
         Retrieve the PDBe graph schema from the remote server and return it as a dictionary.
         Supports both HTTP(S) URLs and local file paths.
         """
-        if conf.graph.schema_url.startswith("file://"):
-            file_path = conf.graph.schema_url[len("file://") :]
+        schema_url = conf.graph.schema_url
+
+        if schema_url.startswith("file://"):
+            file_path = schema_url[len("file://") :]
             with open(file_path, "r", encoding="utf-8") as f:
                 import json
 
                 return json.load(f)
         else:
-            return HTTPClient.get(str(conf.graph.schema_url))
+            return HTTPClient.get(str(schema_url))
 
     def get_nodes(self) -> list[dict[str, Any]]:
         """
@@ -321,7 +326,8 @@ class GraphTools:
             nodes.append(node)
 
             # store the node label in a dictionary for quick access
-            self.node_dict[node.get("id")] = node["label"]
+            if node.get("id"):
+                self.node_dict[node["id"]] = node.get("label", "Unknown")
 
         return nodes
 
@@ -453,9 +459,10 @@ class GraphTools:
             )
         return config
 
-    def _get_neo4j_driver(self):
+    def _get_neo4j_driver(self) -> Any:
         """
         Get a Neo4j driver instance, compatible with both Neo4j 3.5 and 4.x+.
+        This driver is reused across all tool calls to improve performance.
 
         Neo4j 3.5: Uses `GraphDatabase.driver(url, auth=...)` without database parameter
         Neo4j 4.0+: Uses `GraphDatabase.driver(url, auth=..., database=...)` with database parameter
@@ -466,6 +473,9 @@ class GraphTools:
         Raises:
             RuntimeError: If Neo4j is not configured or neo4j driver is not installed.
         """
+        if self._neo4j_driver is not None:
+            return self._neo4j_driver
+
         try:
             from neo4j import GraphDatabase
 
@@ -479,9 +489,9 @@ class GraphTools:
                 }
                 if "neo4j_database" in config:
                     driver_kwargs["database"] = config["neo4j_database"]
-                driver = GraphDatabase.driver(**driver_kwargs)
-                # Driver is lazily validated on first use
-                return driver
+
+                self._neo4j_driver = GraphDatabase.driver(**driver_kwargs)
+                return self._neo4j_driver
             except TypeError as e:
                 # Neo4j 3.5 doesn't accept 'database' parameter
                 if "database" not in str(e).lower():
@@ -491,10 +501,11 @@ class GraphTools:
                     "Neo4j 3.5 detected (no database parameter support). "
                     "Using default database. If this is Neo4j 4+, consider setting NEO4J_DATABASE=neo4j"
                 )
-                return GraphDatabase.driver(
+                self._neo4j_driver = GraphDatabase.driver(
                     config["neo4j_url"],
                     auth=(config["neo4j_username"], config["neo4j_password"]),
                 )
+                return self._neo4j_driver
         except ImportError as e:
             raise RuntimeError(
                 "neo4j driver is not installed. Please install it with: pip install neo4j"
@@ -563,6 +574,27 @@ class GraphTools:
         except Exception as e:
             logger.error("Neo4j query execution failed: %s", e)
             raise RuntimeError(f"Neo4j query execution failed: {e}") from e
-        finally:
-            if driver:
-                driver.close()
+
+    def close(self):
+        """
+        Close the Neo4j driver connection.
+        """
+        if self._neo4j_driver is not None:
+            try:
+                self._neo4j_driver.close()
+            except Exception:
+                logger.warning("Error closing Neo4j driver", exc_info=True)
+            finally:
+                self._neo4j_driver = None
+
+    def __del__(self) -> None:
+        """Cleanup on destruction."""
+        self.close()
+
+    def __enter__(self) -> "GraphTools":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager, ensuring cleanup."""
+        self.close()
