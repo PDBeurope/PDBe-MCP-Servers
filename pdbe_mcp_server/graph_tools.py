@@ -47,14 +47,14 @@ def _get_neo4j_config_from_env() -> dict[str, str] | None:
         Dictionary with neo4j_url, neo4j_username, neo4j_password, and neo4j_database,
         or None if not all required variables are set.
     """
-    neo4j_url = os.getenv("NEO4J_URL")
+    neo4j_uri = os.getenv("NEO4J_URI")
     neo4j_username = os.getenv("NEO4J_USERNAME")
     neo4j_password = os.getenv("NEO4J_PASSWORD")
     neo4j_database = os.getenv("NEO4J_DATABASE")
 
-    if neo4j_url and neo4j_username and neo4j_password:
+    if neo4j_uri and neo4j_username and neo4j_password:
         config = {
-            "neo4j_url": neo4j_url,
+            "neo4j_url": neo4j_uri,
             "neo4j_username": neo4j_username,
             "neo4j_password": neo4j_password,
         }
@@ -252,6 +252,47 @@ class GraphTools:
             ),
         )
 
+    def get_pdbe_graph_indexes_tool(self) -> types.Tool:
+        """
+        Tool to retrieve all indexes defined in the PDBe graph database schema.
+        This helps in writing efficient Cypher queries by knowing which properties are indexed.
+        """
+        return types.Tool(
+            name="pdbe_graph_indexes",
+            description="""
+    Retrieves metadata about all indexes defined in the PDBe (PDBe-KB) Neo4j graph database schema.
+    This tool can be used to understand which node properties are indexed in the graph database, which is helpful
+    when writing Cypher queries to ensure indexes are properly utilized for optimal performance.
+
+    This tool returns detailed information about each index in the graph database. For every index, it includes:
+    - The node label that the index applies to (e.g., 'Entry', 'Pfam', 'UniProt')
+    - The property name that is indexed (e.g., 'ID', 'PFAM_ACCESSION', 'ACCESSION')
+
+    Expected Output Format (text):
+    Node: Entry
+    Property: ID
+
+    Node: Pfam
+    Property: PFAM_ACCESSION
+
+    Node: UniProt
+    Property: ACCESSION
+
+    (Additional indexes follow the same format...)
+    """,
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+            annotations=types.ToolAnnotations(
+                title="Get PDBe Graph Indexes",
+                destructiveHint=False,
+                readOnlyHint=True,
+                idempotentHint=True,
+            ),
+        )
+
     def get_pdbe_run_cypher_query_tool(self) -> types.Tool:
         return types.Tool(
             name="pdbe_run_cypher_query",
@@ -440,6 +481,31 @@ class GraphTools:
             f"Question: {query.get('description', '')}\nQuery:\n{query.get('query', '')}"
             for query in self.graph_schema.get("examples", [])
         )
+
+    def format_indexes(self) -> str:
+        """
+        Format indexes as a string for LLM or human-readable output.
+
+        Returns:
+            A formatted string listing all indexes defined in the graph database schema.
+        """
+        indexes = self.graph_schema.get("indexes", [])
+        if not indexes:
+            return "No indexes defined in the schema."
+
+        return "\n\n".join(
+            f"Node: {idx.get('node', '')}\nProperty: {idx.get('properties', '')}"
+            for idx in indexes
+        )
+
+    def get_indexes(self) -> list[dict[str, str]]:
+        """
+        Get the indexes from the graph schema.
+
+        Returns:
+            List of index dictionaries, each containing 'node' and 'properties' keys.
+        """
+        return self.graph_schema.get("indexes", [])
 
     def _get_neo4j_config(self) -> dict[str, str]:
         """

@@ -296,7 +296,7 @@ uv run pdbe-mcp-server --server-type pdbe_graph_server --transport sse
 
 This server supports executing custom Cypher queries against a Neo4j graph database. The `pdbe_run_cypher_query` tool is only available when the following environment variables are set:
 
-- `NEO4J_URL`: The Neo4j database URL (e.g., `bolt://localhost:7687`)
+- `NEO4J_URI`: The Neo4j database URL (e.g., `bolt://localhost:7687`)
 - `NEO4J_USERNAME`: The Neo4j username
 - `NEO4J_PASSWORD`: The Neo4j password
 - `NEO4J_DATABASE` (optional): The database name. When set, this is passed to the Neo4j driver for Neo4j 4+. For Neo4j 3.5 compatibility, omit this variable to use the default database.

@@ -1,23 +1,26 @@
-# Multi-service container: runs MCP remote server with uvicorn
+# Single-stage Dockerfile for MCP remote server using uv
 FROM python:3.11-slim
 
-# Install system packages: curl (for healthcheck)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+# Install uv
+RUN pip install uv
 
-# Set workdir and copy app source
 WORKDIR /app
-COPY . /app
 
-# Install Python dependencies from project
-RUN pip install --no-cache-dir .
+# Copy only necessary files first for better caching
+COPY pyproject.toml README.md ./
+COPY pdbe_mcp_server/py.typed ./pdbe_mcp_server/py.typed
 
-# Expose port for MCP server
+# Create a virtual environment
+RUN uv venv
+
+# Install dependencies using uv pip install
+RUN uv pip install --no-cache-dir .
+
+# Copy application source
+COPY pdbe_mcp_server/ ./pdbe_mcp_server/
+
+# Expose port
 EXPOSE 8000
 
-# Healthcheck: ensure server responds
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD curl -fsS http://localhost:8000/health || exit 1
-
-# Run MCP remote server with uvicorn
-CMD ["python", "-m", "pdbe_mcp_server.remote_server", "--host", "0.0.0.0", "--port", "8000"]
+# Run with uv
+CMD ["uv", "run", "pdbe-mcp-remote-server", "--host", "0.0.0.0", "--port", "8000"]

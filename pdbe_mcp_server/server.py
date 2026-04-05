@@ -72,6 +72,7 @@ def build_graph_server() -> Server:
             graph_tools.get_pdbe_graph_nodes_tool(),
             graph_tools.get_pdbe_graph_edges_tool(),
             graph_tools.get_pdbe_graph_example_queries_tool(),
+            graph_tools.get_pdbe_graph_indexes_tool(),
         ]
 
         # Add the cypher query tool only if Neo4j is configured
@@ -96,6 +97,8 @@ def build_graph_server() -> Server:
                     text=graph_tools.format_example_queries(), type="text"
                 )
             ]
+        elif name == "pdbe_graph_indexes":
+            return [types.TextContent(text=graph_tools.format_indexes(), type="text")]
         elif name == "pdbe_run_cypher_query":
             if not graph_tools:
                 return [

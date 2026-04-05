@@ -366,3 +366,150 @@ class TestGraphTools:
         )
         assert not is_valid
         assert error is not None
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_get_pdbe_graph_indexes_tool(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test getting the graph indexes MCP tool."""
+        schema_with_indexes = {
+            "nodes": mock_graph_schema["nodes"],
+            "edges": mock_graph_schema["edges"],
+            "examples": mock_graph_schema.get("examples", []),
+            "indexes": [
+                {"node": "Entry", "properties": "ID"},
+                {"node": "Pfam", "properties": "PFAM_ACCESSION"},
+                {"node": "UniProt", "properties": "ACCESSION"},
+            ],
+        }
+        mock_get.return_value = schema_with_indexes
+
+        tools = GraphTools()
+        tool = tools.get_pdbe_graph_indexes_tool()
+
+        assert tool.name == "pdbe_graph_indexes"
+        assert tool.description is not None
+        assert "index" in tool.description.lower()
+        assert "indexed" in tool.description.lower()
+        assert tool.inputSchema["type"] == "object"
+        assert tool.inputSchema["additionalProperties"] is False
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_indexes_with_data(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test formatting indexes with data."""
+        schema_with_indexes = {
+            "nodes": mock_graph_schema["nodes"],
+            "edges": mock_graph_schema["edges"],
+            "examples": mock_graph_schema.get("examples", []),
+            "indexes": [
+                {"node": "Entry", "properties": "ID"},
+                {"node": "Pfam", "properties": "PFAM_ACCESSION"},
+                {"node": "UniProt", "properties": "ACCESSION"},
+            ],
+        }
+        mock_get.return_value = schema_with_indexes
+
+        tools = GraphTools()
+        formatted = tools.format_indexes()
+
+        assert "Node: Entry" in formatted
+        assert "Property: ID" in formatted
+        assert "Node: Pfam" in formatted
+        assert "Property: PFAM_ACCESSION" in formatted
+        assert "Node: UniProt" in formatted
+        assert "Property: ACCESSION" in formatted
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_indexes_empty(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test formatting indexes when there are no indexes."""
+        schema_with_empty_indexes = {
+            "nodes": mock_graph_schema["nodes"],
+            "edges": mock_graph_schema["edges"],
+            "examples": mock_graph_schema.get("examples", []),
+            "indexes": [],
+        }
+        mock_get.return_value = schema_with_empty_indexes
+
+        tools = GraphTools()
+        formatted = tools.format_indexes()
+
+        assert "No indexes defined in the schema." in formatted
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_indexes_no_indexes_key(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test formatting indexes when indexes key is missing."""
+        mock_get.return_value = {
+            "nodes": mock_graph_schema["nodes"],
+            "edges": mock_graph_schema["edges"],
+            "examples": mock_graph_schema.get("examples", []),
+        }
+
+        tools = GraphTools()
+        formatted = tools.format_indexes()
+
+        assert "No indexes defined in the schema." in formatted
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_get_indexes(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test retrieving indexes from schema."""
+        schema_with_indexes = {
+            "nodes": mock_graph_schema["nodes"],
+            "edges": mock_graph_schema["edges"],
+            "examples": mock_graph_schema.get("examples", []),
+            "indexes": [
+                {"node": "Entry", "properties": "ID"},
+                {"node": "Pfam", "properties": "PFAM_ACCESSION"},
+            ],
+        }
+        mock_get.return_value = schema_with_indexes
+
+        tools = GraphTools()
+        indexes = tools.get_indexes()
+
+        assert len(indexes) == 2
+        assert indexes[0]["node"] == "Entry"
+        assert indexes[0]["properties"] == "ID"
+        assert indexes[1]["node"] == "Pfam"
+        assert indexes[1]["properties"] == "PFAM_ACCESSION"
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_get_indexes_empty(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test retrieving indexes when there are none."""
+        schema_with_empty_indexes = {
+            "nodes": mock_graph_schema["nodes"],
+            "edges": mock_graph_schema["edges"],
+            "examples": mock_graph_schema.get("examples", []),
+            "indexes": [],
+        }
+        mock_get.return_value = schema_with_empty_indexes
+
+        tools = GraphTools()
+        indexes = tools.get_indexes()
+
+        assert indexes == []
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_get_indexes_no_key(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test retrieving indexes when indexes key is missing."""
+        mock_get.return_value = {
+            "nodes": mock_graph_schema["nodes"],
+            "edges": mock_graph_schema["edges"],
+            "examples": mock_graph_schema.get("examples", []),
+        }
+
+        tools = GraphTools()
+        indexes = tools.get_indexes()
+
+        assert indexes == []

@@ -7,6 +7,7 @@ import click
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 from starlette.types import Receive, Scope, Send
 
@@ -29,26 +30,12 @@ def parse_cors_origins(origins_str: str) -> list[str]:
     return [o.strip() for o in origins_str.split(",") if o.strip()] or ["*"]
 
 
-async def handle_health(scope: Scope, receive: Receive, send: Send) -> None:
-    await send(
-        {
-            "type": "http.response.start",
-            "status": 200,
-            "headers": [("content-type", "application/json")],
-        }
-    )
-    await send({"type": "http.response.body", "body": b'{"status": "healthy"}'})
+async def handle_health(request) -> JSONResponse:
+    return JSONResponse({"status": "healthy"})
 
 
-async def handle_ready(scope: Scope, receive: Receive, send: Send) -> None:
-    await send(
-        {
-            "type": "http.response.start",
-            "status": 200,
-            "headers": [("content-type", "application/json")],
-        }
-    )
-    await send({"type": "http.response.body", "body": b'{"status": "ready"}'})
+async def handle_ready(request) -> JSONResponse:
+    return JSONResponse({"status": "ready"})
 
 
 # -------------------------
@@ -169,7 +156,7 @@ def main(host, port, log_level, json_response, cors_origins, workers, reload):
 
     import uvicorn
 
-    logger.info(f"Starting server on http://{host}:{port}")
+    logger.info(f"Starting server on http://{host}{ROOT_PREFIX}:{port}")
     logger.info(f"Config: workers={workers}, reload={reload}, log_level={log_level}")
 
     uvicorn.run(
