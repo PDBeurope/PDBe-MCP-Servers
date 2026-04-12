@@ -117,7 +117,7 @@ def build_graph_server() -> Server:
                 ]
 
             try:
-                result = graph_tools.execute_cypher_query(cypher_query)
+                result = await graph_tools.execute_cypher_query(cypher_query)
                 return [types.TextContent(type="text", text=result)]
             except ValueError as e:
                 return [types.TextContent(type="text", text=str(e))]

@@ -543,7 +543,7 @@ class GraphTools:
             return self._neo4j_driver
 
         try:
-            from neo4j import GraphDatabase
+            from neo4j import AsyncGraphDatabase
 
             config = self._get_neo4j_config()
 
@@ -556,7 +556,7 @@ class GraphTools:
                 if "neo4j_database" in config:
                     driver_kwargs["database"] = config["neo4j_database"]
 
-                self._neo4j_driver = GraphDatabase.driver(**driver_kwargs)
+                self._neo4j_driver = AsyncGraphDatabase.driver(**driver_kwargs)
                 return self._neo4j_driver
             except TypeError as e:
                 # Neo4j 3.5 doesn't accept 'database' parameter
@@ -567,7 +567,7 @@ class GraphTools:
                     "Neo4j 3.5 detected (no database parameter support). "
                     "Using default database. If this is Neo4j 4+, consider setting NEO4J_DATABASE=neo4j"
                 )
-                self._neo4j_driver = GraphDatabase.driver(
+                self._neo4j_driver = AsyncGraphDatabase.driver(
                     config["neo4j_url"],
                     auth=(config["neo4j_username"], config["neo4j_password"]),
                 )
@@ -579,7 +579,7 @@ class GraphTools:
         except Exception as e:
             raise RuntimeError(f"Failed to create Neo4j driver: {e}") from e
 
-    def execute_cypher_query(self, query: LiteralString) -> str:
+    async def execute_cypher_query(self, query: LiteralString) -> str:
         """
         Execute a Cypher query against the Neo4j database.
 
@@ -605,9 +605,9 @@ class GraphTools:
         driver = None
         try:
             driver = self._get_neo4j_driver()
-            with driver.session() as session:
-                result = session.run(query)
-                records = list(result)
+            async with driver.session() as session:
+                result = await session.run(query)
+                records = await result.data()
                 keys = result.keys() if records else []
 
                 # Convert to list of dictionaries
