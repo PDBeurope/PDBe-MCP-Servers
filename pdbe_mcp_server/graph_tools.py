@@ -1,7 +1,12 @@
 import logging
 import os
 import re
-from typing import Any, LiteralString
+from typing import Any
+
+try:
+    from typing import LiteralString
+except ImportError:
+    from typing_extensions import LiteralString
 
 import mcp.types as types
 from omegaconf import DictConfig
@@ -13,6 +18,26 @@ logger = logging.getLogger(__name__)
 
 conf: DictConfig = get_config()
 
+# Pre-compiled regular expressions
+_WRITE_PATTERN = re.compile(
+    r"\b(MERGE|CREATE|DELETE|REMOVE|SET|ADD|LOAD\s+CSV|FOREACH)\b", re.IGNORECASE
+)
+
+_ALLOWED_START_PATTERN = re.compile(
+    r"^(?:MATCH|OPTIONAL\s+MATCH|CALL\s*\{[^}]*\})", re.IGNORECASE
+)
+
+_WRITE_KEYWORDS = [
+    "MERGE",
+    "CREATE",
+    "DELETE",
+    "REMOVE",
+    "SET",
+    "ADD",
+    "LOAD CSV",
+    "FOREACH",
+]
+
 
 def _get_neo4j_config_from_env() -> dict[str, str] | None:
     """
@@ -22,14 +47,14 @@ def _get_neo4j_config_from_env() -> dict[str, str] | None:
         Dictionary with neo4j_url, neo4j_username, neo4j_password, and neo4j_database,
         or None if not all required variables are set.
     """
-    neo4j_url = os.getenv("NEO4J_URL")
+    neo4j_uri = os.getenv("NEO4J_URI")
     neo4j_username = os.getenv("NEO4J_USERNAME")
     neo4j_password = os.getenv("NEO4J_PASSWORD")
     neo4j_database = os.getenv("NEO4J_DATABASE")
 
-    if neo4j_url and neo4j_username and neo4j_password:
+    if neo4j_uri and neo4j_username and neo4j_password:
         config = {
-            "neo4j_url": neo4j_url,
+            "neo4j_url": neo4j_uri,
             "neo4j_username": neo4j_username,
             "neo4j_password": neo4j_password,
         }
@@ -46,12 +71,12 @@ def _neo4j_enabled() -> bool:
 
 def _toon_enabled() -> bool:
     """Check if TOON output is enabled."""
-    return os.getenv("TOON_ENABLED", "false").lower() == "true"
+    return os.getenv("TOON_ENABLED", "").lower() in ("true", "1", "yes")
 
 
 def _validate_cypher_query(query: str) -> tuple[bool, str | None]:
     """
-    Validate a Cypher query to ensure it is read-only (no write, delete, or update operations).
+    Validate a Cypher query to ensure it is read-only.
 
     Args:
         query: The Cypher query to validate.
@@ -59,70 +84,37 @@ def _validate_cypher_query(query: str) -> tuple[bool, str | None]:
     Returns:
         Tuple of (is_valid, error_message). If valid, error_message is None.
     """
-    # Normalize the query: remove comments, extra whitespace, convert to uppercase for matching
+    # Remove comments and normalize whitespace
+    # //, /* */
     normalized = re.sub(r"/\*.*?\*/", "", query, flags=re.DOTALL)
+    normalized = re.sub(r"//.*$", "", normalized, flags=re.MULTILINE)
     normalized = re.sub(r"--.*$", "", normalized, flags=re.MULTILINE)
-    normalized = " ".join(normalized.upper().split())
+    normalized = " ".join(normalized.split())
 
-    # Cypher keywords that indicate write, delete, or update operations
-    write_patterns = [
-        r"\bMERGE\b",
-        r"\bCREATE\b",
-        r"\bDELETE\b",
-        r"\bREMOVE\b",
-        r"\bSET\b",
-        r"\bADD\b",
-        r"\bREMOVE\b",
-        r"\bSET\b",
-        r"\bSET\s+[A-Za-z_][A-Za-z0-9_]*\s+=",
-        r"\bMATCH\b.*\bMERGE\b",
-        r"\bMERGE\b.*\bSET\b",
-        r"\bCREATE\b.*\bSET\b",
-        r"\bWITH\b.*\bMERGE\b",
-        r"\bWITH\b.*\bCREATE\b",
-        r"\bWITH\b.*\bDELETE\b",
-        r"\bWITH\b.*\bSET\b",
-        r"\bLOAD\s+CSV\b",
-        r"\bFOREACH\b",
-        r"\bREMOVE\b\b",
-    ]
-
-    for pattern in write_patterns:
-        if re.search(pattern, normalized):
-            return (
-                False,
-                f"Query contains potentially destructive operation (detected pattern: {pattern})",
-            )
-
-    # Additional check: allow only MATCH, OPTIONAL MATCH, CALL {MATCH ...}, RETURN
-    # This is a safer approach - only allow queries that start with these read operations
-    allowed_starts = [
-        r"^(?:MATCH|OPTIONAL\s+MATCH|CALL\s*\{[^}]*\})",
-    ]
-
-    # Check if query matches allowed patterns
-    has_allowed_pattern = any(re.search(p, normalized) for p in allowed_starts)
-
-    # Additional check: if query contains write keywords after MATCH, it might be dangerous
-    # This catches patterns like "MATCH ... RETURN ... MERGE"
-    write_keywords = ["MERGE", "CREATE", "DELETE", "REMOVE", "SET"]
-    if has_allowed_pattern:
-        # Check if any write operation appears after the initial MATCH/MATCH+CALL
-        parts = re.split(r"\bRETURN\b", normalized, flags=re.IGNORECASE)
-        if len(parts) > 1:
-            # Everything after RETURN is part of RETURN clause, check the rest
-            pre_return = parts[0]
-            for keyword in write_keywords:
-                if re.search(rf"\b{keyword}\b", pre_return, re.IGNORECASE):
-                    return (
-                        False,
-                        f"Query contains potentially destructive operation ({keyword}) after MATCH",
-                    )
-    elif not has_allowed_pattern:
+    # Check for any write operations
+    if _WRITE_PATTERN.search(normalized):
         return (
             False,
-            "Query does not start with allowed read operation (MATCH, OPTIONAL MATCH, or CALL)",
+            "Query contains potentially destructive operation",
         )
+
+    # Verify query starts with allowed read operation
+    if not _ALLOWED_START_PATTERN.search(normalized):
+        return (
+            False,
+            "Query must start with MATCH, OPTIONAL MATCH, or CALL",
+        )
+
+    # Additional check: ensure no write operations after RETURN
+    if "RETURN" in normalized.upper():
+        return_parts = re.split(r"\bRETURN\b", normalized, flags=re.IGNORECASE)
+        pre_return = return_parts[0]
+        for keyword in _WRITE_KEYWORDS:
+            if re.search(rf"\b{keyword}\b", pre_return, re.IGNORECASE):
+                return (
+                    False,
+                    f"Query contains destructive operation '{keyword}' before RETURN",
+                )
 
     return True, None
 
@@ -132,14 +124,25 @@ class GraphTools:
     A class to handle PDBe graph-related operations.
     """
 
+    WRITE_OPERATIONS = frozenset(_WRITE_KEYWORDS)
+
     def __init__(self) -> None:
         """
         Initialize the GraphTools object, load the graph schema, and prepare node and edge lists.
+        Also initializes the Neo4j driver for reuse across all tool calls.
         """
         self.graph_schema: dict[str, Any] = self._get_graph_schema()
         self.node_dict: dict[Any, str] = {}
         self.nodes: list[dict[str, Any]] = self.get_nodes()
         self.edges: list[dict[str, Any]] = self.get_edges()
+
+        # Initialize Neo4j driver once for reuse
+        self._neo4j_driver: Any = None
+
+    @property
+    def neo4j_enabled(self) -> bool:
+        """Check if Neo4j is configured."""
+        return _neo4j_enabled()
 
     def get_pdbe_graph_nodes_tool(self) -> types.Tool:
         return types.Tool(
@@ -249,6 +252,47 @@ class GraphTools:
             ),
         )
 
+    def get_pdbe_graph_indexes_tool(self) -> types.Tool:
+        """
+        Tool to retrieve all indexes defined in the PDBe graph database schema.
+        This helps in writing efficient Cypher queries by knowing which properties are indexed.
+        """
+        return types.Tool(
+            name="pdbe_graph_indexes",
+            description="""
+    Retrieves metadata about all indexes defined in the PDBe (PDBe-KB) Neo4j graph database schema.
+    This tool can be used to understand which node properties are indexed in the graph database, which is helpful
+    when writing Cypher queries to ensure indexes are properly utilized for optimal performance.
+
+    This tool returns detailed information about each index in the graph database. For every index, it includes:
+    - The node label that the index applies to (e.g., 'Entry', 'Pfam', 'UniProt')
+    - The property name that is indexed (e.g., 'ID', 'PFAM_ACCESSION', 'ACCESSION')
+
+    Expected Output Format (text):
+    Node: Entry
+    Property: ID
+
+    Node: Pfam
+    Property: PFAM_ACCESSION
+
+    Node: UniProt
+    Property: ACCESSION
+
+    (Additional indexes follow the same format...)
+    """,
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+            annotations=types.ToolAnnotations(
+                title="Get PDBe Graph Indexes",
+                destructiveHint=False,
+                readOnlyHint=True,
+                idempotentHint=True,
+            ),
+        )
+
     def get_pdbe_run_cypher_query_tool(self) -> types.Tool:
         return types.Tool(
             name="pdbe_run_cypher_query",
@@ -275,7 +319,7 @@ class GraphTools:
                 "properties": {
                     "cypher_query": {
                         "type": "string",
-                        "description": "The Cypher query to execute. Only MATCH and OPTIONAL MATCH queries are allowed. MERGE, CREATE, DELETE, REMOVE, SET, LOAD CSV, and FOREACH operations are not permitted.",
+                        "description": "The Cypher query to execute. Only read-only operations are allowed.",
                     }
                 },
                 "required": ["cypher_query"],
@@ -294,14 +338,16 @@ class GraphTools:
         Retrieve the PDBe graph schema from the remote server and return it as a dictionary.
         Supports both HTTP(S) URLs and local file paths.
         """
-        if conf.graph.schema_url.startswith("file://"):
-            file_path = conf.graph.schema_url[len("file://") :]
+        schema_url = conf.graph.schema_url
+
+        if schema_url.startswith("file://"):
+            file_path = schema_url[len("file://") :]
             with open(file_path, "r", encoding="utf-8") as f:
                 import json
 
                 return json.load(f)
         else:
-            return HTTPClient.get(str(conf.graph.schema_url))
+            return HTTPClient.get(str(schema_url))
 
     def get_nodes(self) -> list[dict[str, Any]]:
         """
@@ -321,7 +367,8 @@ class GraphTools:
             nodes.append(node)
 
             # store the node label in a dictionary for quick access
-            self.node_dict[node.get("id")] = node["label"]
+            if node.get("id"):
+                self.node_dict[node["id"]] = node.get("label", "Unknown")
 
         return nodes
 
@@ -435,6 +482,31 @@ class GraphTools:
             for query in self.graph_schema.get("examples", [])
         )
 
+    def format_indexes(self) -> str:
+        """
+        Format indexes as a string for LLM or human-readable output.
+
+        Returns:
+            A formatted string listing all indexes defined in the graph database schema.
+        """
+        indexes = self.graph_schema.get("indexes", [])
+        if not indexes:
+            return "No indexes defined in the schema."
+
+        return "\n\n".join(
+            f"Node: {idx.get('node', '')}\nProperty: {idx.get('properties', '')}"
+            for idx in indexes
+        )
+
+    def get_indexes(self) -> list[dict[str, str]]:
+        """
+        Get the indexes from the graph schema.
+
+        Returns:
+            List of index dictionaries, each containing 'node' and 'properties' keys.
+        """
+        return self.graph_schema.get("indexes", [])
+
     def _get_neo4j_config(self) -> dict[str, str]:
         """
         Get Neo4j configuration from environment variables.
@@ -453,9 +525,10 @@ class GraphTools:
             )
         return config
 
-    def _get_neo4j_driver(self):
+    def _get_neo4j_driver(self) -> Any:
         """
         Get a Neo4j driver instance, compatible with both Neo4j 3.5 and 4.x+.
+        This driver is reused across all tool calls to improve performance.
 
         Neo4j 3.5: Uses `GraphDatabase.driver(url, auth=...)` without database parameter
         Neo4j 4.0+: Uses `GraphDatabase.driver(url, auth=..., database=...)` with database parameter
@@ -466,8 +539,11 @@ class GraphTools:
         Raises:
             RuntimeError: If Neo4j is not configured or neo4j driver is not installed.
         """
+        if self._neo4j_driver is not None:
+            return self._neo4j_driver
+
         try:
-            from neo4j import GraphDatabase
+            from neo4j import AsyncGraphDatabase
 
             config = self._get_neo4j_config()
 
@@ -479,9 +555,9 @@ class GraphTools:
                 }
                 if "neo4j_database" in config:
                     driver_kwargs["database"] = config["neo4j_database"]
-                driver = GraphDatabase.driver(**driver_kwargs)
-                # Driver is lazily validated on first use
-                return driver
+
+                self._neo4j_driver = AsyncGraphDatabase.driver(**driver_kwargs)
+                return self._neo4j_driver
             except TypeError as e:
                 # Neo4j 3.5 doesn't accept 'database' parameter
                 if "database" not in str(e).lower():
@@ -491,10 +567,11 @@ class GraphTools:
                     "Neo4j 3.5 detected (no database parameter support). "
                     "Using default database. If this is Neo4j 4+, consider setting NEO4J_DATABASE=neo4j"
                 )
-                return GraphDatabase.driver(
+                self._neo4j_driver = AsyncGraphDatabase.driver(
                     config["neo4j_url"],
                     auth=(config["neo4j_username"], config["neo4j_password"]),
                 )
+                return self._neo4j_driver
         except ImportError as e:
             raise RuntimeError(
                 "neo4j driver is not installed. Please install it with: pip install neo4j"
@@ -502,7 +579,7 @@ class GraphTools:
         except Exception as e:
             raise RuntimeError(f"Failed to create Neo4j driver: {e}") from e
 
-    def execute_cypher_query(self, query: LiteralString) -> str:
+    async def execute_cypher_query(self, query: LiteralString) -> str:
         """
         Execute a Cypher query against the Neo4j database.
 
@@ -528,9 +605,9 @@ class GraphTools:
         driver = None
         try:
             driver = self._get_neo4j_driver()
-            with driver.session() as session:
-                result = session.run(query)
-                records = list(result)
+            async with driver.session() as session:
+                result = await session.run(query)
+                records = await result.data()
                 keys = result.keys() if records else []
 
                 # Convert to list of dictionaries
@@ -563,6 +640,27 @@ class GraphTools:
         except Exception as e:
             logger.error("Neo4j query execution failed: %s", e)
             raise RuntimeError(f"Neo4j query execution failed: {e}") from e
-        finally:
-            if driver:
-                driver.close()
+
+    def close(self):
+        """
+        Close the Neo4j driver connection.
+        """
+        if self._neo4j_driver is not None:
+            try:
+                self._neo4j_driver.close()
+            except Exception:
+                logger.warning("Error closing Neo4j driver", exc_info=True)
+            finally:
+                self._neo4j_driver = None
+
+    def __del__(self) -> None:
+        """Cleanup on destruction."""
+        self.close()
+
+    def __enter__(self) -> "GraphTools":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager, ensuring cleanup."""
+        self.close()

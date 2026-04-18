@@ -235,6 +235,21 @@ Common searchable fields include:
 Use `get_search_schema` to discover all available fields and their descriptions.
 
 ## Development and Advanced Usage
+### Docker (single container with Nginx)
+
+Build and run all three MCP servers behind Nginx using the included Dockerfile:
+
+```bash
+docker build -t pdbe-mcp-servers:latest .
+docker run --rm -p 8080:8080 pdbe-mcp-servers:latest
+```
+
+Endpoints:
+- `http://localhost:8080/api/sse` and `http://localhost:8080/api/messages/`
+- `http://localhost:8080/graph/sse` and `http://localhost:8080/graph/messages/`
+- `http://localhost:8080/search/sse` and `http://localhost:8080/search/messages/`
+- Health: `http://localhost:8080/health`
+
 
 ### Development Installation
 
@@ -281,7 +296,7 @@ uv run pdbe-mcp-server --server-type pdbe_graph_server --transport sse
 
 This server supports executing custom Cypher queries against a Neo4j graph database. The `pdbe_run_cypher_query` tool is only available when the following environment variables are set:
 
-- `NEO4J_URL`: The Neo4j database URL (e.g., `bolt://localhost:7687`)
+- `NEO4J_URI`: The Neo4j database URL (e.g., `bolt://localhost:7687`)
 - `NEO4J_USERNAME`: The Neo4j username
 - `NEO4J_PASSWORD`: The Neo4j password
 - `NEO4J_DATABASE` (optional): The database name. When set, this is passed to the Neo4j driver for Neo4j 4+. For Neo4j 3.5 compatibility, omit this variable to use the default database.

@@ -1,0 +1,28 @@
+docker_build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - |
+      mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR --destination ${CI_REGISTRY_IMAGE}/app:$CI_COMMIT_SHORT_SHA
+  tags:
+    - pdbe-docker
+
+trigger_deploy:
+  stage: deploy
+  inherit:
+    variables: false
+  variables:
+    UPSTREAM_REF: $CI_COMMIT_REF_NAME
+    IMAGE_PATHS: ${CI_REGISTRY_IMAGE}/app:$CI_COMMIT_SHORT_SHA
+    IMAGE_NAMES: pdbe-mcp-server
+    APP_NAME: pdbe-mcp-server
+  trigger:
+    project: pdbe/backend/k8s-deploy-configs
+    branch: main
+    strategy: depend
+  needs:
+    - docker_build
