@@ -17,8 +17,10 @@ class SearchTools:
             description="""
 Executes a search query against the PDBe Solr search service.
     This tool allows users to perform search queries on the PDBe database using Solr's querying capabilities. Users can specify various parameters to refine their search and retrieve relevant results.
+    IMPORTANT: the `text` field is a copy field that contains the full searchable text aggregated from the document. By default, LLMs should use the `text` field for any search unless there is a strong reason to target a different field.
+    IMPORTANT: search queries should always be treated as case-insensitive wildcard searches on the `text` field. The backend will normalize the input into the form `text:*<query>*`, so a user query like `1cbs` will search as `text:*1cbs*`.
     Expected Input Parameters:
-    - query (string): The search query string to be executed.
+    - query (string): The search text to be executed. This will always be converted into a case-insensitive wildcard query on the `text` field.
     - filters (list of strings, optional): A list of filter queries to narrow down the search results.
     - sort (string, optional): The sorting criteria for the search results.
     - start (integer, optional): The starting index for pagination of results.
@@ -26,7 +28,7 @@ Executes a search query against the PDBe Solr search service.
 
     Example Input:
     {
-        "query": "pdb_id:1cbs",
+        "query": "1cbs",
         "filters": ["deposition_date"],
         "sort": "deposition_date desc",
         "start": 0,
@@ -61,6 +63,23 @@ Executes a search query against the PDBe Solr search service.
                 idempotentHint=False,
             ),
         )
+
+    @staticmethod
+    def _build_text_wildcard_query(query: str) -> str:
+        query = query.strip().lower()
+        if not query:
+            return "text:*"
+
+        # Escape Solr special characters in the user input before applying the
+        # wildcard pattern on the `text` copy field.
+        escaped_query = []
+        for char in query:
+            if char in r'+-&|!(){}[]^"~?:\/':
+                escaped_query.append(f"\\{char}")
+            else:
+                escaped_query.append(char)
+
+        return f"text:*{''.join(escaped_query)}*"
 
     def get_search_schema_tool(self) -> types.Tool:
         return types.Tool(
@@ -101,7 +120,7 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
         return "\n".join(content)
 
     def run_search_query(self, arguments: dict[str, Any]) -> str:
-        query = arguments.get("query", "")
+        query = self._build_text_wildcard_query(arguments.get("query", ""))
         filters = arguments.get("filters", [])
         sort = arguments.get("sort", None)
         start = arguments.get("start", 0)
