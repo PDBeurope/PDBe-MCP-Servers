@@ -100,7 +100,7 @@ class TestSearchTools:
         call_args = mock_get.call_args
         assert call_args is not None
         params = call_args.kwargs["params"]
-        assert params["q"] == "pdb_id:1cbs"
+        assert params["q"] == r"text:*pdb_id\:1cbs*"
         assert params["fl"] == "pdb_id,title"
         assert params["rows"] == "10"
 
