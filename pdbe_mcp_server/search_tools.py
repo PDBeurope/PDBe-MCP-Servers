@@ -21,7 +21,8 @@ Executes a search query against the PDBe Solr search service.
     IMPORTANT: search queries should always be treated as case-insensitive wildcard searches on the `text` field. The backend will normalize the input into the form `text:*<query>*`, so a user query like `1cbs` will search as `text:*1cbs*`.
     Expected Input Parameters:
     - query (string): The search text to be executed. This will always be converted into a case-insensitive wildcard query on the `text` field.
-    - filters (list of strings, optional): A list of filter queries to narrow down the search results.
+    - filters (list of strings, optional): A list of field names to include in the search results.
+    - fq (string or list of strings, optional): Solr filter query or queries to narrow down the search results.
     - sort (string, optional): The sorting criteria for the search results.
     - start (integer, optional): The starting index for pagination of results.
     - rows (integer, optional): The number of results to return.
@@ -29,7 +30,8 @@ Executes a search query against the PDBe Solr search service.
     Example Input:
     {
         "query": "1cbs",
-        "filters": ["deposition_date"],
+        "filters": ["pdb_id", "deposition_date"],
+        "fq": ["experimental_method:\"X-ray diffraction\""],
         "sort": "deposition_date desc",
         "start": 0,
         "rows": 10
@@ -48,6 +50,15 @@ Executes a search query against the PDBe Solr search service.
                     "filters": {
                         "type": "array",
                         "items": {"type": "string"},
+                    },
+                    "fq": {
+                        "oneOf": [
+                            {"type": "string"},
+                            {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        ],
                     },
                     "sort": {"type": "string"},
                     "start": {"type": "integer"},
@@ -122,6 +133,7 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
     def run_search_query(self, arguments: dict[str, Any]) -> str:
         query = self._build_text_wildcard_query(arguments.get("query", ""))
         filters = arguments.get("filters", [])
+        fq = arguments.get("fq", None)
         sort = arguments.get("sort", None)
         start = arguments.get("start", 0)
         rows = arguments.get("rows", 10)
@@ -136,6 +148,8 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
             fields["sort"] = sort
         if filters:
             fields["fl"] = ",".join(filters)
+        if fq is not None:
+            fields["fq"] = fq
 
         last_error: Exception | None = None
         data = None
