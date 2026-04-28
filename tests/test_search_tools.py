@@ -105,6 +105,35 @@ class TestSearchTools:
         assert params["rows"] == "10"
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_fq(
+        self, mock_get: MagicMock, mock_search_response: dict[str, Any]
+    ) -> None:
+        """Test running search query with Solr filter queries."""
+        mock_get.return_value = mock_search_response
+
+        tools = SearchTools()
+        arguments = {
+            "query": "kinase",
+            "fq": [
+                'experimental_method:"X-ray diffraction"',
+                "resolution:[0 TO 2.0]",
+            ],
+            "start": 0,
+            "rows": 10,
+        }
+        result = tools.run_search_query(arguments)
+        assert "1cbs" in result
+
+        call_args = mock_get.call_args
+        assert call_args is not None
+        params = call_args.kwargs["params"]
+        assert params["q"] == "text:*kinase*"
+        assert params["fq"] == [
+            'experimental_method:"X-ray diffraction"',
+            "resolution:[0 TO 2.0]",
+        ]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_sort(
         self, mock_get: MagicMock, mock_search_response: dict[str, Any]
     ) -> None:
