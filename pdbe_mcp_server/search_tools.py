@@ -1,4 +1,3 @@
-import time
 from typing import Any
 
 import mcp.types as types
@@ -16,22 +15,33 @@ class SearchTools:
             name="run_search_query",
             description="""
 Executes a search query against the PDBe Solr search service.
-    This tool allows users to perform search queries on the PDBe database using Solr's querying capabilities. Users can specify various parameters to refine their search and retrieve relevant results.
-    IMPORTANT: the `text` field is a copy field that contains the full searchable text aggregated from the document. By default, LLMs should use the `text` field for any search unless there is a strong reason to target a different field.
-    IMPORTANT: search queries should always be treated as case-insensitive wildcard searches on the `text` field. The backend will normalize the input into the form `text:*<query>*`, so a user query like `1cbs` will search as `text:*1cbs*`.
+    This tool exposes common Solr query parameters directly so users can construct fielded queries, filter queries, field lists, facets, grouping, sorting, and pagination against the PDBe search index.
+    IMPORTANT: `query` is passed to Solr as the raw `q` parameter. Use Solr query syntax such as `*:*`, `pdb_id:1cbs`, `text:*kinase*`, boolean clauses, ranges, and boosts as needed.
+    IMPORTANT: the `text` field is a copy field that contains the full searchable text aggregated from the document. Use `text:*<term>*` when you want a broad wildcard text search.
     Expected Input Parameters:
-    - query (string): The search text to be executed. This will always be converted into a case-insensitive wildcard query on the `text` field.
-    - filters (list of strings, optional): A list of field names to include in the search results.
+    - query (string): Raw Solr query string passed as `q`.
+    - fl (string or list of strings, optional): Solr field list. The legacy `filters` parameter is also accepted as an alias.
+    - filters (list of strings, optional): Backwards-compatible alias for `fl`.
     - fq (string or list of strings, optional): Solr filter query or queries to narrow down the search results.
     - sort (string, optional): The sorting criteria for the search results.
     - start (integer, optional): The starting index for pagination of results.
     - rows (integer, optional): The number of results to return.
+    - facet (boolean, optional): Enable Solr faceting.
+    - facet_fields (string or list of strings, optional): Field facets, sent as `facet.field`.
+    - facet_queries (string or list of strings, optional): Query facets, sent as `facet.query`.
+    - facet_limit, facet_mincount, facet_sort (optional): Common facet controls.
+    - group (boolean, optional): Enable Solr grouping.
+    - group_field (string or list of strings, optional): Grouping field, sent as `group.field`.
+    - group_limit, group_offset, group_sort (optional): Common grouping controls.
+    - params (object, optional): Additional Solr parameters to pass through for advanced use.
 
     Example Input:
     {
-        "query": "1cbs",
-        "filters": ["pdb_id", "deposition_date"],
+        "query": "text:*kinase*",
+        "fl": ["pdb_id", "title", "deposition_date"],
         "fq": ["experimental_method:\"X-ray diffraction\""],
+        "facet": true,
+        "facet_fields": ["experimental_method"],
         "sort": "deposition_date desc",
         "start": 0,
         "rows": 10
@@ -47,6 +57,15 @@ Executes a search query against the PDBe Solr search service.
                 "type": "object",
                 "properties": {
                     "query": {"type": "string"},
+                    "fl": {
+                        "oneOf": [
+                            {"type": "string"},
+                            {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        ],
+                    },
                     "filters": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -63,6 +82,63 @@ Executes a search query against the PDBe Solr search service.
                     "sort": {"type": "string"},
                     "start": {"type": "integer"},
                     "rows": {"type": "integer"},
+                    "facet": {"type": "boolean"},
+                    "facet_fields": {
+                        "oneOf": [
+                            {"type": "string"},
+                            {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        ],
+                    },
+                    "facet_queries": {
+                        "oneOf": [
+                            {"type": "string"},
+                            {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        ],
+                    },
+                    "facet_limit": {"type": "integer"},
+                    "facet_mincount": {"type": "integer"},
+                    "facet_sort": {"type": "string"},
+                    "group": {"type": "boolean"},
+                    "group_field": {
+                        "oneOf": [
+                            {"type": "string"},
+                            {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        ],
+                    },
+                    "group_limit": {"type": "integer"},
+                    "group_offset": {"type": "integer"},
+                    "group_sort": {"type": "string"},
+                    "params": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "oneOf": [
+                                {"type": "string"},
+                                {"type": "number"},
+                                {"type": "integer"},
+                                {"type": "boolean"},
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "oneOf": [
+                                            {"type": "string"},
+                                            {"type": "number"},
+                                            {"type": "integer"},
+                                            {"type": "boolean"},
+                                        ]
+                                    },
+                                },
+                            ]
+                        },
+                    },
                 },
                 "required": ["query"],
                 "additionalProperties": False,
@@ -70,27 +146,98 @@ Executes a search query against the PDBe Solr search service.
             annotations=types.ToolAnnotations(
                 title="Run PDBe Search Query",
                 destructiveHint=False,
-                readOnlyHint=False,
-                idempotentHint=False,
+                readOnlyHint=True,
+                idempotentHint=True,
             ),
         )
 
     @staticmethod
-    def _build_text_wildcard_query(query: str) -> str:
-        query = query.strip().lower()
-        if not query:
-            return "text:*"
+    def _as_solr_value(value: Any) -> Any:
+        if isinstance(value, bool):
+            return str(value).lower()
+        if isinstance(value, int | float):
+            return str(value)
+        return value
 
-        # Escape Solr special characters in the user input before applying the
-        # wildcard pattern on the `text` copy field.
-        escaped_query = []
-        for char in query:
-            if char in r'+-&|!(){}[]^"~?:\/':
-                escaped_query.append(f"\\{char}")
-            else:
-                escaped_query.append(char)
+    @classmethod
+    def _add_param(
+        cls, params: dict[str, Any], solr_name: str, value: Any, *, join_lists: bool
+    ) -> None:
+        if value is None:
+            return
+        if isinstance(value, list):
+            converted = [cls._as_solr_value(item) for item in value]
+            params[solr_name] = ",".join(converted) if join_lists else converted
+            return
+        params[solr_name] = cls._as_solr_value(value)
 
-        return f"text:*{''.join(escaped_query)}*"
+    @staticmethod
+    def _format_value(value: Any, indent: int = 0) -> list[str]:
+        prefix = " " * indent
+        if isinstance(value, dict):
+            lines: list[str] = []
+            for key, nested_value in value.items():
+                if isinstance(nested_value, dict | list):
+                    lines.append(f"{prefix}{key}:")
+                    lines.extend(SearchTools._format_value(nested_value, indent + 2))
+                else:
+                    lines.append(f"{prefix}{key}: {nested_value}")
+            return lines
+        if isinstance(value, list):
+            if not value:
+                return [f"{prefix}[]"]
+            if all(not isinstance(item, dict | list) for item in value):
+                return [f"{prefix}{', '.join(str(item) for item in value)}"]
+            lines = []
+            for item in value:
+                lines.extend(SearchTools._format_value(item, indent))
+            return lines
+        return [f"{prefix}{value}"]
+
+    @classmethod
+    def _build_solr_params(cls, arguments: dict[str, Any]) -> dict[str, Any]:
+        params = arguments.get("params", {}).copy()
+        fields = arguments.get("fl", arguments.get("filters"))
+
+        cls._add_param(params, "q", arguments.get("query"), join_lists=False)
+        cls._add_param(params, "start", arguments.get("start", 0), join_lists=False)
+        cls._add_param(params, "rows", arguments.get("rows", 10), join_lists=False)
+        cls._add_param(params, "sort", arguments.get("sort"), join_lists=False)
+        cls._add_param(params, "fl", fields, join_lists=True)
+        cls._add_param(params, "fq", arguments.get("fq"), join_lists=False)
+        cls._add_param(params, "facet", arguments.get("facet"), join_lists=False)
+        cls._add_param(
+            params, "facet.field", arguments.get("facet_fields"), join_lists=False
+        )
+        cls._add_param(
+            params, "facet.query", arguments.get("facet_queries"), join_lists=False
+        )
+        cls._add_param(
+            params, "facet.limit", arguments.get("facet_limit"), join_lists=False
+        )
+        cls._add_param(
+            params,
+            "facet.mincount",
+            arguments.get("facet_mincount"),
+            join_lists=False,
+        )
+        cls._add_param(
+            params, "facet.sort", arguments.get("facet_sort"), join_lists=False
+        )
+        cls._add_param(params, "group", arguments.get("group"), join_lists=False)
+        cls._add_param(
+            params, "group.field", arguments.get("group_field"), join_lists=False
+        )
+        cls._add_param(
+            params, "group.limit", arguments.get("group_limit"), join_lists=False
+        )
+        cls._add_param(
+            params, "group.offset", arguments.get("group_offset"), join_lists=False
+        )
+        cls._add_param(
+            params, "group.sort", arguments.get("group_sort"), join_lists=False
+        )
+        return params
 
     def get_search_schema_tool(self) -> types.Tool:
         return types.Tool(
@@ -131,39 +278,8 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
         return "\n".join(content)
 
     def run_search_query(self, arguments: dict[str, Any]) -> str:
-        query = self._build_text_wildcard_query(arguments.get("query", ""))
-        filters = arguments.get("filters", [])
-        fq = arguments.get("fq", None)
-        sort = arguments.get("sort", None)
-        start = arguments.get("start", 0)
-        rows = arguments.get("rows", 10)
-
-        # Filter out None values from the fields dictionary
-        fields = {
-            "q": query,
-            "start": str(start),
-            "rows": str(rows),
-        }
-        if sort is not None:
-            fields["sort"] = sort
-        if filters:
-            fields["fl"] = ",".join(filters)
-        if fq is not None:
-            fields["fq"] = fq
-
-        last_error: Exception | None = None
-        data = None
-        for attempt in range(3):
-            try:
-                data = HTTPClient.get(conf.search.search_api, params=fields)
-                last_error = None
-                break
-            except Exception as exc:
-                last_error = exc
-                if attempt < 2:
-                    time.sleep(0.5)
-        if last_error is not None:
-            raise last_error
+        fields = self._build_solr_params(arguments)
+        data = HTTPClient.get(conf.search.search_api, params=fields)
 
         if data is None or "response" not in data:
             raise Exception("Invalid response from search service")
@@ -181,7 +297,15 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
             results.append(f"Document {i}:")
             for key, value in doc.items():
                 results.append(
-                    f"  {key}: {', '.join(str(v) for v in set(value)) if isinstance(value, list) else str(value)}"
+                    f"  {key}: {', '.join(str(v) for v in value) if isinstance(value, list) else str(value)}"
                 )
+
+        if "facet_counts" in data:
+            results.append("Facet counts:")
+            results.extend(self._format_value(data["facet_counts"], indent=2))
+
+        if "grouped" in data:
+            results.append("Grouped results:")
+            results.extend(self._format_value(data["grouped"], indent=2))
 
         return "\n".join(results)
