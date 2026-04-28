@@ -21,6 +21,9 @@ class TestSearchTools:
         assert "search query" in tool.description.lower()
         assert "query" in tool.inputSchema["properties"]
         assert tool.inputSchema["properties"]["query"]["type"] == "string"
+        assert "fl" in tool.inputSchema["properties"]
+        assert "facet" in tool.inputSchema["properties"]
+        assert "group" in tool.inputSchema["properties"]
         assert "query" in tool.inputSchema["required"]
 
     def test_get_search_schema_tool(self) -> None:
@@ -77,11 +80,16 @@ class TestSearchTools:
         assert "Test Structure 1" in result
         assert "2.5" in result
 
+        call_args = mock_get.call_args
+        assert call_args is not None
+        params = call_args.kwargs["params"]
+        assert params["q"] == "pdb_id:1cbs"
+
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_filters(
         self, mock_get: MagicMock, mock_search_response: dict[str, Any]
     ) -> None:
-        """Test running search query with filters."""
+        """Test running search query with legacy filters alias."""
         mock_get.return_value = mock_search_response
 
         tools = SearchTools()
@@ -100,9 +108,30 @@ class TestSearchTools:
         call_args = mock_get.call_args
         assert call_args is not None
         params = call_args.kwargs["params"]
-        assert params["q"] == r"text:*pdb_id\:1cbs*"
+        assert params["q"] == "pdb_id:1cbs"
         assert params["fl"] == "pdb_id,title"
         assert params["rows"] == "10"
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_fl(
+        self, mock_get: MagicMock, mock_search_response: dict[str, Any]
+    ) -> None:
+        """Test running search query with Solr fl."""
+        mock_get.return_value = mock_search_response
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "fl": ["pdb_id", "title", "resolution"],
+        }
+        result = tools.run_search_query(arguments)
+        assert "1cbs" in result
+
+        call_args = mock_get.call_args
+        assert call_args is not None
+        params = call_args.kwargs["params"]
+        assert params["q"] == "*:*"
+        assert params["fl"] == "pdb_id,title,resolution"
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_fq(
@@ -127,7 +156,7 @@ class TestSearchTools:
         call_args = mock_get.call_args
         assert call_args is not None
         params = call_args.kwargs["params"]
-        assert params["q"] == "text:*kinase*"
+        assert params["q"] == "kinase"
         assert params["fq"] == [
             'experimental_method:"X-ray diffraction"',
             "resolution:[0 TO 2.0]",
@@ -195,6 +224,111 @@ class TestSearchTools:
         assert params["start"] == "0"
         assert params["rows"] == "10"
         assert "sort" not in params  # Should not be present if not specified
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_facets(self, mock_get: MagicMock) -> None:
+        """Test running search query with Solr facets."""
+        mock_get.return_value = {
+            "response": {"numFound": 0, "start": 0, "docs": []},
+            "facet_counts": {
+                "facet_fields": {
+                    "experimental_method": [
+                        "X-ray diffraction",
+                        10,
+                        "Electron microscopy",
+                        5,
+                    ]
+                }
+            },
+        }
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "facet": True,
+            "facet_fields": ["experimental_method"],
+            "facet_mincount": 1,
+        }
+        result = tools.run_search_query(arguments)
+
+        assert "Facet counts:" in result
+        assert "experimental_method:" in result
+        assert "X-ray diffraction" in result
+
+        call_args = mock_get.call_args
+        assert call_args is not None
+        params = call_args.kwargs["params"]
+        assert params["facet"] == "true"
+        assert params["facet.field"] == ["experimental_method"]
+        assert params["facet.mincount"] == "1"
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_grouping(self, mock_get: MagicMock) -> None:
+        """Test running search query with Solr grouping."""
+        mock_get.return_value = {
+            "response": {"numFound": 0, "start": 0, "docs": []},
+            "grouped": {
+                "experimental_method": {
+                    "matches": 2,
+                    "groups": [
+                        {
+                            "groupValue": "X-ray diffraction",
+                            "doclist": {
+                                "numFound": 1,
+                                "start": 0,
+                                "docs": [{"pdb_id": "1cbs"}],
+                            },
+                        }
+                    ],
+                }
+            },
+        }
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "group": True,
+            "group_field": "experimental_method",
+            "group_limit": 3,
+        }
+        result = tools.run_search_query(arguments)
+
+        assert "Grouped results:" in result
+        assert "experimental_method:" in result
+        assert "X-ray diffraction" in result
+
+        call_args = mock_get.call_args
+        assert call_args is not None
+        params = call_args.kwargs["params"]
+        assert params["group"] == "true"
+        assert params["group.field"] == "experimental_method"
+        assert params["group.limit"] == "3"
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_additional_params(
+        self, mock_get: MagicMock, mock_search_response: dict[str, Any]
+    ) -> None:
+        """Test pass-through Solr params."""
+        mock_get.return_value = mock_search_response
+
+        tools = SearchTools()
+        arguments = {
+            "query": "text:*kinase*",
+            "params": {
+                "defType": "edismax",
+                "qf": "title text",
+                "debug": True,
+            },
+        }
+        tools.run_search_query(arguments)
+
+        call_args = mock_get.call_args
+        assert call_args is not None
+        params = call_args.kwargs["params"]
+        assert params["q"] == "text:*kinase*"
+        assert params["defType"] == "edismax"
+        assert params["qf"] == "title text"
+        assert params["debug"] is True
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_invalid_response(self, mock_get: MagicMock) -> None:

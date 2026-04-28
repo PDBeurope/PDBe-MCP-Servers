@@ -203,21 +203,50 @@ Retrieves the complete Solr search schema showing all available fields, data typ
 ```
 
 #### `run_search_query`
-Execute advanced search queries with flexible filtering, sorting, and pagination options.
+Execute Solr-style search queries with flexible field selection, filter queries, facets, grouping, sorting, and pagination options.
 
 **Parameters:**
-- `query` (required): Solr query string (e.g., `pdb_id:1cbs`, `experimental_method:"X-ray diffraction"`)
-- `filters` (optional): Array of field names to include in results
+- `query` (required): Raw Solr query string passed as `q` (e.g., `*:*`, `pdb_id:1cbs`, `text:*kinase*`, `resolution:[0 TO 2.0]`)
+- `fl` (optional): Field list as a string or array of field names to include in results
+- `filters` (optional): Backwards-compatible alias for `fl`
+- `fq` (optional): Filter query string or array of filter query strings
 - `sort` (optional): Sort criteria (e.g., `release_date desc`, `resolution asc`)
 - `start` (optional): Starting index for pagination (default: 0)
 - `rows` (optional): Number of results to return (default: 10)
+- `facet` (optional): Enable Solr faceting
+- `facet_fields` (optional): Field facet string or array, sent as `facet.field`
+- `facet_queries` (optional): Query facet string or array, sent as `facet.query`
+- `facet_limit`, `facet_mincount`, `facet_sort` (optional): Common facet controls
+- `group` (optional): Enable Solr grouping
+- `group_field` (optional): Grouping field string or array, sent as `group.field`
+- `group_limit`, `group_offset`, `group_sort` (optional): Common grouping controls
+- `params` (optional): Object of additional Solr parameters for advanced use
 
 **Example queries:**
 ```
-"Find all structures released in October 2025 grouped by experimental method"
-"Search for all X-ray crystal structures with resolution better than 2.0 Å"
-"Show me the latest 20 cryo-EM structures sorted by release date"
-"Find structures containing ligand 'ATP' with specific binding sites"
+{
+  "query": "*:*",
+  "fq": ["release_date:[2025-10-01T00:00:00Z TO 2025-10-31T23:59:59Z]"],
+  "group": true,
+  "group_field": "experimental_method",
+  "rows": 0
+}
+
+{
+  "query": "*:*",
+  "fq": ["experimental_method:\"X-ray diffraction\"", "resolution:[0 TO 2.0]"],
+  "fl": ["pdb_id", "title", "resolution", "experimental_method"],
+  "sort": "resolution asc",
+  "rows": 20
+}
+
+{
+  "query": "text:*ATP*",
+  "facet": true,
+  "facet_fields": ["ligand_name", "experimental_method"],
+  "facet_mincount": 1,
+  "rows": 10
+}
 ```
 
 ### Search Field Examples
