@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 pdbe-mcp-server = "pdbe_mcp_server.server:main"
+pdbe-mcp-remote-server = "pdbe_mcp_server.remote_server:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,3 +1,4 @@
+import os
 from typing import Any, Callable, Sequence
 
 import anyio
@@ -15,6 +16,8 @@ search_tools: SearchTools = SearchTools()
 graph_tools: GraphTools = GraphTools()
 
 conf: DictConfig = get_config()
+
+ROOT_PREFIX = os.getenv("ROOT_PREFIX", "")
 
 
 class MCPServerFactory:
@@ -69,6 +72,7 @@ def build_graph_server() -> Server:
             graph_tools.get_pdbe_graph_nodes_tool(),
             graph_tools.get_pdbe_graph_edges_tool(),
             graph_tools.get_pdbe_graph_example_queries_tool(),
+            graph_tools.get_pdbe_graph_indexes_tool(),
         ]
 
         # Add the cypher query tool only if Neo4j is configured
@@ -93,6 +97,8 @@ def build_graph_server() -> Server:
                     text=graph_tools.format_example_queries(), type="text"
                 )
             ]
+        elif name == "pdbe_graph_indexes":
+            return [types.TextContent(text=graph_tools.format_indexes(), type="text")]
         elif name == "pdbe_run_cypher_query":
             if not graph_tools:
                 return [
@@ -111,7 +117,7 @@ def build_graph_server() -> Server:
                 ]
 
             try:
-                result = graph_tools.execute_cypher_query(cypher_query)
+                result = await graph_tools.execute_cypher_query(cypher_query)
                 return [types.TextContent(type="text", text=result)]
             except ValueError as e:
                 return [types.TextContent(type="text", text=str(e))]
@@ -196,6 +202,12 @@ def main(port: int, transport: str, server_type: str) -> int:
 
         sse = SseServerTransport("/messages/")
 
+        root_paths = {
+            "pdbe_api_server": f"{ROOT_PREFIX}/api",
+            "pdbe_graph_server": f"{ROOT_PREFIX}/graph",
+            "pdbe_search_server": f"{ROOT_PREFIX}/search",
+        }
+
         async def handle_sse(request):
             async with sse.connect_sse(
                 request.scope,
@@ -210,12 +222,14 @@ def main(port: int, transport: str, server_type: str) -> int:
         starlette_app = Starlette(
             debug=True,
             routes=[
-                Route("/sse", endpoint=handle_sse, methods=["GET"]),
+                Route("/sse", endpoint=handle_sse, methods=["GET", "POST"]),
                 Mount("/messages/", app=sse.handle_post_message),
             ],
         )
 
-        uvicorn.run(starlette_app, host="0.0.0.0", port=port)
+        uvicorn.run(
+            starlette_app, host="0.0.0.0", port=port, root_path=root_paths[server_type]
+        )
 
     else:
         from mcp.server.stdio import stdio_server
