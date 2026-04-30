@@ -163,6 +163,60 @@ class TestSearchTools:
         ]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_structured_fq(
+        self, mock_get: MagicMock, mock_search_response: dict[str, Any]
+    ) -> None:
+        """Test running search query with structured field filters."""
+        mock_get.return_value = mock_search_response
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "fq": {
+                "experimental_method": "X-ray diffraction",
+                "pdb_id": "1cbs",
+            },
+        }
+        result = tools.run_search_query(arguments)
+        assert "1cbs" in result
+
+        call_args = mock_get.call_args
+        assert call_args is not None
+        params = call_args.kwargs["params"]
+        assert params["fq"] == [
+            'experimental_method:"X-ray diffraction"',
+            "pdb_id:1cbs",
+        ]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_mixed_structured_fq_list(
+        self, mock_get: MagicMock, mock_search_response: dict[str, Any]
+    ) -> None:
+        """Test running search query with mixed raw and structured filters."""
+        mock_get.return_value = mock_search_response
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "fq": [
+                {"experimental_method": '"X-ray diffraction"'},
+                {"pdb_id": "1cbs"},
+                "resolution:[0 TO 2.0]",
+            ],
+        }
+        result = tools.run_search_query(arguments)
+        assert "1cbs" in result
+
+        call_args = mock_get.call_args
+        assert call_args is not None
+        params = call_args.kwargs["params"]
+        assert params["fq"] == [
+            'experimental_method:"X-ray diffraction"',
+            "pdb_id:1cbs",
+            "resolution:[0 TO 2.0]",
+        ]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_sort(
         self, mock_get: MagicMock, mock_search_response: dict[str, Any]
     ) -> None:
