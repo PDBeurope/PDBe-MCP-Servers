@@ -22,7 +22,7 @@ Executes a search query against the PDBe Solr search service.
     - query (string): Raw Solr query string passed as `q`.
     - fl (string or list of strings, optional): Solr field list. The legacy `filters` parameter is also accepted as an alias.
     - filters (list of strings, optional): Backwards-compatible alias for `fl`.
-    - fq (string or list of strings, optional): Solr filter query or queries to narrow down the search results.
+    - fq (string, object, list of strings, or list of objects, optional): Solr filter query or queries to narrow down the search results. Objects are converted to fielded filters, e.g. {"experimental_method": "X-ray diffraction"} becomes experimental_method:"X-ray diffraction".
     - sort (string, optional): The sorting criteria for the search results.
     - start (integer, optional): The starting index for pagination of results.
     - rows (integer, optional): The number of results to return.
@@ -74,8 +74,34 @@ Executes a search query against the PDBe Solr search service.
                         "oneOf": [
                             {"type": "string"},
                             {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "oneOf": [
+                                        {"type": "string"},
+                                        {"type": "number"},
+                                        {"type": "integer"},
+                                        {"type": "boolean"},
+                                    ]
+                                },
+                            },
+                            {
                                 "type": "array",
-                                "items": {"type": "string"},
+                                "items": {
+                                    "oneOf": [
+                                        {"type": "string"},
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "oneOf": [
+                                                    {"type": "string"},
+                                                    {"type": "number"},
+                                                    {"type": "integer"},
+                                                    {"type": "boolean"},
+                                                ]
+                                            },
+                                        },
+                                    ]
+                                },
                             },
                         ],
                     },
@@ -171,6 +197,35 @@ Executes a search query against the PDBe Solr search service.
             return
         params[solr_name] = cls._as_solr_value(value)
 
+    @classmethod
+    def _as_solr_filter_value(cls, value: Any) -> str:
+        converted = str(cls._as_solr_value(value))
+        if " " in converted and not (
+            converted.startswith('"') and converted.endswith('"')
+        ):
+            return f'"{converted}"'
+        return converted
+
+    @classmethod
+    def _normalize_filter_queries(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            return [
+                f"{field}:{cls._as_solr_filter_value(field_value)}"
+                for field, field_value in value.items()
+            ]
+        if isinstance(value, list):
+            normalized: list[Any] = []
+            for item in value:
+                item_value = cls._normalize_filter_queries(item)
+                if isinstance(item_value, list):
+                    normalized.extend(item_value)
+                elif item_value is not None:
+                    normalized.append(item_value)
+            return normalized
+        return cls._as_solr_value(value)
+
     @staticmethod
     def _format_value(value: Any, indent: int = 0) -> list[str]:
         prefix = " " * indent
@@ -204,7 +259,12 @@ Executes a search query against the PDBe Solr search service.
         cls._add_param(params, "rows", arguments.get("rows", 10), join_lists=False)
         cls._add_param(params, "sort", arguments.get("sort"), join_lists=False)
         cls._add_param(params, "fl", fields, join_lists=True)
-        cls._add_param(params, "fq", arguments.get("fq"), join_lists=False)
+        cls._add_param(
+            params,
+            "fq",
+            cls._normalize_filter_queries(arguments.get("fq")),
+            join_lists=False,
+        )
         cls._add_param(params, "facet", arguments.get("facet"), join_lists=False)
         cls._add_param(
             params, "facet.field", arguments.get("facet_fields"), join_lists=False

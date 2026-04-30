@@ -256,18 +256,19 @@ class OpenAPIToMCPGenerator:
         # Build full URL
         full_url = urljoin(self.base_url, url_path.lstrip("/"))
 
-        # Build path parameters
-        path_params = {}
-        for param_name in tool_info["path_params"]:
+        query_params = {}
+        for param_name in tool_info["query_params"]:
             if param_name in arguments:
-                path_params[param_name] = arguments[param_name]
+                query_params[param_name] = arguments[param_name]
 
         last_error: requests.RequestException | None = None
         data = None
         for attempt in range(3):
             try:
                 if tool_info["method"] == "GET":
-                    data = HTTPClient.get(full_url)
+                    data = HTTPClient.get(
+                        full_url, params=query_params if query_params else None
+                    )
                 elif tool_info["method"] == "POST":
                     data = HTTPClient.post(full_url)
                 else:

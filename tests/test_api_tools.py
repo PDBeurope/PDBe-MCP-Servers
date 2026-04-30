@@ -157,6 +157,34 @@ class TestOpenAPIToMCPGenerator:
         assert "success" in result[0].text
         assert "test_data" in result[0].text
 
+        mock_get.assert_called_with(
+            "https://www.ebi.ac.uk/pdbe/api/v2/test/test123",
+            params={"format": "json"},
+        )
+
+    @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
+    def test_call_tool_omits_absent_query_params(
+        self, mock_get: MagicMock, mock_openapi_spec: dict[str, Any]
+    ) -> None:
+        """Test that missing optional query parameters are not sent."""
+        mock_get.side_effect = [
+            mock_openapi_spec,
+            {"result": "success", "data": "test_data"},
+        ]
+
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+        generator.list_tools()
+
+        result = generator.call_tool("get_test", {"id": "test123"})
+
+        assert len(result) == 1
+        assert result[0].type == "text"
+        assert "success" in result[0].text
+        mock_get.assert_called_with(
+            "https://www.ebi.ac.uk/pdbe/api/v2/test/test123",
+            params=None,
+        )
+
     @patch("toon.encode")
     @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
     def test_call_tool_toon_success(
