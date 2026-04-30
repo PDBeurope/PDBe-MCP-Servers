@@ -2,10 +2,18 @@
 
 from typing import Any
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
 from pdbe_mcp_server.search_tools import SearchTools
+
+
+def get_called_query_params(mock_get: MagicMock) -> dict[str, list[str]]:
+    call_args = mock_get.call_args
+    assert call_args is not None
+    url = call_args.args[0]
+    return parse_qs(urlparse(url).query)
 
 
 class TestSearchTools:
@@ -80,10 +88,8 @@ class TestSearchTools:
         assert "Test Structure 1" in result
         assert "2.5" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["q"] == "pdb_id:1cbs"
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["pdb_id:1cbs"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_filters(
@@ -105,12 +111,10 @@ class TestSearchTools:
         assert "2.5" in result
 
         # Verify HTTPClient.get was called with correct parameters
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["q"] == "pdb_id:1cbs"
-        assert params["fl"] == "pdb_id,title"
-        assert params["rows"] == "10"
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["pdb_id:1cbs"]
+        assert params["fl"] == ["pdb_id,title"]
+        assert params["rows"] == ["10"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_fl(
@@ -127,11 +131,9 @@ class TestSearchTools:
         result = tools.run_search_query(arguments)
         assert "1cbs" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["q"] == "*:*"
-        assert params["fl"] == "pdb_id,title,resolution"
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["*:*"]
+        assert params["fl"] == ["pdb_id,title,resolution"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_fq(
@@ -153,10 +155,8 @@ class TestSearchTools:
         result = tools.run_search_query(arguments)
         assert "1cbs" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["q"] == "kinase"
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["kinase"]
         assert params["fq"] == [
             'experimental_method:"X-ray diffraction"',
             "resolution:[0 TO 2.0]",
@@ -180,9 +180,7 @@ class TestSearchTools:
         result = tools.run_search_query(arguments)
         assert "1cbs" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
+        params = get_called_query_params(mock_get)
         assert params["fq"] == [
             'experimental_method:"X-ray diffraction"',
             "pdb_id:1cbs",
@@ -207,9 +205,7 @@ class TestSearchTools:
         result = tools.run_search_query(arguments)
         assert "1cbs" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
+        params = get_called_query_params(mock_get)
         assert params["fq"] == [
             'experimental_method:"X-ray diffraction"',
             "pdb_id:1cbs",
@@ -237,10 +233,8 @@ class TestSearchTools:
         assert "2.5" in result
 
         # Verify sort parameter was passed
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["sort"] == "resolution asc"
+        params = get_called_query_params(mock_get)
+        assert params["sort"] == ["resolution asc"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_list_values(
@@ -272,11 +266,9 @@ class TestSearchTools:
         assert "2.5" in result
 
         # Verify default parameters
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["start"] == "0"
-        assert params["rows"] == "10"
+        params = get_called_query_params(mock_get)
+        assert params["start"] == ["0"]
+        assert params["rows"] == ["10"]
         assert "sort" not in params  # Should not be present if not specified
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
@@ -309,12 +301,10 @@ class TestSearchTools:
         assert "experimental_method:" in result
         assert "X-ray diffraction" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["facet"] == "true"
+        params = get_called_query_params(mock_get)
+        assert params["facet"] == ["true"]
         assert params["facet.field"] == ["experimental_method"]
-        assert params["facet.mincount"] == "1"
+        assert params["facet.mincount"] == ["1"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_grouping(self, mock_get: MagicMock) -> None:
@@ -351,12 +341,10 @@ class TestSearchTools:
         assert "experimental_method:" in result
         assert "X-ray diffraction" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["group"] == "true"
-        assert params["group.field"] == "experimental_method"
-        assert params["group.limit"] == "3"
+        params = get_called_query_params(mock_get)
+        assert params["group"] == ["true"]
+        assert params["group.field"] == ["experimental_method"]
+        assert params["group.limit"] == ["3"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_additional_params(
@@ -376,13 +364,11 @@ class TestSearchTools:
         }
         tools.run_search_query(arguments)
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["q"] == "text:*kinase*"
-        assert params["defType"] == "edismax"
-        assert params["qf"] == "title text"
-        assert params["debug"] is True
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["text:*kinase*"]
+        assert params["defType"] == ["edismax"]
+        assert params["qf"] == ["title text"]
+        assert params["debug"] == ["True"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_invalid_response(self, mock_get: MagicMock) -> None:
