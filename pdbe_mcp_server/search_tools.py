@@ -1,4 +1,6 @@
+import json
 from typing import Any
+from urllib.parse import urlencode
 
 import mcp.types as types
 from omegaconf import DictConfig
@@ -39,7 +41,7 @@ Executes a search query against the PDBe Solr search service.
     {
         "query": "text:*kinase*",
         "fl": ["pdb_id", "title", "deposition_date"],
-        "fq": ["experimental_method:\"X-ray diffraction\""],
+        "fq": ["experimental_method:\\"X-ray diffraction\\""],
         "facet": true,
         "facet_fields": ["experimental_method"],
         "sort": "deposition_date desc",
@@ -49,7 +51,7 @@ Executes a search query against the PDBe Solr search service.
 
     Expected Output Format:
     A text representation of the search results, formatted in a readable manner. The output will include:
-    - Metadata about the search results (e.g., number of documents found, start index).
+    - Metadata about the search results (e.g. number of documents found, start index).
     - A list of documents matching the search query, with each document's fields and values clearly presented.
     The output will be structured to facilitate easy interpretation of the search results, allowing users to quickly identify relevant information.
             """,
@@ -178,6 +180,39 @@ Executes a search query against the PDBe Solr search service.
         )
 
     @staticmethod
+    def _parse_json_like_string(value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+
+        stripped = value.strip()
+        if not stripped:
+            return value
+
+        if not (
+            (stripped.startswith("[") and stripped.endswith("]"))
+            or (stripped.startswith("{") and stripped.endswith("}"))
+        ):
+            return value
+
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            return value
+
+    @classmethod
+    def _sanitize_json_like_strings(cls, value: Any) -> Any:
+        value = cls._parse_json_like_string(value)
+
+        if isinstance(value, dict):
+            return {
+                key: cls._sanitize_json_like_strings(nested_value)
+                for key, nested_value in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._sanitize_json_like_strings(item) for item in value]
+        return value
+
+    @staticmethod
     def _as_solr_value(value: Any) -> Any:
         if isinstance(value, bool):
             return str(value).lower()
@@ -189,6 +224,8 @@ Executes a search query against the PDBe Solr search service.
     def _add_param(
         cls, params: dict[str, Any], solr_name: str, value: Any, *, join_lists: bool
     ) -> None:
+        value = cls._sanitize_json_like_strings(value)
+
         if value is None:
             return
         if isinstance(value, list):
@@ -208,6 +245,8 @@ Executes a search query against the PDBe Solr search service.
 
     @classmethod
     def _normalize_filter_queries(cls, value: Any) -> Any:
+        value = cls._sanitize_json_like_strings(value)
+
         if value is None:
             return None
         if isinstance(value, dict):
@@ -251,7 +290,9 @@ Executes a search query against the PDBe Solr search service.
 
     @classmethod
     def _build_solr_params(cls, arguments: dict[str, Any]) -> dict[str, Any]:
-        params = arguments.get("params", {}).copy()
+        arguments = cls._sanitize_json_like_strings(arguments)
+        raw_params = arguments.get("params", {})
+        params = raw_params.copy() if isinstance(raw_params, dict) else {}
         fields = arguments.get("fl", arguments.get("filters"))
 
         cls._add_param(params, "q", arguments.get("query"), join_lists=False)
@@ -299,6 +340,15 @@ Executes a search query against the PDBe Solr search service.
         )
         return params
 
+    @staticmethod
+    def _build_solr_url(base_url: str, params: dict[str, Any]) -> str:
+        query_string = urlencode(params, doseq=True)
+        if not query_string:
+            return base_url
+
+        separator = "&" if "?" in base_url else "?"
+        return f"{base_url}{separator}{query_string}"
+
     def get_search_schema_tool(self) -> types.Tool:
         return types.Tool(
             name="get_search_schema",
@@ -308,7 +358,7 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
     Expected Output Format:
     A text representation of the search schema, formatted as a table with the following columns:
     - Field Name: The name of the field in the Solr schema.
-    - Type: The data type of the field (e.g., string, integer, date).
+    - Type: The data type of the field (e.g. string, integer, date).
     - Stored: Indicates whether the field is stored in the index (true/false).
     - Indexed: Indicates whether the field is indexed for searching (true/false).
     - Description: A brief description of the field and its purpose.
@@ -339,11 +389,12 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
 
     def run_search_query(self, arguments: dict[str, Any]) -> str:
         fields = self._build_solr_params(arguments)
-        data = HTTPClient.get(conf.search.search_api, params=fields)
+        search_url = self._build_solr_url(conf.search.search_api, fields)
+        data = HTTPClient.get(search_url)
 
         if data is None or "response" not in data:
             raise Exception("Invalid response from search service")
-        # Extract the relevant information from the response
+
         response = data["response"]
         docs = response.get("docs", [])
         num_found = response.get("numFound", 0)
