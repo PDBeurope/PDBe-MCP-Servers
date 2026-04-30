@@ -180,9 +180,7 @@ class TestSearchTools:
         result = tools.run_search_query(arguments)
         assert "1cbs" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
+        params = get_called_query_params(mock_get)
         assert params["fq"] == [
             'experimental_method:"X-ray diffraction"',
             "pdb_id:1cbs",
@@ -207,9 +205,7 @@ class TestSearchTools:
         result = tools.run_search_query(arguments)
         assert "1cbs" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
+        params = get_called_query_params(mock_get)
         assert params["fq"] == [
             'experimental_method:"X-ray diffraction"',
             "pdb_id:1cbs",
