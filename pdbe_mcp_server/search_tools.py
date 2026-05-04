@@ -3,6 +3,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 import mcp.types as types
+import requests
 from omegaconf import DictConfig
 
 from pdbe_mcp_server import get_config
@@ -478,6 +479,39 @@ Executes a search query against the PDBe Solr search service.
         separator = "&" if "?" in base_url else "?"
         return f"{base_url}{separator}{query_string}"
 
+    @staticmethod
+    def _format_search_http_error(error: requests.HTTPError) -> str:
+        response = error.response
+        if response is None:
+            return f"Search query failed: {error}"
+
+        lines = [
+            f"Search query failed: HTTP {response.status_code}.",
+            f"URL: {response.url}",
+        ]
+
+        try:
+            payload = response.json()
+        except ValueError:
+            body = response.text.strip()
+            if body:
+                lines.append(f"Response body: {body}")
+            return "\n".join(lines)
+
+        solr_error = payload.get("error") if isinstance(payload, dict) else None
+        if isinstance(solr_error, dict):
+            message = solr_error.get("msg")
+            code = solr_error.get("code")
+            if message:
+                lines.append(f"Solr error: {message}")
+            if code is not None:
+                lines.append(f"Solr error code: {code}")
+
+        if len(lines) == 2:
+            lines.append(f"Response body: {json.dumps(payload)}")
+
+        return "\n".join(lines)
+
     def get_search_schema_tool(self) -> types.Tool:
         return types.Tool(
             name="get_search_schema",
@@ -519,7 +553,10 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
     def run_search_query(self, arguments: dict[str, Any]) -> str:
         fields = self._build_solr_params(arguments)
         search_url = self._build_solr_url(conf.search.search_api, fields)
-        data = HTTPClient.get(search_url)
+        try:
+            data = HTTPClient.get(search_url)
+        except requests.HTTPError as e:
+            return self._format_search_http_error(e)
 
         if data is None or not any(
             key in data

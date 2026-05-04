@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+import requests
 
 from pdbe_mcp_server.search_tools import SearchTools
 
@@ -492,6 +493,61 @@ class TestSearchTools:
 
         with pytest.raises(Exception, match="Invalid response from search service"):
             tools.run_search_query(arguments)
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_returns_solr_error_message(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test Solr HTTP errors are returned with the server diagnostic."""
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.url = (
+            "https://www.ebi.ac.uk/pdbe/search/pdb/select?"
+            "q=document_type%3Alatest_chemistry&group=true&group.field=new_ligand"
+        )
+        mock_response.json.return_value = {
+            "error": {
+                "msg": "can not use FieldCache on multivalued field: new_ligand",
+                "code": 400,
+            }
+        }
+        mock_get.side_effect = requests.HTTPError(response=mock_response)
+
+        tools = SearchTools()
+        result = tools.run_search_query(
+            {
+                "query": "document_type:latest_chemistry",
+                "group": True,
+                "group_field": "new_ligand",
+            }
+        )
+
+        assert "Search query failed: HTTP 400." in result
+        assert "group.field=new_ligand" in result
+        assert (
+            "Solr error: can not use FieldCache on multivalued field: new_ligand"
+            in result
+        )
+        assert "Solr error code: 400" in result
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_returns_plain_text_error_body(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test non-JSON HTTP errors still include the response body."""
+        mock_response = MagicMock()
+        mock_response.status_code = 502
+        mock_response.url = "https://www.ebi.ac.uk/pdbe/search/pdb/select?q=test"
+        mock_response.text = "Bad Gateway"
+        mock_response.json.side_effect = ValueError("not json")
+        mock_get.side_effect = requests.HTTPError(response=mock_response)
+
+        tools = SearchTools()
+        result = tools.run_search_query({"query": "test"})
+
+        assert "Search query failed: HTTP 502." in result
+        assert "URL: https://www.ebi.ac.uk/pdbe/search/pdb/select?q=test" in result
+        assert "Response body: Bad Gateway" in result
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_empty_results(self, mock_get: MagicMock) -> None:
