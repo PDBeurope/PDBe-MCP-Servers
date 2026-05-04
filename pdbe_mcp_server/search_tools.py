@@ -145,6 +145,18 @@ Executes a search query against the PDBe Solr search service.
                     "group_limit": {"type": "integer"},
                     "group_offset": {"type": "integer"},
                     "group_sort": {"type": "string"},
+                    "group_format": {"type": "string"},
+                    "group_main": {"type": "boolean"},
+                    "group_ngroups": {"type": "boolean"},
+                    "group_query": {
+                        "oneOf": [
+                            {"type": "string"},
+                            {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        ],
+                    },
                     "params": {
                         "type": "object",
                         "additionalProperties": {
@@ -266,6 +278,111 @@ Executes a search query against the PDBe Solr search service.
         return cls._as_solr_value(value)
 
     @staticmethod
+    def _format_document(doc: dict[str, Any], indent: int = 2) -> list[str]:
+        prefix = " " * indent
+        return [
+            f"{prefix}{key}: {', '.join(str(v) for v in value) if isinstance(value, list) else str(value)}"
+            for key, value in doc.items()
+        ]
+
+    @classmethod
+    def _format_doclist(
+        cls, doclist: dict[str, Any], indent: int = 0, *, include_header: bool = True
+    ) -> list[str]:
+        prefix = " " * indent
+        docs = doclist.get("docs", [])
+        lines: list[str] = []
+
+        if include_header:
+            lines.extend(
+                [
+                    f"{prefix}Number of documents found: {doclist.get('numFound', 0)}",
+                    f"{prefix}Start index: {doclist.get('start', 0)}",
+                    f"{prefix}Documents returned: {len(docs)}",
+                ]
+            )
+
+        for index, doc in enumerate(docs, start=1):
+            lines.append(f"{prefix}Document {index}:")
+            if isinstance(doc, dict):
+                lines.extend(cls._format_document(doc, indent + 2))
+            else:
+                lines.extend(cls._format_value(doc, indent + 2))
+
+        return lines
+
+    @classmethod
+    def _format_grouped_results(
+        cls, grouped: dict[str, Any], indent: int = 0
+    ) -> list[str]:
+        prefix = " " * indent
+        lines: list[str] = []
+
+        for group_field, group_data in grouped.items():
+            lines.append(f"{prefix}Group field: {group_field}")
+
+            if not isinstance(group_data, dict):
+                lines.extend(cls._format_value(group_data, indent + 2))
+                continue
+
+            if "matches" in group_data:
+                lines.append(
+                    f"{prefix}  Matching documents: {group_data.get('matches', 0)}"
+                )
+            if "ngroups" in group_data:
+                lines.append(f"{prefix}  Number of groups: {group_data.get('ngroups')}")
+
+            groups = group_data.get("groups")
+            if isinstance(groups, list):
+                lines.append(f"{prefix}  Groups returned: {len(groups)}")
+                for index, group in enumerate(groups, start=1):
+                    if not isinstance(group, dict):
+                        lines.append(f"{prefix}  Group {index}:")
+                        lines.extend(cls._format_value(group, indent + 4))
+                        continue
+
+                    lines.append(
+                        f"{prefix}  Group {index}: {group.get('groupValue', '<null>')}"
+                    )
+                    doclist = group.get("doclist")
+                    if isinstance(doclist, dict):
+                        lines.append(
+                            f"{prefix}    Documents in group: {doclist.get('numFound', 0)}"
+                        )
+                        if "start" in doclist:
+                            lines.append(
+                                f"{prefix}    Group start index: {doclist.get('start')}"
+                            )
+                        lines.extend(
+                            cls._format_doclist(
+                                doclist, indent + 4, include_header=False
+                            )
+                        )
+                    else:
+                        remaining = {
+                            key: value
+                            for key, value in group.items()
+                            if key != "groupValue"
+                        }
+                        lines.extend(cls._format_value(remaining, indent + 4))
+                continue
+
+            doclist = group_data.get("doclist")
+            if isinstance(doclist, dict):
+                lines.extend(cls._format_doclist(doclist, indent + 2))
+                continue
+
+            remaining = {
+                key: value
+                for key, value in group_data.items()
+                if key not in {"matches", "ngroups"}
+            }
+            if remaining:
+                lines.extend(cls._format_value(remaining, indent + 2))
+
+        return lines
+
+    @staticmethod
     def _format_value(value: Any, indent: int = 0) -> list[str]:
         prefix = " " * indent
         if isinstance(value, dict):
@@ -338,6 +455,18 @@ Executes a search query against the PDBe Solr search service.
         cls._add_param(
             params, "group.sort", arguments.get("group_sort"), join_lists=False
         )
+        cls._add_param(
+            params, "group.format", arguments.get("group_format"), join_lists=False
+        )
+        cls._add_param(
+            params, "group.main", arguments.get("group_main"), join_lists=False
+        )
+        cls._add_param(
+            params, "group.ngroups", arguments.get("group_ngroups"), join_lists=False
+        )
+        cls._add_param(
+            params, "group.query", arguments.get("group_query"), join_lists=False
+        )
         return params
 
     @staticmethod
@@ -392,24 +521,40 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
         search_url = self._build_solr_url(conf.search.search_api, fields)
         data = HTTPClient.get(search_url)
 
-        if data is None or "response" not in data:
+        if data is None or not any(
+            key in data
+            for key in (
+                "response",
+                "grouped",
+                "facet_counts",
+                "stats",
+                "highlighting",
+                "spellcheck",
+                "terms",
+            )
+        ):
             raise Exception("Invalid response from search service")
 
-        response = data["response"]
-        docs = response.get("docs", [])
-        num_found = response.get("numFound", 0)
-        results = [
-            "Results metadata:",
-            f"Number of documents found: {num_found}",
-            f"Start index: {response.get('start', 0)}",
-            "Documents:",
-        ]
-        for i, doc in enumerate(docs, start=1):
-            results.append(f"Document {i}:")
-            for key, value in doc.items():
-                results.append(
-                    f"  {key}: {', '.join(str(v) for v in value) if isinstance(value, list) else str(value)}"
-                )
+        results: list[str] = []
+        if "response" in data:
+            response = data["response"]
+            docs = response.get("docs", []) if isinstance(response, dict) else []
+            num_found = response.get("numFound", 0) if isinstance(response, dict) else 0
+            start = response.get("start", 0) if isinstance(response, dict) else 0
+            results.extend(
+                [
+                    "Results metadata:",
+                    f"Number of documents found: {num_found}",
+                    f"Start index: {start}",
+                    "Documents:",
+                ]
+            )
+            for i, doc in enumerate(docs, start=1):
+                results.append(f"Document {i}:")
+                if isinstance(doc, dict):
+                    results.extend(self._format_document(doc))
+                else:
+                    results.extend(self._format_value(doc, indent=2))
 
         if "facet_counts" in data:
             results.append("Facet counts:")
@@ -417,6 +562,11 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
 
         if "grouped" in data:
             results.append("Grouped results:")
-            results.extend(self._format_value(data["grouped"], indent=2))
+            results.extend(self._format_grouped_results(data["grouped"], indent=2))
+
+        for key in ("stats", "highlighting", "spellcheck", "terms"):
+            if key in data:
+                results.append(f"{key}:")
+                results.extend(self._format_value(data[key], indent=2))
 
         return "\n".join(results)

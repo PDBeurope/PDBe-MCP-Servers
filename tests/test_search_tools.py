@@ -338,13 +338,125 @@ class TestSearchTools:
         result = tools.run_search_query(arguments)
 
         assert "Grouped results:" in result
-        assert "experimental_method:" in result
+        assert "Group field: experimental_method" in result
         assert "X-ray diffraction" in result
 
         params = get_called_query_params(mock_get)
         assert params["group"] == ["true"]
         assert params["group.field"] == ["experimental_method"]
         assert params["group.limit"] == ["3"]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_grouping_without_response(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test grouped Solr responses that omit the top-level response key."""
+        mock_get.return_value = {
+            "responseHeader": {
+                "status": 0,
+                "params": {
+                    "q": "new_ligand:*",
+                    "group": "true",
+                    "group.field": "pdb_id",
+                },
+            },
+            "grouped": {
+                "pdb_id": {
+                    "matches": 39,
+                    "groups": [
+                        {
+                            "groupValue": "12xx",
+                            "doclist": {
+                                "numFound": 1,
+                                "start": 0,
+                                "docs": [
+                                    {
+                                        "deposition_date": "2026-04-21T01:00:00Z",
+                                        "entity_id": 1,
+                                        "new_ligand": ["A1DD0 : cobalt salen complex"],
+                                        "pdb_id": "12xx",
+                                        "title": "Structure with salen bound",
+                                    }
+                                ],
+                            },
+                        },
+                        {
+                            "groupValue": "25sm",
+                            "doclist": {
+                                "numFound": 1,
+                                "start": 0,
+                                "docs": [
+                                    {
+                                        "deposition_date": "2026-04-16T01:00:00Z",
+                                        "entity_id": 1,
+                                        "new_ligand": ["A1MGB : 3-CN-3-deazaguanosine"],
+                                        "pdb_id": "25sm",
+                                        "title": "Modified duplex RNA",
+                                    }
+                                ],
+                            },
+                        },
+                    ],
+                }
+            },
+        }
+
+        tools = SearchTools()
+        arguments = {
+            "query": "new_ligand:*",
+            "fl": ["pdb_id", "entity_id", "new_ligand", "title", "deposition_date"],
+            "group": True,
+            "group_field": "pdb_id",
+            "group_limit": 10,
+            "rows": 50,
+            "sort": "deposition_date desc",
+        }
+        result = tools.run_search_query(arguments)
+
+        assert "Grouped results:" in result
+        assert "Group field: pdb_id" in result
+        assert "Matching documents: 39" in result
+        assert "Groups returned: 2" in result
+        assert "Group 1: 12xx" in result
+        assert "Documents in group: 1" in result
+        assert "pdb_id: 12xx" in result
+        assert "A1DD0 : cobalt salen complex" in result
+        assert "Number of documents found:" not in result
+
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["new_ligand:*"]
+        assert params["fl"] == ["pdb_id,entity_id,new_ligand,title,deposition_date"]
+        assert params["group"] == ["true"]
+        assert params["group.field"] == ["pdb_id"]
+        assert params["group.limit"] == ["10"]
+        assert params["rows"] == ["50"]
+        assert params["sort"] == ["deposition_date desc"]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_additional_group_params(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test additional Solr grouping parameters."""
+        mock_get.return_value = {"grouped": {"pdb_id": {"matches": 0, "groups": []}}}
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "group": True,
+            "group_field": "pdb_id",
+            "group_format": "grouped",
+            "group_main": False,
+            "group_ngroups": True,
+            "group_query": ["new_ligand:*", "resolution:[0 TO 2]"],
+        }
+        result = tools.run_search_query(arguments)
+
+        assert "Group field: pdb_id" in result
+        params = get_called_query_params(mock_get)
+        assert params["group.format"] == ["grouped"]
+        assert params["group.main"] == ["false"]
+        assert params["group.ngroups"] == ["true"]
+        assert params["group.query"] == ["new_ligand:*", "resolution:[0 TO 2]"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_additional_params(
