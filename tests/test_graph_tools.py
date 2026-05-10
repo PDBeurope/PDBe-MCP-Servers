@@ -166,12 +166,10 @@ class TestGraphTools:
         formatted = tools.format_node_relationships(["NodeA"])
 
         assert (
-            "(NodeA)-[:RELATES_TO]->(NodeB) "
-            "[bidirectional: reverse edge also exists]"
+            "(NodeA)-[:RELATES_TO]->(NodeB) [bidirectional: reverse edge also exists]"
         ) in formatted
         assert (
-            "(NodeB)-[:RELATES_TO]->(NodeA) "
-            "[bidirectional: reverse edge also exists]"
+            "(NodeB)-[:RELATES_TO]->(NodeA) [bidirectional: reverse edge also exists]"
         ) in formatted
         assert "(NodeA)-[:REFERENCES]->(NodeA) [self-loop]" in formatted
 
