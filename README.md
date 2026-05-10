@@ -351,6 +351,17 @@ Retrieves metadata about all relationship types (edges) defined in the PDBe grap
 "Show me all relationship types in the PDBe graph database"
 ```
 
+#### `pdbe_graph_node_relationships`
+Verifies selected node labels and returns the incoming, outgoing, and self-loop relationship patterns defined for each label. This uses the public graph schema and does not require local Neo4j credentials.
+
+**Parameters:**
+- `node_labels` (required): List of exact, case-sensitive node labels to verify.
+
+**Example usage:**
+```
+"Verify relationships for Entry, Entity, and UniProt"
+```
+
 #### `pdbe_graph_example_queries`
 Retrieves example Cypher queries that demonstrate how to interact with the PDBe graph database. This uses the public graph schema and does not require local Neo4j credentials.
 
