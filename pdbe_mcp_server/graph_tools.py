@@ -215,6 +215,59 @@ class GraphTools:
             ),
         )
 
+    def get_pdbe_graph_node_relationships_tool(self) -> types.Tool:
+        return types.Tool(
+            name="pdbe_graph_node_relationships",
+            description="""
+    Verifies one or more PDBe graph node labels and returns the relationships connected to each label.
+    Use this tool after inspecting the node and edge schema, when you have selected node labels for a Cypher query
+    and want to confirm that the labels and relationship directions exist in the PDBe graph schema.
+
+    For each requested node label, this tool returns:
+    - Whether the node label exists in the schema
+    - Outgoing relationship patterns from that node label
+    - Incoming relationship patterns to that node label
+    - Self-loop relationship patterns where both ends use the same node label
+    - A bidirectional note when the schema has the same relationship label in both directions between two node labels
+
+    Parameters:
+        node_labels (required): A list of exact, case-sensitive node labels to verify.
+            Example: ["Entry", "Entity", "UniProt"]
+
+    Expected Output Format (text):
+    Node: Entry
+    Status: Found
+    Outgoing edges:
+      - (Entry)-[:HAS_ENTITY]->(Entity)
+    Incoming edges:
+      - None
+    Self-loop edges:
+      - None
+
+    Node: FakeNode
+    Status: Not found in schema
+    """,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "node_labels": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 1,
+                        "description": "Exact, case-sensitive node labels to verify against the PDBe graph schema.",
+                    }
+                },
+                "required": ["node_labels"],
+                "additionalProperties": False,
+            },
+            annotations=types.ToolAnnotations(
+                title="Verify PDBe Graph Node Relationships",
+                destructiveHint=False,
+                readOnlyHint=True,
+                idempotentHint=True,
+            ),
+        )
+
     def get_pdbe_graph_example_queries_tool(self) -> types.Tool:
         return types.Tool(
             name="pdbe_graph_example_queries",
@@ -387,6 +440,148 @@ class GraphTools:
             )
             for edge in self.edges
         )
+
+    def _edge_node_label(self, edge: dict[str, Any], endpoint: str) -> str:
+        """
+        Get the node label for an edge endpoint.
+
+        Args:
+            edge: Edge dictionary from the graph schema.
+            endpoint: The endpoint key to resolve, either "from" or "to".
+
+        Returns:
+            The endpoint node label if known, otherwise the raw endpoint identifier.
+        """
+        node_id = edge.get(endpoint)
+        return str(self.node_dict.get(node_id, node_id))
+
+    def _has_reverse_edge(self, edge: dict[str, Any]) -> bool:
+        """
+        Check whether the schema defines the same relationship in the reverse direction.
+
+        Args:
+            edge: Edge dictionary from the graph schema.
+
+        Returns:
+            True if another edge with the same label exists from the target node back
+            to the source node.
+        """
+        from_node = edge.get("from")
+        to_node = edge.get("to")
+        if from_node == to_node:
+            return False
+
+        return any(
+            other.get("label") == edge.get("label")
+            and other.get("from") == to_node
+            and other.get("to") == from_node
+            for other in self.edges
+        )
+
+    def _format_relationship_pattern(
+        self, edge: dict[str, Any], *, self_loop: bool = False
+    ) -> str:
+        """
+        Format an edge as a Cypher-like relationship pattern.
+
+        Args:
+            edge: Edge dictionary from the graph schema.
+            self_loop: Whether the edge connects a label to the same label.
+
+        Returns:
+            A plain text relationship pattern with direction and optional notes.
+        """
+        from_label = self._edge_node_label(edge, "from")
+        to_label = self._edge_node_label(edge, "to")
+        pattern = f"({from_label})-[:{edge.get('label', '')}]->({to_label})"
+
+        notes = []
+        if self_loop:
+            notes.append("self-loop")
+        if self._has_reverse_edge(edge):
+            notes.append("bidirectional: reverse edge also exists")
+        if notes:
+            pattern += f" [{'; '.join(notes)}]"
+
+        return pattern
+
+    def _format_relationship_section(self, heading: str, patterns: list[str]) -> str:
+        """
+        Format a relationship section for a node label.
+
+        Args:
+            heading: Section heading.
+            patterns: Relationship patterns for the section.
+
+        Returns:
+            Formatted plain text section.
+        """
+        if not patterns:
+            return f"{heading}:\n  - None"
+
+        return f"{heading}:\n" + "\n".join(f"  - {pattern}" for pattern in patterns)
+
+    def format_node_relationships(self, node_labels: list[str]) -> str:
+        """
+        Format incoming, outgoing, and self-loop relationships for selected node labels.
+
+        Args:
+            node_labels: Exact, case-sensitive node labels to verify.
+
+        Returns:
+            A formatted plain text relationship summary for each requested node label.
+        """
+        if not node_labels:
+            return (
+                "Error: node_labels parameter is required and must contain at least "
+                "one node label."
+            )
+
+        requested_labels = []
+        for node_label in node_labels:
+            if not isinstance(node_label, str) or not node_label.strip():
+                return "Error: node_labels must be a list of non-empty strings."
+
+            cleaned_label = node_label.strip()
+            if cleaned_label not in requested_labels:
+                requested_labels.append(cleaned_label)
+
+        known_labels = {node.get("label") for node in self.nodes}
+        blocks = []
+
+        for node_label in requested_labels:
+            lines = [f"Node: {node_label}"]
+            if node_label not in known_labels:
+                lines.append("Status: Not found in schema")
+                blocks.append("\n".join(lines))
+                continue
+
+            outgoing = []
+            incoming = []
+            self_loops = []
+
+            for edge in self.edges:
+                from_label = self._edge_node_label(edge, "from")
+                to_label = self._edge_node_label(edge, "to")
+
+                if from_label == node_label and to_label == node_label:
+                    self_loops.append(
+                        self._format_relationship_pattern(edge, self_loop=True)
+                    )
+                elif from_label == node_label:
+                    outgoing.append(self._format_relationship_pattern(edge))
+                elif to_label == node_label:
+                    incoming.append(self._format_relationship_pattern(edge))
+
+            lines.append("Status: Found")
+            lines.append(self._format_relationship_section("Outgoing edges", outgoing))
+            lines.append(self._format_relationship_section("Incoming edges", incoming))
+            lines.append(
+                self._format_relationship_section("Self-loop edges", self_loops)
+            )
+            blocks.append("\n".join(lines))
+
+        return "\n\n".join(blocks)
 
     def get_node_by_label(self, node_label: str) -> str | None:
         """

@@ -83,6 +83,97 @@ class TestGraphTools:
         assert "count" in formatted
 
     @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_node_relationships(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test relationship verification formatting for selected node labels."""
+        mock_get.return_value = mock_graph_schema
+
+        tools = GraphTools()
+        formatted = tools.format_node_relationships(["Structure", "Ligand"])
+
+        assert "Node: Structure" in formatted
+        assert "Status: Found" in formatted
+        assert "Outgoing edges:\n  - (Structure)-[:HAS_LIGAND]->(Ligand)" in formatted
+        assert "Incoming edges:\n  - None" in formatted
+        assert "Node: Ligand" in formatted
+        assert "Incoming edges:\n  - (Structure)-[:HAS_LIGAND]->(Ligand)" in formatted
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_node_relationships_missing_label(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test relationship verification output for unknown node labels."""
+        mock_get.return_value = mock_graph_schema
+
+        tools = GraphTools()
+        formatted = tools.format_node_relationships(["NonExistent"])
+
+        assert formatted == "Node: NonExistent\nStatus: Not found in schema"
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_node_relationships_empty_input(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test relationship verification output for empty input."""
+        mock_get.return_value = mock_graph_schema
+
+        tools = GraphTools()
+        formatted = tools.format_node_relationships([])
+
+        assert "node_labels parameter is required" in formatted
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_format_node_relationships_bidirectional_and_self_loop(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test bidirectional reverse edges and self-loop relationship notes."""
+        schema = {
+            "nodes": [
+                {"id": 1, "label": "NodeA", "title": "A", "description": "A"},
+                {"id": 2, "label": "NodeB", "title": "B", "description": "B"},
+            ],
+            "edges": [
+                {
+                    "label": "RELATES_TO",
+                    "title": "Relates",
+                    "description": "A relates to B",
+                    "from": 1,
+                    "to": 2,
+                    "properties": [],
+                },
+                {
+                    "label": "RELATES_TO",
+                    "title": "Relates",
+                    "description": "B relates to A",
+                    "from": 2,
+                    "to": 1,
+                    "properties": [],
+                },
+                {
+                    "label": "REFERENCES",
+                    "title": "References",
+                    "description": "A references A",
+                    "from": 1,
+                    "to": 1,
+                    "properties": [],
+                },
+            ],
+        }
+        mock_get.return_value = schema
+
+        tools = GraphTools()
+        formatted = tools.format_node_relationships(["NodeA"])
+
+        assert (
+            "(NodeA)-[:RELATES_TO]->(NodeB) [bidirectional: reverse edge also exists]"
+        ) in formatted
+        assert (
+            "(NodeB)-[:RELATES_TO]->(NodeA) [bidirectional: reverse edge also exists]"
+        ) in formatted
+        assert "(NodeA)-[:REFERENCES]->(NodeA) [self-loop]" in formatted
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
     def test_get_node_by_label_found(
         self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
     ) -> None:
@@ -212,6 +303,24 @@ class TestGraphTools:
         assert "relationship" in tool.description.lower()
         assert tool.inputSchema["type"] == "object"
         assert tool.inputSchema["additionalProperties"] is False
+
+    @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
+    def test_get_pdbe_graph_node_relationships_tool(
+        self, mock_get: MagicMock, mock_graph_schema: dict[str, Any]
+    ) -> None:
+        """Test getting the graph node relationships MCP tool."""
+        mock_get.return_value = mock_graph_schema
+
+        tools = GraphTools()
+        tool = tools.get_pdbe_graph_node_relationships_tool()
+
+        assert tool.name == "pdbe_graph_node_relationships"
+        assert tool.description is not None
+        assert "verify" in tool.description.lower()
+        assert tool.inputSchema["type"] == "object"
+        assert tool.inputSchema["additionalProperties"] is False
+        assert "node_labels" in tool.inputSchema.get("properties", {})
+        assert "node_labels" in tool.inputSchema.get("required", [])
 
     @patch("pdbe_mcp_server.graph_tools.HTTPClient.get")
     def test_format_example_queries(
