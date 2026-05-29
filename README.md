@@ -1,6 +1,6 @@
 # PDBe MCP Servers
 
-A set of Model Context Protocol (MCP) servers that provides seamless access to the Protein Data Bank in Europe (PDBe) API and PDBe Search. These servers expose PDBe's comprehensive structural biology data as MCP tools, enabling direct integration with Claude Desktop and other AI-powered applications.
+A set of Model Context Protocol (MCP) servers that provides seamless access to the Protein Data Bank in Europe (PDBe) API and PDBe Search. These servers expose PDBe's comprehensive structural biology data as MCP tools, enabling direct integration with any AI client that supports MCP.
 
 The package also includes an advanced PDBe Graph server for users who run their own local PDBe-KB Neo4j graph database. PDBe does not provide a public running graph database instance for this MCP server to query, so most users should start with the API and Search servers.
 
@@ -45,16 +45,17 @@ For development work or customization:
    uv pip install .
    ```
 
-## Claude Desktop Integration
+## AI Client Integration
 
 ### Configuration
 
-1. **Locate your Claude Desktop configuration file:**
-   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-   - **Linux**: `~/.config/Claude/claude_desktop_config.json`
+1. **Open your AI client's MCP configuration.**
 
-2. **Add the recommended PDBe MCP server configuration:**
+   MCP-compatible clients use different settings locations and file formats. Many JSON-based clients use an `mcpServers` object, while some clients provide commands or a settings UI for adding servers.
+
+2. **Add the recommended PDBe MCP server configuration.**
+
+   For JSON-based clients that support `mcpServers`, add:
 
    **For PyPI installation (recommended):**
    ```json
@@ -116,17 +117,61 @@ For development work or customization:
 
    Add the graph server only if you have a local PDBe-KB Neo4j graph database configured. See [Advanced Graph Server Configuration](#advanced-graph-server-configuration).
 
-3. **Restart Claude Desktop** to load the new configuration.
+3. **Restart or reload your AI client** to load the new configuration.
 
-### Using in Claude
+### Antigravity Example
 
-Once configured, you can access PDBe tools directly in your Claude conversations:
+In Antigravity, open **Manage MCP Servers** and select **View raw config**, or edit `~/.gemini/antigravity/mcp_config.json`, then add the PDBe server entries:
+
+```json
+{
+  "mcpServers": {
+    "PDBe API Server": {
+      "command": "uvx",
+      "args": [
+        "pdbe-mcp-server",
+        "--server-type",
+        "pdbe_api_server"
+      ]
+    },
+    "PDBe Search Server": {
+      "command": "uvx",
+      "args": [
+        "pdbe-mcp-server",
+        "--server-type",
+        "pdbe_search_server"
+      ]
+    }
+  }
+}
+```
+
+### Codex Example
+
+In Codex, add the PDBe MCP servers with the CLI:
+
+```bash
+codex mcp add pdbe-api -- uvx pdbe-mcp-server --server-type pdbe_api_server
+codex mcp add pdbe-search -- uvx pdbe-mcp-server --server-type pdbe_search_server
+codex mcp list
+```
+
+For a local development checkout, point Codex at the repository directory:
+
+```bash
+codex mcp add pdbe-api-local -- uv run --directory /path/to/your/PDBe-MCP-Servers pdbe-mcp-server --server-type pdbe_api_server
+codex mcp add pdbe-search-local -- uv run --directory /path/to/your/PDBe-MCP-Servers pdbe-mcp-server --server-type pdbe_search_server
+```
+
+### Using in an AI Client
+
+Once configured, you can access PDBe tools directly in your AI client conversations:
 
 - **Search for protein structures**: "Find structures for UniProt accession P12345"
 - **Query structure releases**: "Show me all structures released this month grouped by experimental method"
 - **Advanced search queries**: "Find all X-ray crystal structures with resolution better than 2.0 Å from 2024"
 
-The tools will appear in Claude's tools interface, where you can enable or disable them as needed.
+The tools will appear in your AI client's tools interface, where you can enable or disable them as needed.
 
 ### Server Types
 
@@ -272,9 +317,9 @@ Once your local Neo4j database is running, set these environment variables befor
 
 The Neo4j driver is included in this package's dependencies.
 
-### Claude Desktop Graph Configuration
+### MCP Client Graph Configuration
 
-Add this server only when the environment variables above are available to Claude Desktop.
+Add this server only when the environment variables above are available to your AI client.
 
 **For PyPI installation:**
 ```json
@@ -319,6 +364,15 @@ Add this server only when the environment variables above are available to Claud
     }
   }
 }
+```
+
+**Codex example:**
+```bash
+codex mcp add pdbe-graph \
+  --env NEO4J_URL=bolt://localhost:7687 \
+  --env NEO4J_USERNAME=neo4j \
+  --env NEO4J_PASSWORD=your-password \
+  -- uvx pdbe-mcp-server --server-type pdbe_graph_server
 ```
 
 ### Starting the Graph Server Manually
@@ -399,7 +453,7 @@ The MCP Inspector provides an interactive interface to browse tools, test querie
 
 ### Transport Options
 
-- **stdio**: Default mode - Optimal for direct client integration like Claude Desktop
+- **stdio**: Default mode - Optimal for direct MCP client integration
 - **SSE (Server-Sent Events)**: `--transport sse` - Best for web-based clients and development
 
 ### Experimental TOON Output
@@ -417,11 +471,11 @@ See the TOON format specification at https://toonformat.dev/.
 
 **"Command not found" errors:**
 - Ensure `uv` is installed and in your PATH
-- Verify the full path to `uv` in your Claude Desktop configuration
+- Verify the full path to `uv` in your AI client's MCP configuration
 
-**Missing tools in Claude:**
-- Restart Claude Desktop after configuration changes
-- Check the Claude Desktop logs for MCP server errors
+**Missing tools in your AI client:**
+- Restart or reload your AI client after configuration changes
+- Check your AI client's MCP server logs for errors
 - Verify JSON syntax in your configuration file
 
 ## Resources
@@ -429,7 +483,8 @@ See the TOON format specification at https://toonformat.dev/.
 - **[Model Context Protocol](https://modelcontextprotocol.org/)** - Official MCP documentation and specifications
 - **[PDBe API Documentation](https://www.ebi.ac.uk/pdbe/api/v2/)** - Complete API reference and examples
 - **[PDBe Graph Database](https://www.ebi.ac.uk/pdbe/pdbe-kb/graph)** - Advanced querying and relationship mapping
-- **[Claude Desktop](https://claude.ai/desktop)** - Download and setup instructions
+- **[Antigravity MCP Documentation](https://antigravity.google/docs/mcp)** - MCP setup instructions for Antigravity
+- **[OpenAI Docs MCP](https://platform.openai.com/docs/docs-mcp)** - Codex MCP configuration examples
 
 ## License
 
