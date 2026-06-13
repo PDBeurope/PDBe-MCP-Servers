@@ -25,7 +25,7 @@ class TestSearchTools:
         tools = SearchTools()
         tool = tools.get_run_search_query_tool()
 
-        assert tool.name == "run_search_query"
+        assert tool.name == "run_pdbe_search_query"
         assert tool.description is not None
         assert "search query" in tool.description.lower()
         assert "query" in tool.inputSchema["properties"]
@@ -40,7 +40,7 @@ class TestSearchTools:
         tools = SearchTools()
         tool = tools.get_search_schema_tool()
 
-        assert tool.name == "get_search_schema"
+        assert tool.name == "get_pdbe_search_schema"
         assert tool.description is not None
         assert "schema" in tool.description.lower()
         assert tool.inputSchema["type"] == "object"

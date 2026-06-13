@@ -733,7 +733,7 @@ wheels = [
 
 [[package]]
 name = "pdbe-mcp-server"
-version = "1.1.3"
+version = "1.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
