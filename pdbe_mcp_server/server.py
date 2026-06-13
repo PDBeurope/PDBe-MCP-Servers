@@ -164,11 +164,11 @@ in the PDBe database. Always make sure to understand the search schema before co
     async def call_tool(
         name: str, arguments: dict[str, Any]
     ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-        if name == "get_search_schema":
+        if name == "get_pdbe_search_schema":
             return [
                 types.TextContent(type="text", text=search_tools.get_search_schema())
             ]
-        elif name == "run_search_query":
+        elif name == "run_pdbe_search_query":
             return [
                 types.TextContent(
                     type="text",

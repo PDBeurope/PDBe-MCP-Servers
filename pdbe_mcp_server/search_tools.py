@@ -15,7 +15,7 @@ conf: DictConfig = get_config()
 class SearchTools:
     def get_run_search_query_tool(self) -> types.Tool:
         return types.Tool(
-            name="run_search_query",
+            name="run_pdbe_search_query",
             description="""
 Executes a search query against the PDBe Solr search service.
     This tool exposes common Solr query parameters directly so users can construct fielded queries, filter queries, field lists, facets, grouping, sorting, and pagination against the PDBe search index.
@@ -514,9 +514,9 @@ Executes a search query against the PDBe Solr search service.
 
     def get_search_schema_tool(self) -> types.Tool:
         return types.Tool(
-            name="get_search_schema",
+            name="get_pdbe_search_schema",
             description="""
-Retrieves the Solr search schema for the PDBe search service. You can use this tool to understand the structure and fields available in the PDBe search index. Once you have the schema, you can use it to construct more effective search queries and run the query using the `run_search_query` tool.
+Retrieves the Solr search schema for the PDBe search service. You can use this tool to understand the structure and fields available in the PDBe search index. Once you have the schema, you can use it to construct more effective search queries and run the query using the `run_pdbe_search_query` tool.
     This tool returns a detailed schema of the Solr search index used by PDBe. The schema includes information about all the fields available for searching, along with their types, whether they are stored or indexed, and any relevant descriptions.
     Expected Output Format:
     A text representation of the search schema, formatted as a table with the following columns:

@@ -187,7 +187,7 @@ The `pdbe_api_server` generates tools from the PDBe API OpenAPI specification. U
 
 ### Search Server Tools
 
-#### `get_search_schema`
+#### `get_pdbe_search_schema`
 Retrieves the complete Solr search schema showing all available fields, data types, and descriptions. Use this to understand what fields you can search and filter on.
 
 **Example usage:**
@@ -195,7 +195,7 @@ Retrieves the complete Solr search schema showing all available fields, data typ
 "Show me the search schema for PDBe structures"
 ```
 
-#### `run_search_query`
+#### `run_pdbe_search_query`
 Execute Solr-style search queries with flexible field selection, filter queries, facets, grouping, sorting, and pagination options.
 
 **Parameters:**
@@ -254,7 +254,7 @@ Common searchable fields include:
 - `ligand_name`: Bound ligands
 - `title`: Structure title/description
 
-Use `get_search_schema` to discover all available fields and their descriptions.
+Use `get_pdbe_search_schema` to discover all available fields and their descriptions.
 
 ## Development and Advanced Usage
 
