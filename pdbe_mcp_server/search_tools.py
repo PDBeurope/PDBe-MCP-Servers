@@ -229,7 +229,11 @@ Executes a search query against the PDBe Solr search service.
     def _as_solr_value(value: Any) -> Any:
         if isinstance(value, bool):
             return str(value).lower()
-        if isinstance(value, int | float):
+        if isinstance(value, float):
+            if value.is_integer():
+                return str(int(value))
+            return str(value)
+        if isinstance(value, int):
             return str(value)
         return value
 
@@ -480,8 +484,18 @@ Executes a search query against the PDBe Solr search service.
         return f"{base_url}{separator}{query_string}"
 
     @staticmethod
-    def _format_search_http_error(error: requests.HTTPError) -> str:
-        response = error.response
+    def _format_search_http_error(error: requests.RequestException) -> str:
+        response = getattr(error, "response", None)
+        if response is None:
+            # Extract last response from the exception chain (e.g. after retries exhausted)
+            cause = getattr(error, "__cause__", None)
+            while cause is not None:
+                last_response = getattr(cause, "response", None)
+                if last_response is not None:
+                    response = last_response
+                    break
+                cause = getattr(cause, "__cause__", None)
+
         if response is None:
             return f"Search query failed: {error}"
 
@@ -554,8 +568,8 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
         fields = self._build_solr_params(arguments)
         search_url = self._build_solr_url(conf.search.search_api, fields)
         try:
-            data = HTTPClient.get(search_url)
-        except requests.HTTPError as e:
+            data = HTTPClient.get(search_url, max_retries=1, retry_delay=0.5)
+        except requests.RequestException as e:
             return self._format_search_http_error(e)
 
         if data is None or not any(
