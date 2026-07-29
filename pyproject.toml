@@ -1,6 +1,6 @@
 [project]
 name = "pdbe-mcp-server"
-version = "1.1.5"
+version = "1.1.6"
 description = "A Model Context Protocol (MCP) server for accessing PDBe (Protein Data Bank in Europe) structural biology data and services"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -8,16 +8,16 @@ authors = [{ name = "Sreenath Sasidharan Nair", email = "sreenath@ebi.ac.uk" }]
 keywords = ["mcp", "llm", "automation", "web", "fetch", "http", "streamable", "stateless"]
 license = { text = "Apache-2.0" }
 dependencies = [
-    "anyio>=4.5",
-    "click>=8.1.0",
-    "httpx>=0.27",
-    "mcp>=1.23.0",
-    "neo4j>=5.0",
-    "omegaconf>=2.3.0",
-    "python-toon>=0.1.3",
-    "requests>=2.33.0",
-    "starlette>=1.0.1",
-    "uvicorn",
+    "anyio>=4.5,<5",
+    "click>=8.1,<9",
+    "httpx>=0.27,<1",
+    "mcp>=1.23,<2",
+    "neo4j>=5,<6",
+    "omegaconf>=2.3,<3",
+    "python-toon>=0.1.3,<0.2",
+    "requests>=2.33,<3",
+    "starlette>=1.0.1,<2",
+    "uvicorn>=0.30,<1",
 ]
 
 [project.scripts]

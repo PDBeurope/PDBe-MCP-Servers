@@ -657,14 +657,14 @@ wheels = [
 
 [[package]]
 name = "neo4j"
-version = "6.1.0"
+version = "5.28.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1b/01/d6ce65e4647f6cb2b9cca3b813978f7329b54b4e36660aaec1ddf0ccce7a/neo4j-6.1.0.tar.gz", hash = "sha256:b5dde8c0d8481e7b6ae3733569d990dd3e5befdc5d452f531ad1884ed3500b84", size = 239629, upload-time = "2026-01-12T11:27:34.777Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/62/aa/83baca8f9e5e5ba1a00722067a4bf3c088c5c02019a7b485e94c8cf05d39/neo4j-5.28.4.tar.gz", hash = "sha256:4a2d8d6eb8c2da0bc87a30e96e2c179fbc0045665626482901ca3dcc9c2b1811", size = 232608, upload-time = "2026-05-04T08:00:55.426Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/5c/ee71e2dd955045425ef44283f40ba1da67673cf06404916ca2950ac0cd39/neo4j-6.1.0-py3-none-any.whl", hash = "sha256:3bd93941f3a3559af197031157220af9fd71f4f93a311db687bd69ffa417b67d", size = 325326, upload-time = "2026-01-12T11:27:33.196Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/fd/d46f29f4089a00a7d4894f5e1739288c2a42622b72ea7161a226b73ff4fa/neo4j-5.28.4-py3-none-any.whl", hash = "sha256:ba87c423fd2a1fbe6a116c47ac96cfbe7d8c419d24d2f5611e5674283dddf7b9", size = 313927, upload-time = "2026-05-04T08:00:52.005Z" },
 ]
 
 [[package]]
@@ -733,7 +733,7 @@ wheels = [
 
 [[package]]
 name = "pdbe-mcp-server"
-version = "1.1.4"
+version = "1.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
@@ -768,16 +768,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anyio", specifier = ">=4.5" },
-    { name = "click", specifier = ">=8.1.0" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "mcp", specifier = ">=1.23.0" },
-    { name = "neo4j", specifier = ">=5.0" },
-    { name = "omegaconf", specifier = ">=2.3.0" },
-    { name = "python-toon", specifier = ">=0.1.3" },
-    { name = "requests", specifier = ">=2.33.0" },
-    { name = "starlette", specifier = ">=1.0.1" },
-    { name = "uvicorn" },
+    { name = "anyio", specifier = ">=4.5,<5" },
+    { name = "click", specifier = ">=8.1,<9" },
+    { name = "httpx", specifier = ">=0.27,<1" },
+    { name = "mcp", specifier = ">=1.23,<2" },
+    { name = "neo4j", specifier = ">=5,<6" },
+    { name = "omegaconf", specifier = ">=2.3,<3" },
+    { name = "python-toon", specifier = ">=0.1.3,<0.2" },
+    { name = "requests", specifier = ">=2.33,<3" },
+    { name = "starlette", specifier = ">=1.0.1,<2" },
+    { name = "uvicorn", specifier = ">=0.30,<1" },
 ]
 
 [package.metadata.requires-dev]
