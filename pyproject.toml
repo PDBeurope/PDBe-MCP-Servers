@@ -28,8 +28,12 @@ pdbe-mcp-server = "pdbe_mcp_server.server:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.sdist]
+core-metadata-version = "2.4"
+
 [tool.hatch.build.targets.wheel]
 packages = ["pdbe_mcp_server"]
+core-metadata-version = "2.4"
 
 [tool.hatch.build.targets.wheel.force-include]
 "pdbe_mcp_server/py.typed" = "pdbe_mcp_server/py.typed"
