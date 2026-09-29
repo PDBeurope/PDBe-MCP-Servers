@@ -1,10 +1,11 @@
 import logging
 import os
 import re
-from typing import Any, LiteralString
+from typing import Any
 
 import mcp.types as types
 from omegaconf import DictConfig
+from typing_extensions import LiteralString
 
 from pdbe_mcp_server import get_config
 from pdbe_mcp_server.utils import HTMLStripper, HTTPClient
