@@ -246,13 +246,8 @@ class OpenAPIToMCPGenerator:
                     )
                     tool_name = f"{method}_{clean_path}".replace("__", "_")
 
-<<<<<<< HEAD
                 # Shorten tool name intelligently with hash for uniqueness
                 tool_name = self._shorten_tool_name(tool_name, max_length=50)
-=======
-                # trim tool name to at most 50 characters (leaving room for prefixes)
-                tool_name = tool_name[:50]
->>>>>>> b10f70a (Api tool id fix (#46))
 
                 # Get description
                 description = operation.get("description", operation.get("summary"))
