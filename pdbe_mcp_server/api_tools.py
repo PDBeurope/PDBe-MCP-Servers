@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import os
@@ -133,6 +134,82 @@ class OpenAPIToMCPGenerator:
 
         return properties, required
 
+    def _shorten_tool_name(self, tool_name: str, max_length: int = 50) -> str:
+        """Intelligently shorten tool name by removing common words and abbreviating.
+
+        Args:
+            tool_name: Original tool name
+            max_length: Maximum allowed length for the shortened name
+
+        Returns:
+            Shortened tool name with hash suffix for uniqueness
+        """
+        # Domain-specific abbreviations for PDBe
+        abbreviations = {
+            "get": "",
+            "api": "",
+            "pdb": "",
+            "entry": "ent",
+            "sequence": "seq",
+            "validation": "val",
+            "coordinates": "coord",
+            "information": "info",
+            "molecule": "mol",
+            "structure": "struct",
+            "experimental": "exp",
+            "secondary": "sec",
+            "annotations": "annot",
+            "interface": "iface",
+            "residues": "res",
+            "binding": "bind",
+            "sites": "sites",
+            "uniprot": "unip",
+            "accession": "acc",
+            "compound": "comp",
+            "interaction": "intx",
+            "protein": "prot",
+            "generic": "gen",
+            "summary": "sum",
+            "mapping": "map",
+            "mappings": "maps",
+            "domain": "dom",
+            "domains": "doms",
+            "statistics": "stats",
+            "best": "best",
+            "observed": "obs",
+            "chains": "chains",
+            "variation": "var",
+        }
+
+        # Split into words
+        words = tool_name.split("_")
+
+        # Apply abbreviations and filter out empty strings
+        shortened = []
+        for word in words:
+            abbreviated = abbreviations.get(word, word)
+            if abbreviated:  # Only keep non-empty strings
+                shortened.append(abbreviated)
+
+        result = "_".join(shortened)
+
+        # If still too long, truncate intelligently while preserving most meaningful parts
+        if len(result) > max_length - 9:  # Leave room for hash
+            parts = result.split("_")
+            if len(parts) > 3:
+                # Keep first, middle indicator, and last parts
+                middle = "".join(p[0] for p in parts[1:-1] if p)
+                result = f"{parts[0]}_{middle}_{parts[-1]}"
+            result = result[: max_length - 9]
+
+        # Generate hash from original name for uniqueness
+        hash_suffix = hashlib.md5(tool_name.encode()).hexdigest()[:8]
+
+        # Combine shortened name with hash
+        final_name = f"{result}_{hash_suffix}"
+
+        return final_name.rstrip("_")
+
     def list_tools(self) -> list[types.Tool]:
         """
         Generate MCP tools from the OpenAPI specification.
@@ -169,8 +246,8 @@ class OpenAPIToMCPGenerator:
                     )
                     tool_name = f"{method}_{clean_path}".replace("__", "_")
 
-                # trim tool name to at most 50 characters (leaving room for prefixes)
-                tool_name = tool_name[:50]
+                # Shorten tool name intelligently with hash for uniqueness
+                tool_name = self._shorten_tool_name(tool_name, max_length=50)
 
                 # Get description
                 description = operation.get("description", operation.get("summary"))
