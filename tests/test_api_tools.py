@@ -1,5 +1,6 @@
 """Tests for api_tools module."""
 
+import hashlib
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +11,12 @@ from pdbe_mcp_server.api_tools import (
     OpenAPIToMCPGenerator,
     create_mcp_tools_from_openapi,
 )
+
+
+def get_expected_shortened_name(original_name: str) -> str:
+    """Helper to compute expected shortened tool name."""
+    generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+    return generator._shorten_tool_name(original_name)
 
 
 class TestOpenAPIToMCPGenerator:
@@ -94,7 +101,9 @@ class TestOpenAPIToMCPGenerator:
 
         # Should create one tool from the enabled endpoint
         assert len(tools) == 1
-        assert tools[0].name == "get_test"
+        # Tool name should be shortened and hashed
+        expected_name = get_expected_shortened_name("get_test")
+        assert tools[0].name == expected_name
         assert tools[0].description is not None
         assert "test data" in tools[0].description.lower()
 
@@ -115,7 +124,8 @@ class TestOpenAPIToMCPGenerator:
 
         # Should not include the disabled endpoint
         tool_names = [tool.name for tool in tools]
-        assert "disabled_endpoint" not in tool_names
+        disabled_name = get_expected_shortened_name("disabled_endpoint")
+        assert disabled_name not in tool_names
 
     @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
     def test_list_tools_stores_metadata(
@@ -129,7 +139,9 @@ class TestOpenAPIToMCPGenerator:
 
         assert len(generator.tools) == 1
         tool_meta = generator.tools[0]
-        assert tool_meta["name"] == "get_test"
+        # Tool name should be shortened and hashed
+        expected_name = get_expected_shortened_name("get_test")
+        assert tool_meta["name"] == expected_name
         assert tool_meta["method"] == "GET"
         assert tool_meta["path"] == "/test/{id}"
         assert "id" in tool_meta["path_params"]
@@ -150,7 +162,8 @@ class TestOpenAPIToMCPGenerator:
         generator.list_tools()
 
         arguments = {"id": "test123", "format": "json"}
-        result = generator.call_tool("get_test", arguments)
+        tool_name = get_expected_shortened_name("get_test")
+        result = generator.call_tool(tool_name, arguments)
 
         assert len(result) == 1
         assert result[0].type == "text"
@@ -175,7 +188,8 @@ class TestOpenAPIToMCPGenerator:
         generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
         generator.list_tools()
 
-        result = generator.call_tool("get_test", {"id": "test123"})
+        tool_name = get_expected_shortened_name("get_test")
+        result = generator.call_tool(tool_name, {"id": "test123"})
 
         assert len(result) == 1
         assert result[0].type == "text"
@@ -200,8 +214,9 @@ class TestOpenAPIToMCPGenerator:
         generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
         generator.list_tools()
 
+        tool_name = get_expected_shortened_name("get_test")
         with patch.dict("os.environ", {"TOON_ENABLED": "true"}):
-            result = generator.call_tool("get_test", {"id": "test123"})
+            result = generator.call_tool(tool_name, {"id": "test123"})
 
         assert len(result) == 1
         assert result[0].type == "text"
@@ -223,8 +238,9 @@ class TestOpenAPIToMCPGenerator:
         generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
         generator.list_tools()
 
+        tool_name = get_expected_shortened_name("get_test")
         with patch.dict("os.environ", {"TOON_ENABLED": "true"}):
-            result = generator.call_tool("get_test", {"id": "test123"})
+            result = generator.call_tool(tool_name, {"id": "test123"})
 
         assert len(result) == 1
         assert result[0].type == "text"
@@ -255,8 +271,9 @@ class TestOpenAPIToMCPGenerator:
         generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
         generator.list_tools()
 
+        tool_name = get_expected_shortened_name("get_test")
         with pytest.raises(ValueError, match="Missing required path parameter"):
-            generator.call_tool("get_test", {})
+            generator.call_tool(tool_name, {})
 
     @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
     def test_call_tool_request_exception(
@@ -277,7 +294,8 @@ class TestOpenAPIToMCPGenerator:
         generator.list_tools()
 
         arguments = {"id": "test123"}
-        result = generator.call_tool("get_test", arguments)
+        tool_name = get_expected_shortened_name("get_test")
+        result = generator.call_tool(tool_name, arguments)
 
         assert len(result) == 1
         from mcp.types import TextContent
@@ -335,4 +353,144 @@ class TestCreateMCPToolsFromOpenAPI:
 
         assert isinstance(generator, OpenAPIToMCPGenerator)
         assert len(tools) == 1
-        assert tools[0].name == "get_test"
+        # Tool name should be shortened and hashed
+        expected_name = get_expected_shortened_name("get_test")
+        assert tools[0].name == expected_name
+
+
+class TestShortenToolName:
+    """Tests for _shorten_tool_name method."""
+
+    def test_shorten_tool_name_with_common_words(self) -> None:
+        """Test that common words are abbreviated or removed."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        # Test removal of 'get', 'api', 'pdb'
+        result = generator._shorten_tool_name("get_api_pdb_entry_sequence")
+        assert "get" not in result
+        assert "api" not in result
+        assert "pdb" not in result
+        assert "ent" in result  # entry -> ent
+        assert "seq" in result  # sequence -> seq
+
+    def test_shorten_tool_name_with_domain_abbreviations(self) -> None:
+        """Test domain-specific abbreviations are applied."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        result = generator._shorten_tool_name(
+            "get_uniprot_accession_binding_sites"
+        )
+        assert "unip" in result  # uniprot -> unip
+        assert "acc" in result  # accession -> acc
+        assert "bind" in result  # binding -> bind
+
+    def test_shorten_tool_name_length_limit(self) -> None:
+        """Test that shortened names respect max_length."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        long_name = "get_pdb_entry_sequence_validation_coordinates_information"
+        result = generator._shorten_tool_name(long_name, max_length=50)
+
+        assert len(result) <= 50
+        # Should have hash suffix
+        parts = result.split("_")
+        assert len(parts[-1]) == 8  # 8-char hash
+
+    def test_shorten_tool_name_uniqueness(self) -> None:
+        """Test that different inputs produce different hashes."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        name1 = "get_pdb_entry_sequence"
+        name2 = "get_pdb_entry_sequences"
+
+        result1 = generator._shorten_tool_name(name1)
+        result2 = generator._shorten_tool_name(name2)
+
+        # Should be different due to hash
+        assert result1 != result2
+
+    def test_shorten_tool_name_hash_format(self) -> None:
+        """Test that hash is always 8 hex characters."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        test_names = [
+            "get_pdb_entry",
+            "get_uniprot_accession_binding_sites",
+            "get_secondary_structure_annotations_validation",
+        ]
+
+        for name in test_names:
+            result = generator._shorten_tool_name(name)
+            parts = result.split("_")
+            hash_part = parts[-1]
+            assert len(hash_part) == 8
+            # Verify it's hex
+            assert all(c in "0123456789abcdef" for c in hash_part)
+
+    def test_shorten_tool_name_consistency(self) -> None:
+        """Test that same input produces same output."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        name = "get_pdb_entry_sequence_validation"
+        result1 = generator._shorten_tool_name(name)
+        result2 = generator._shorten_tool_name(name)
+
+        assert result1 == result2
+
+    def test_shorten_tool_name_preserves_structure(self) -> None:
+        """Test that meaningful structure is preserved."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        result = generator._shorten_tool_name(
+            "get_pdb_entry_sequence_validation_coordinates_information"
+        )
+
+        # Should contain abbreviated but recognizable parts
+        assert "ent" in result
+        assert "seq" in result
+        assert "val" in result
+        assert "coord" in result
+        assert "info" in result
+
+    def test_shorten_tool_name_already_short(self) -> None:
+        """Test that short names are still hashed."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        short_name = "get_pdb"
+        result = generator._shorten_tool_name(short_name, max_length=50)
+
+        # Even short names should have hash suffix
+        parts = result.split("_")
+        assert len(parts[-1]) == 8
+
+    def test_shorten_tool_name_empty_after_abbreviation(self) -> None:
+        """Test handling when all words are removed."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        # Only removable words
+        result = generator._shorten_tool_name("get_api_pdb")
+
+        # Should still produce valid output with hash
+        assert "_" in result
+        parts = result.split("_")
+        assert len(parts[-1]) == 8
+
+    def test_shorten_tool_name_complex_pdb_names(self) -> None:
+        """Test with realistic PDBe API names."""
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+
+        test_cases = [
+            "get_pdb_entry_sequence",
+            "get_uniprot_accession_binding_sites",
+            "get_secondary_structure_annotations",
+            "get_validation_statistics_outliers",
+            "get_compound_interaction_proteins",
+            "get_interface_residues_mappings",
+        ]
+
+        for name in test_cases:
+            result = generator._shorten_tool_name(name, max_length=50)
+            assert len(result) <= 50, f"'{name}' produced too long result: {result}"
+            # Verify hash is present
+            parts = result.split("_")
+            assert len(parts[-1]) == 8, f"Missing hash in result: {result}"
