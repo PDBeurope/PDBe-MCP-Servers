@@ -169,8 +169,8 @@ class OpenAPIToMCPGenerator:
                     )
                     tool_name = f"{method}_{clean_path}".replace("__", "_")
 
-                # trim tool name to at most 60 characters
-                tool_name = tool_name[:60]
+                # trim tool name to at most 50 characters (leaving room for prefixes)
+                tool_name = tool_name[:50]
 
                 # Get description
                 description = operation.get("description", operation.get("summary"))
