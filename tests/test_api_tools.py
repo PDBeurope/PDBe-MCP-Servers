@@ -1,6 +1,5 @@
 """Tests for api_tools module."""
 
-import hashlib
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -377,9 +376,7 @@ class TestShortenToolName:
         """Test domain-specific abbreviations are applied."""
         generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
 
-        result = generator._shorten_tool_name(
-            "get_uniprot_accession_binding_sites"
-        )
+        result = generator._shorten_tool_name("get_uniprot_accession_binding_sites")
         assert "unip" in result  # uniprot -> unip
         assert "acc" in result  # accession -> acc
         assert "bind" in result  # binding -> bind

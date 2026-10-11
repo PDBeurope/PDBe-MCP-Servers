@@ -146,43 +146,43 @@ class OpenAPIToMCPGenerator:
         """
         # Domain-specific abbreviations for PDBe
         abbreviations = {
-            'get': '',
-            'api': '',
-            'pdb': '',
-            'entry': 'ent',
-            'sequence': 'seq',
-            'validation': 'val',
-            'coordinates': 'coord',
-            'information': 'info',
-            'molecule': 'mol',
-            'structure': 'struct',
-            'experimental': 'exp',
-            'secondary': 'sec',
-            'annotations': 'annot',
-            'interface': 'iface',
-            'residues': 'res',
-            'binding': 'bind',
-            'sites': 'sites',
-            'uniprot': 'unip',
-            'accession': 'acc',
-            'compound': 'comp',
-            'interaction': 'intx',
-            'protein': 'prot',
-            'generic': 'gen',
-            'summary': 'sum',
-            'mapping': 'map',
-            'mappings': 'maps',
-            'domain': 'dom',
-            'domains': 'doms',
-            'statistics': 'stats',
-            'best': 'best',
-            'observed': 'obs',
-            'chains': 'chains',
-            'variation': 'var',
+            "get": "",
+            "api": "",
+            "pdb": "",
+            "entry": "ent",
+            "sequence": "seq",
+            "validation": "val",
+            "coordinates": "coord",
+            "information": "info",
+            "molecule": "mol",
+            "structure": "struct",
+            "experimental": "exp",
+            "secondary": "sec",
+            "annotations": "annot",
+            "interface": "iface",
+            "residues": "res",
+            "binding": "bind",
+            "sites": "sites",
+            "uniprot": "unip",
+            "accession": "acc",
+            "compound": "comp",
+            "interaction": "intx",
+            "protein": "prot",
+            "generic": "gen",
+            "summary": "sum",
+            "mapping": "map",
+            "mappings": "maps",
+            "domain": "dom",
+            "domains": "doms",
+            "statistics": "stats",
+            "best": "best",
+            "observed": "obs",
+            "chains": "chains",
+            "variation": "var",
         }
 
         # Split into words
-        words = tool_name.split('_')
+        words = tool_name.split("_")
 
         # Apply abbreviations and filter out empty strings
         shortened = []
@@ -191,16 +191,16 @@ class OpenAPIToMCPGenerator:
             if abbreviated:  # Only keep non-empty strings
                 shortened.append(abbreviated)
 
-        result = '_'.join(shortened)
+        result = "_".join(shortened)
 
         # If still too long, truncate intelligently while preserving most meaningful parts
         if len(result) > max_length - 9:  # Leave room for hash
-            parts = result.split('_')
+            parts = result.split("_")
             if len(parts) > 3:
                 # Keep first, middle indicator, and last parts
-                middle = ''.join(p[0] for p in parts[1:-1] if p)
+                middle = "".join(p[0] for p in parts[1:-1] if p)
                 result = f"{parts[0]}_{middle}_{parts[-1]}"
-            result = result[:max_length - 9]
+            result = result[: max_length - 9]
 
         # Generate hash from original name for uniqueness
         hash_suffix = hashlib.md5(tool_name.encode()).hexdigest()[:8]
@@ -208,7 +208,7 @@ class OpenAPIToMCPGenerator:
         # Combine shortened name with hash
         final_name = f"{result}_{hash_suffix}"
 
-        return final_name.rstrip('_')
+        return final_name.rstrip("_")
 
     def list_tools(self) -> list[types.Tool]:
         """
