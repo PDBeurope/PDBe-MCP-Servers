@@ -13,7 +13,6 @@ These examples show how an LLM can answer real structural-biology questions by c
 | Q008 — Find an EMDB map linked to a PDB entry | [Q008: PDB-to-EMDB link](Q008-find-linked-emdb-map.md) |
 | Q010 — Search for uncomplexed SARS-CoV-2 spike entries | [Q010: SARS-CoV-2 spike](Q010-unbound-sars-cov-2-spike.md) |
 | Q011 — Cryo-EM ribosomes better than 3 Å | [Q011: Ribosome search](Q011-cryo-em-ribosome-under-3a.md) |
-| Q013 — Download coordinates for 1CBS | [Q013: Download coordinates](Q013-download-1cbs-coordinates.md) |
 | Q015 — 6QVT ligands and NCC interactions | [Q015: Ligand interactions](Q015-6qvt-ligand-interactions.md) |
 | Q016 — 4EE3 glycosylation and modified residues | [Q016: Glycosylation and modifications](Q016-4ee3-glycosylation-modifications.md) |
 

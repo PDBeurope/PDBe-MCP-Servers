@@ -12,9 +12,10 @@
 
 ## What the tools returned
 
-- EMDB entries are linked to PDB entries via the **`emdb_id`** field in the PDBe search index.
-- **7K00** → `emdb_id: emd-22586`
-- **6ZGI** → `emdb_id: emd-11207`
+- **Call 1 →** EMDB entries are linked to PDB entries via the **`emdb_id`** field in the PDBe search index. Query for entry **7K00** returned `emdb_id: emd-22586`.
+- **Call 2 →** Query for entry **6ZGI** returned `emdb_id: emd-11207`.
+
+Both calls demonstrate that the `emdb_id` field contains the linked EMDB map identifier for electron microscopy entries.
 
 ## Example answer
 

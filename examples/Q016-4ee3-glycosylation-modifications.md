@@ -13,11 +13,15 @@
 ## What the tools returned
 
 ### Entry summary
-- **4EE3** — Crystal structure of human M340H-beta-1,4-galactosyltransferase-1 (M340H-B4GAL-T1) in complex with pentasaccharide
-- **Method:** X-ray diffraction
-- **Organism:** *Homo sapiens* (expressed in *E. coli*)
+
+- **Call 1 →** Search query returned:
+  - **4EE3** — Crystal structure of human M340H-beta-1,4-galactosyltransferase-1 (M340H-B4GAL-T1) in complex with pentasaccharide
+  - **Method:** X-ray diffraction
+  - **Organism:** *Homo sapiens* (expressed in *E. coli*)
 
 ### Molecules in 4EE3
+
+- **Call 2 →** Molecules API returned detailed entity information:
 
 | Entity | Type | Name | Copies |
 |--------|------|------|--------|

@@ -13,9 +13,9 @@
 
 ## What the tools returned
 
-- Search annotations list **retinoic acid binding** and other lipid/retinoid and protein-binding functions; associated biological processes include fatty-acid transport and transcriptional regulation.
-- The protein entity is **cellular retinoic acid-binding protein 2 (CRABP2)**, from *Homo sapiens*. The expression host is *E. coli* BL21(DE3), which is distinct from the protein's source organism.
-- The structure contains **retinoic acid** (CCD code `REA`) and **water**. The entry title describes the structural study of cellular retinoic-acid-binding proteins in complex with all-trans-retinoic acid and a synthetic retinoid.
+- **Call 1 →** Inspected available search fields to understand what biological function and organism data can be retrieved.
+- **Call 2 →** Search annotations list **retinoic acid binding** and other lipid/retinoid and protein-binding functions; associated biological processes include fatty-acid transport and transcriptional regulation. The protein entity is **cellular retinoic acid-binding protein 2 (CRABP2)**, from *Homo sapiens*. The expression host is *E. coli* BL21(DE3), which is distinct from the protein's source organism.
+- **Call 3 →** The structure contains **retinoic acid** (CCD code `REA`) and **water**. The entry title describes the structural study of cellular retinoic-acid-binding proteins in complex with all-trans-retinoic acid and a synthetic retinoid.
 
 ## Example answer
 

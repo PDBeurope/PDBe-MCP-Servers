@@ -13,9 +13,9 @@
 
 ## What the tools returned
 
-- **60 total entries** match "sialyltransferase" in the search index.
-- **14 human entries** (`organism_scientific_name: "Homo sapiens"`).
-- Several entries contain **N-acetylglucosamine (NAG)** or related sugar ligands.
+- **Call 1 →** **60 total entries** match "sialyltransferase" in the search index. Results include PDB IDs, titles, organism information, and bound compounds for the top 10 entries.
+- **Call 2 →** **14 human entries** (`organism_scientific_name: "Homo sapiens"`) filtered from the sialyltransferase results, showing titles and ligand information.
+- **Call 3 →** Entries from human sialyltransferases that contain sugar ligands (NAG, GAL, MAN), showing several entries with **N-acetylglucosamine (NAG)** or related sugar ligands.
 
 ## Human sialyltransferase entries (examples)
 

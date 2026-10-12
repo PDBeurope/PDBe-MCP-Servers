@@ -12,8 +12,8 @@
 
 ## What the tools returned
 
-- **73 entries** match "SARS-CoV-2 spike" with "closed" or "unbound" conformation.
-- The search finds entries with titles containing "apo", "closed", or "unbound" — indicating uncomplexed spike protein.
+- **Call 1 →** **73 entries** match "SARS-CoV-2 spike" with "closed" or "unbound" conformation. The search finds entries with titles containing "apo", "closed", or "unbound" — indicating uncomplexed spike protein.
+- **Call 2 →** Same query sorted by resolution ascending, returning the highest-resolution entries first. Results include entries 12JZ (2.35 Å), 6ZGE (2.6 Å), 13BD (2.65 Å), 6ZP0 (3.0 Å), and 6ZGI (2.9 Å).
 
 ## Selected unbound SARS-CoV-2 spike entries
 

@@ -16,6 +16,8 @@
 
 ## Selected high-resolution cryo-EM ribosome entries
 
+*Selection criteria: Top 5 results from the search query, sorted by resolution (lowest/highest quality first).*
+
 | PDB ID | Resolution | Organism | Description |
 |--------|------------|----------|-------------|
 | **8FKW** | 2.50 Å | *Homo sapiens* | Human nucleolar pre-60S ribosomal subunit (State D2) |

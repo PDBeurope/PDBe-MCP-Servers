@@ -15,6 +15,9 @@
 
 ### Ligands in 6QVT
 
+- **Call 1 →** Search query returned entry 6QVT with title and bound compound information showing NCC and PEG.
+- **Call 2 →** Molecules API returned detailed entity information:
+
 | Entity ID | Molecule Type | Name | Copies |
 |-----------|---------------|------|--------|
 | 1 | Polypeptide | Beta-galactoside alpha-2,6-sialyltransferase 1 (ST6Gal1) | 2 |
@@ -24,7 +27,7 @@
 
 ### NCC (CMP-sialic acid) Interactions
 
-Based on aggregated interaction data from PDB structures containing NCC:
+- **Call 3 →** Interaction data API returned aggregated interaction data from PDB structures containing NCC:
 
 | Interaction Type | Common Interacting Residues |
 |-------------------|----------------------------|

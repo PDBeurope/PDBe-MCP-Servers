@@ -12,10 +12,12 @@
 
 ## What the tools returned
 
-- **Biological function** includes: heme binding, iron ion binding, oxygen binding, oxygen carrier activity, peroxidase activity, and protein binding.
-- **Biological processes** include: oxygen transport, carbon dioxide transport, erythrocyte development, cellular oxidant detoxification, and inflammatory response.
-- **Human deoxyhaemoglobin (2HHB)**: Deoxy form (no oxygen bound), 1.74 Å resolution.
-- **Human oxyhaemoglobin (1HHO)**: Oxygen-bound form, 2.1 Å resolution, contains molecular oxygen (`OXY`) ligand.
+- **Call 1 →** Search for hemoglobin entries with oxygen-related annotations and X-ray diffraction method returned multiple PDB entries including 1HHO and 2HHB.
+- **Call 2 →** Detailed entry information:
+  - **Biological function** includes: heme binding, iron ion binding, oxygen binding, oxygen carrier activity, peroxidase activity, and protein binding.
+  - **Biological processes** include: oxygen transport, carbon dioxide transport, erythrocyte development, cellular oxidant detoxification, and inflammatory response.
+  - **Human deoxyhaemoglobin (2HHB)**: Deoxy form (no oxygen bound), 1.74 Å resolution.
+  - **Human oxyhaemoglobin (1HHO)**: Oxygen-bound form, 2.1 Å resolution, contains molecular oxygen (`OXY`) ligand.
 
 ## Example answer
 
