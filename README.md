@@ -9,6 +9,17 @@ The package also includes an advanced PDBe Graph server for users who run their 
 - **PDBe Search Server**: Perform advanced Solr-based searches across structural data
 - **PDBe Graph Server**: Inspect the graph schema and, with a local PDBe-KB Neo4j setup, query complex relationships and molecular interactions
 
+
+## Worked Examples
+
+See the [`examples/`](examples/) directory for worked examples showing how an LLM can answer real structural-biology questions by combining PDBe API and PDBe Search MCP tools. These examples demonstrate:
+
+- Finding protein functions, organisms, and ligands
+- Searching for specific structure types (cryo-EM, high-resolution)
+- Finding related entries and EMDB maps
+- Understanding ligand interactions and glycosylation
+
+
 ## Prerequisites
 
 - **Python 3.10+** - Required for the server runtime
