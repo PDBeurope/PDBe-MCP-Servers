@@ -312,7 +312,7 @@ uvx pdbe-mcp-server --server-type pdbe_api_server --transport sse
 uv run pdbe-mcp-server --server-type pdbe_api_server --transport sse
 ```
 
-
+<<<<<<< HEAD
 #### PDBe Graph Database Server
 Enables complex relationship queries and network analysis:
 
@@ -349,7 +349,8 @@ Execute query: MATCH (s:Structure) WHERE s.PDB_ID = '1abc' RETURN s.PDB_ID as id
 
 The tool response is formatted as JSON by default, but can be converted to TOON format by setting `TOON_ENABLED=true`.
 
-
+=======
+>>>>>>> main
 #### PDBe Search Server
 Provides advanced Solr-based search and analytics capabilities:
 

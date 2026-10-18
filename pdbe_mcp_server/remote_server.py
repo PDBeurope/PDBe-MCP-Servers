@@ -12,6 +12,7 @@ from starlette.routing import Mount, Route
 from starlette.types import Receive, Scope, Send
 
 from pdbe_mcp_server.server import (
+    build_all_server,
     build_graph_server,
     build_pdbe_api_server,
     build_pdbe_search_server,
@@ -41,7 +42,10 @@ async def handle_ready(request) -> JSONResponse:
 # -------------------------
 # App Factory
 # -------------------------
-def create_app() -> Starlette:
+def create_app(include_all: bool | None = None) -> Starlette:
+    if include_all is None:
+        include_all = os.getenv("ALL_SERVERS", "false").lower() == "true"
+
     log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, log_level_str, logging.INFO)
 
@@ -79,6 +83,14 @@ def create_app() -> Starlette:
             stateless=True,
         ),
     }
+    if include_all:
+        all_server = build_all_server([api_server, search_server, graph_server])
+        session_managers["all"] = StreamableHTTPSessionManager(
+            app=all_server,
+            event_store=None,
+            json_response=json_response,
+            stateless=True,
+        )
 
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette):
@@ -115,9 +127,17 @@ def create_app() -> Starlette:
         Mount(f"{ROOT_PREFIX}/graph", app=create_handler(session_managers["graph"])),
         Mount(f"{ROOT_PREFIX}/search", app=create_handler(session_managers["search"])),
         Mount(f"{ROOT_PREFIX}/api", app=create_handler(session_managers["api"])),
-        Route(f"{ROOT_PREFIX}/health", endpoint=handle_health),
-        Route(f"{ROOT_PREFIX}/ready", endpoint=handle_ready),
     ]
+    if include_all:
+        routes.append(
+            Mount(f"{ROOT_PREFIX}/all", app=create_handler(session_managers["all"]))
+        )
+    routes.extend(
+        [
+            Route(f"{ROOT_PREFIX}/health", endpoint=handle_health),
+            Route(f"{ROOT_PREFIX}/ready", endpoint=handle_ready),
+        ]
+    )
 
     app = Starlette(
         debug=(log_level == logging.DEBUG),
@@ -144,7 +164,16 @@ starlette_app = create_app()
 @click.option("--cors-origins", default="*")
 @click.option("--workers", default=1, type=int)
 @click.option("--reload", is_flag=True, default=False)
-def main(host, port, log_level, json_response, cors_origins, workers, reload):
+@click.option(
+    "--all",
+    "include_all",
+    is_flag=True,
+    default=False,
+    help="Expose all PDBe tools at the /all endpoint.",
+)
+def main(
+    host, port, log_level, json_response, cors_origins, workers, reload, include_all
+):
     # Validate combination
     if reload and workers > 1:
         raise click.UsageError("Cannot use --reload with multiple workers")
@@ -153,11 +182,22 @@ def main(host, port, log_level, json_response, cors_origins, workers, reload):
     os.environ["LOG_LEVEL"] = log_level
     os.environ["JSON_RESPONSE"] = str(json_response).lower()
     os.environ["CORS_ORIGINS"] = cors_origins
+    os.environ["ALL_SERVERS"] = str(include_all).lower()
+
+    # The module-level app is created before Click invokes main(). Rebuild it
+    # when --all is enabled so the selected endpoint is present in this process;
+    # workers and reload subprocesses read ALL_SERVERS during module import.
+    if include_all:
+        global starlette_app
+        starlette_app = create_app(include_all=True)
 
     import uvicorn
 
     logger.info(f"Starting server on http://{host}{ROOT_PREFIX}:{port}")
-    logger.info(f"Config: workers={workers}, reload={reload}, log_level={log_level}")
+    logger.info(
+        f"Config: workers={workers}, reload={reload}, log_level={log_level}, "
+        f"all_servers={include_all}"
+    )
 
     uvicorn.run(
         "pdbe_mcp_server.remote_server:starlette_app",

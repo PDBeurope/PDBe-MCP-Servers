@@ -187,6 +187,70 @@ in the PDBe database. Always make sure to understand the search schema before co
     return search_server
 
 
+def build_all_server(servers: Sequence[Server] | None = None) -> Server:
+    """Build one MCP server that exposes the tools from every PDBe server."""
+    if servers is None:
+        servers = [
+            build_pdbe_api_server(),
+            build_pdbe_search_server(),
+            build_graph_server(),
+        ]
+
+    all_server = Server("pdbe-all-server")
+    tool_servers: dict[str, Server] = {}
+
+    @all_server.list_tools()
+    async def list_tools() -> list[types.Tool]:
+        tools: list[types.Tool] = []
+        owners: dict[str, Server] = {}
+
+        for tool_server in servers:
+            handler = tool_server.request_handlers[types.ListToolsRequest]
+            result = await handler(types.ListToolsRequest())
+            tool_result = result.root
+            if not isinstance(tool_result, types.ListToolsResult):
+                raise RuntimeError(
+                    f"Unexpected tools/list response from {tool_server.name}"
+                )
+
+            for tool in tool_result.tools:
+                if tool.name in owners:
+                    raise ValueError(f"Duplicate tool name in all server: {tool.name}")
+                owners[tool.name] = tool_server
+                tools.append(tool)
+
+        tool_servers.clear()
+        tool_servers.update(owners)
+        return tools
+
+    @all_server.call_tool()
+    async def call_tool(
+        name: str, arguments: dict[str, Any]
+    ) -> types.CallToolResult:
+        tool_server = tool_servers.get(name)
+        if tool_server is None:
+            # Ensure the owner map exists if a client calls a tool before listing.
+            await list_tools()
+            tool_server = tool_servers.get(name)
+        if tool_server is None:
+            raise ValueError(f"Unknown tool name: {name}")
+
+        handler = tool_server.request_handlers[types.CallToolRequest]
+        result = await handler(
+            types.CallToolRequest(
+                params=types.CallToolRequestParams(name=name, arguments=arguments)
+            )
+        )
+        tool_result = result.root
+        if not isinstance(tool_result, types.CallToolResult):
+            raise RuntimeError(
+                f"Unexpected tools/call response from {tool_server.name}"
+            )
+        return tool_result
+
+    return all_server
+
+
 factory.register("pdbe_graph_server", build_graph_server)
 factory.register("pdbe_api_server", build_pdbe_api_server)
 factory.register("pdbe_search_server", build_pdbe_search_server)
