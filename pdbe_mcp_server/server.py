@@ -224,9 +224,7 @@ def build_all_server(servers: Sequence[Server] | None = None) -> Server:
         return tools
 
     @all_server.call_tool()
-    async def call_tool(
-        name: str, arguments: dict[str, Any]
-    ) -> types.CallToolResult:
+    async def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         tool_server = tool_servers.get(name)
         if tool_server is None:
             # Ensure the owner map exists if a client calls a tool before listing.
