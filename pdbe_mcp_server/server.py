@@ -199,8 +199,7 @@ def build_all_server(servers: Sequence[Server] | None = None) -> Server:
     all_server = Server("pdbe-all-server")
     tool_servers: dict[str, Server] = {}
 
-    @all_server.list_tools()
-    async def list_tools() -> list[types.Tool]:
+    async def get_tools() -> list[types.Tool]:
         tools: list[types.Tool] = []
         owners: dict[str, Server] = {}
 
@@ -223,12 +222,16 @@ def build_all_server(servers: Sequence[Server] | None = None) -> Server:
         tool_servers.update(owners)
         return tools
 
+    @all_server.list_tools()
+    async def list_tools() -> list[types.Tool]:
+        return await get_tools()
+
     @all_server.call_tool()
     async def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         tool_server = tool_servers.get(name)
         if tool_server is None:
             # Ensure the owner map exists if a client calls a tool before listing.
-            await list_tools()
+            await get_tools()
             tool_server = tool_servers.get(name)
         if tool_server is None:
             raise ValueError(f"Unknown tool name: {name}")

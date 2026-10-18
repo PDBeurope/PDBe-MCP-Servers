@@ -42,7 +42,7 @@ async def handle_ready(request) -> JSONResponse:
 # -------------------------
 # App Factory
 # -------------------------
-def create_app(include_all: bool | None = None) -> Starlette:
+def create_app(include_all: bool | None = None) -> CORSMiddleware:
     if include_all is None:
         include_all = os.getenv("ALL_SERVERS", "false").lower() == "true"
 
@@ -123,7 +123,7 @@ def create_app(include_all: bool | None = None) -> Starlette:
 
         return handler
 
-    routes = [
+    routes: list[Mount | Route] = [
         Mount(f"{ROOT_PREFIX}/graph", app=create_handler(session_managers["graph"])),
         Mount(f"{ROOT_PREFIX}/search", app=create_handler(session_managers["search"])),
         Mount(f"{ROOT_PREFIX}/api", app=create_handler(session_managers["api"])),
