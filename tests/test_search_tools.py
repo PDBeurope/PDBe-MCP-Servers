@@ -2,10 +2,19 @@
 
 from typing import Any
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
+import requests
 
 from pdbe_mcp_server.search_tools import SearchTools
+
+
+def get_called_query_params(mock_get: MagicMock) -> dict[str, list[str]]:
+    call_args = mock_get.call_args
+    assert call_args is not None
+    url = call_args.args[0]
+    return parse_qs(urlparse(url).query)
 
 
 class TestSearchTools:
@@ -16,11 +25,14 @@ class TestSearchTools:
         tools = SearchTools()
         tool = tools.get_run_search_query_tool()
 
-        assert tool.name == "run_search_query"
+        assert tool.name == "run_pdbe_search_query"
         assert tool.description is not None
         assert "search query" in tool.description.lower()
         assert "query" in tool.inputSchema["properties"]
         assert tool.inputSchema["properties"]["query"]["type"] == "string"
+        assert "fl" in tool.inputSchema["properties"]
+        assert "facet" in tool.inputSchema["properties"]
+        assert "group" in tool.inputSchema["properties"]
         assert "query" in tool.inputSchema["required"]
 
     def test_get_search_schema_tool(self) -> None:
@@ -28,7 +40,7 @@ class TestSearchTools:
         tools = SearchTools()
         tool = tools.get_search_schema_tool()
 
-        assert tool.name == "get_search_schema"
+        assert tool.name == "get_pdbe_search_schema"
         assert tool.description is not None
         assert "schema" in tool.description.lower()
         assert tool.inputSchema["type"] == "object"
@@ -77,11 +89,14 @@ class TestSearchTools:
         assert "Test Structure 1" in result
         assert "2.5" in result
 
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["pdb_id:1cbs"]
+
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_filters(
         self, mock_get: MagicMock, mock_search_response: dict[str, Any]
     ) -> None:
-        """Test running search query with filters."""
+        """Test running search query with legacy filters alias."""
         mock_get.return_value = mock_search_response
 
         tools = SearchTools()
@@ -97,12 +112,29 @@ class TestSearchTools:
         assert "2.5" in result
 
         # Verify HTTPClient.get was called with correct parameters
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["q"] == r"text:*pdb_id\:1cbs*"
-        assert params["fl"] == "pdb_id,title"
-        assert params["rows"] == "10"
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["pdb_id:1cbs"]
+        assert params["fl"] == ["pdb_id,title"]
+        assert params["rows"] == ["10"]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_fl(
+        self, mock_get: MagicMock, mock_search_response: dict[str, Any]
+    ) -> None:
+        """Test running search query with Solr fl."""
+        mock_get.return_value = mock_search_response
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "fl": ["pdb_id", "title", "resolution"],
+        }
+        result = tools.run_search_query(arguments)
+        assert "1cbs" in result
+
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["*:*"]
+        assert params["fl"] == ["pdb_id,title,resolution"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_with_fq(
@@ -124,12 +156,60 @@ class TestSearchTools:
         result = tools.run_search_query(arguments)
         assert "1cbs" in result
 
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["q"] == "text:*kinase*"
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["kinase"]
         assert params["fq"] == [
             'experimental_method:"X-ray diffraction"',
+            "resolution:[0 TO 2.0]",
+        ]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_structured_fq(
+        self, mock_get: MagicMock, mock_search_response: dict[str, Any]
+    ) -> None:
+        """Test running search query with structured field filters."""
+        mock_get.return_value = mock_search_response
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "fq": {
+                "experimental_method": "X-ray diffraction",
+                "pdb_id": "1cbs",
+            },
+        }
+        result = tools.run_search_query(arguments)
+        assert "1cbs" in result
+
+        params = get_called_query_params(mock_get)
+        assert params["fq"] == [
+            'experimental_method:"X-ray diffraction"',
+            "pdb_id:1cbs",
+        ]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_mixed_structured_fq_list(
+        self, mock_get: MagicMock, mock_search_response: dict[str, Any]
+    ) -> None:
+        """Test running search query with mixed raw and structured filters."""
+        mock_get.return_value = mock_search_response
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "fq": [
+                {"experimental_method": '"X-ray diffraction"'},
+                {"pdb_id": "1cbs"},
+                "resolution:[0 TO 2.0]",
+            ],
+        }
+        result = tools.run_search_query(arguments)
+        assert "1cbs" in result
+
+        params = get_called_query_params(mock_get)
+        assert params["fq"] == [
+            'experimental_method:"X-ray diffraction"',
+            "pdb_id:1cbs",
             "resolution:[0 TO 2.0]",
         ]
 
@@ -154,10 +234,8 @@ class TestSearchTools:
         assert "2.5" in result
 
         # Verify sort parameter was passed
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["sort"] == "resolution asc"
+        params = get_called_query_params(mock_get)
+        assert params["sort"] == ["resolution asc"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_list_values(
@@ -189,12 +267,221 @@ class TestSearchTools:
         assert "2.5" in result
 
         # Verify default parameters
-        call_args = mock_get.call_args
-        assert call_args is not None
-        params = call_args.kwargs["params"]
-        assert params["start"] == "0"
-        assert params["rows"] == "10"
+        params = get_called_query_params(mock_get)
+        assert params["start"] == ["0"]
+        assert params["rows"] == ["10"]
         assert "sort" not in params  # Should not be present if not specified
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_facets(self, mock_get: MagicMock) -> None:
+        """Test running search query with Solr facets."""
+        mock_get.return_value = {
+            "response": {"numFound": 0, "start": 0, "docs": []},
+            "facet_counts": {
+                "facet_fields": {
+                    "experimental_method": [
+                        "X-ray diffraction",
+                        10,
+                        "Electron microscopy",
+                        5,
+                    ]
+                }
+            },
+        }
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "facet": True,
+            "facet_fields": ["experimental_method"],
+            "facet_mincount": 1,
+        }
+        result = tools.run_search_query(arguments)
+
+        assert "Facet counts:" in result
+        assert "experimental_method:" in result
+        assert "X-ray diffraction" in result
+
+        params = get_called_query_params(mock_get)
+        assert params["facet"] == ["true"]
+        assert params["facet.field"] == ["experimental_method"]
+        assert params["facet.mincount"] == ["1"]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_grouping(self, mock_get: MagicMock) -> None:
+        """Test running search query with Solr grouping."""
+        mock_get.return_value = {
+            "response": {"numFound": 0, "start": 0, "docs": []},
+            "grouped": {
+                "experimental_method": {
+                    "matches": 2,
+                    "groups": [
+                        {
+                            "groupValue": "X-ray diffraction",
+                            "doclist": {
+                                "numFound": 1,
+                                "start": 0,
+                                "docs": [{"pdb_id": "1cbs"}],
+                            },
+                        }
+                    ],
+                }
+            },
+        }
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "group": True,
+            "group_field": "experimental_method",
+            "group_limit": 3,
+        }
+        result = tools.run_search_query(arguments)
+
+        assert "Grouped results:" in result
+        assert "Group field: experimental_method" in result
+        assert "X-ray diffraction" in result
+
+        params = get_called_query_params(mock_get)
+        assert params["group"] == ["true"]
+        assert params["group.field"] == ["experimental_method"]
+        assert params["group.limit"] == ["3"]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_grouping_without_response(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test grouped Solr responses that omit the top-level response key."""
+        mock_get.return_value = {
+            "responseHeader": {
+                "status": 0,
+                "params": {
+                    "q": "new_ligand:*",
+                    "group": "true",
+                    "group.field": "pdb_id",
+                },
+            },
+            "grouped": {
+                "pdb_id": {
+                    "matches": 39,
+                    "groups": [
+                        {
+                            "groupValue": "12xx",
+                            "doclist": {
+                                "numFound": 1,
+                                "start": 0,
+                                "docs": [
+                                    {
+                                        "deposition_date": "2026-04-21T01:00:00Z",
+                                        "entity_id": 1,
+                                        "new_ligand": ["A1DD0 : cobalt salen complex"],
+                                        "pdb_id": "12xx",
+                                        "title": "Structure with salen bound",
+                                    }
+                                ],
+                            },
+                        },
+                        {
+                            "groupValue": "25sm",
+                            "doclist": {
+                                "numFound": 1,
+                                "start": 0,
+                                "docs": [
+                                    {
+                                        "deposition_date": "2026-04-16T01:00:00Z",
+                                        "entity_id": 1,
+                                        "new_ligand": ["A1MGB : 3-CN-3-deazaguanosine"],
+                                        "pdb_id": "25sm",
+                                        "title": "Modified duplex RNA",
+                                    }
+                                ],
+                            },
+                        },
+                    ],
+                }
+            },
+        }
+
+        tools = SearchTools()
+        arguments = {
+            "query": "new_ligand:*",
+            "fl": ["pdb_id", "entity_id", "new_ligand", "title", "deposition_date"],
+            "group": True,
+            "group_field": "pdb_id",
+            "group_limit": 10,
+            "rows": 50,
+            "sort": "deposition_date desc",
+        }
+        result = tools.run_search_query(arguments)
+
+        assert "Grouped results:" in result
+        assert "Group field: pdb_id" in result
+        assert "Matching documents: 39" in result
+        assert "Groups returned: 2" in result
+        assert "Group 1: 12xx" in result
+        assert "Documents in group: 1" in result
+        assert "pdb_id: 12xx" in result
+        assert "A1DD0 : cobalt salen complex" in result
+        assert "Number of documents found:" not in result
+
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["new_ligand:*"]
+        assert params["fl"] == ["pdb_id,entity_id,new_ligand,title,deposition_date"]
+        assert params["group"] == ["true"]
+        assert params["group.field"] == ["pdb_id"]
+        assert params["group.limit"] == ["10"]
+        assert params["rows"] == ["50"]
+        assert params["sort"] == ["deposition_date desc"]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_additional_group_params(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test additional Solr grouping parameters."""
+        mock_get.return_value = {"grouped": {"pdb_id": {"matches": 0, "groups": []}}}
+
+        tools = SearchTools()
+        arguments = {
+            "query": "*:*",
+            "group": True,
+            "group_field": "pdb_id",
+            "group_format": "grouped",
+            "group_main": False,
+            "group_ngroups": True,
+            "group_query": ["new_ligand:*", "resolution:[0 TO 2]"],
+        }
+        result = tools.run_search_query(arguments)
+
+        assert "Group field: pdb_id" in result
+        params = get_called_query_params(mock_get)
+        assert params["group.format"] == ["grouped"]
+        assert params["group.main"] == ["false"]
+        assert params["group.ngroups"] == ["true"]
+        assert params["group.query"] == ["new_ligand:*", "resolution:[0 TO 2]"]
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_with_additional_params(
+        self, mock_get: MagicMock, mock_search_response: dict[str, Any]
+    ) -> None:
+        """Test pass-through Solr params."""
+        mock_get.return_value = mock_search_response
+
+        tools = SearchTools()
+        arguments = {
+            "query": "text:*kinase*",
+            "params": {
+                "defType": "edismax",
+                "qf": "title text",
+                "debug": True,
+            },
+        }
+        tools.run_search_query(arguments)
+
+        params = get_called_query_params(mock_get)
+        assert params["q"] == ["text:*kinase*"]
+        assert params["defType"] == ["edismax"]
+        assert params["qf"] == ["title text"]
+        assert params["debug"] == ["True"]
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_invalid_response(self, mock_get: MagicMock) -> None:
@@ -206,6 +493,61 @@ class TestSearchTools:
 
         with pytest.raises(Exception, match="Invalid response from search service"):
             tools.run_search_query(arguments)
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_returns_solr_error_message(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test Solr HTTP errors are returned with the server diagnostic."""
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.url = (
+            "https://www.ebi.ac.uk/pdbe/search/pdb/select?"
+            "q=document_type%3Alatest_chemistry&group=true&group.field=new_ligand"
+        )
+        mock_response.json.return_value = {
+            "error": {
+                "msg": "can not use FieldCache on multivalued field: new_ligand",
+                "code": 400,
+            }
+        }
+        mock_get.side_effect = requests.HTTPError(response=mock_response)
+
+        tools = SearchTools()
+        result = tools.run_search_query(
+            {
+                "query": "document_type:latest_chemistry",
+                "group": True,
+                "group_field": "new_ligand",
+            }
+        )
+
+        assert "Search query failed: HTTP 400." in result
+        assert "group.field=new_ligand" in result
+        assert (
+            "Solr error: can not use FieldCache on multivalued field: new_ligand"
+            in result
+        )
+        assert "Solr error code: 400" in result
+
+    @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
+    def test_run_search_query_returns_plain_text_error_body(
+        self, mock_get: MagicMock
+    ) -> None:
+        """Test non-JSON HTTP errors still include the response body."""
+        mock_response = MagicMock()
+        mock_response.status_code = 502
+        mock_response.url = "https://www.ebi.ac.uk/pdbe/search/pdb/select?q=test"
+        mock_response.text = "Bad Gateway"
+        mock_response.json.side_effect = ValueError("not json")
+        mock_get.side_effect = requests.HTTPError(response=mock_response)
+
+        tools = SearchTools()
+        result = tools.run_search_query({"query": "test"})
+
+        assert "Search query failed: HTTP 502." in result
+        assert "URL: https://www.ebi.ac.uk/pdbe/search/pdb/select?q=test" in result
+        assert "Response body: Bad Gateway" in result
 
     @patch("pdbe_mcp_server.search_tools.HTTPClient.get")
     def test_run_search_query_empty_results(self, mock_get: MagicMock) -> None:

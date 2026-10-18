@@ -71,6 +71,7 @@ def build_graph_server() -> Server:
         tools = [
             graph_tools.get_pdbe_graph_nodes_tool(),
             graph_tools.get_pdbe_graph_edges_tool(),
+            graph_tools.get_pdbe_graph_node_relationships_tool(),
             graph_tools.get_pdbe_graph_example_queries_tool(),
             graph_tools.get_pdbe_graph_indexes_tool(),
         ]
@@ -87,10 +88,29 @@ def build_graph_server() -> Server:
     async def call_tool(
         name: str, arguments: dict[str, Any]
     ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+        if arguments is None:
+            arguments = {}
+
         if name == "pdbe_graph_nodes":
             return [types.TextContent(text=graph_tools.format_nodes(), type="text")]
         elif name == "pdbe_graph_edges":
             return [types.TextContent(text=graph_tools.format_edges(), type="text")]
+        elif name == "pdbe_graph_node_relationships":
+            node_labels = arguments.get("node_labels", [])
+            if not isinstance(node_labels, list):
+                return [
+                    types.TextContent(
+                        type="text",
+                        text="Error: node_labels parameter must be a list of strings",
+                    )
+                ]
+
+            return [
+                types.TextContent(
+                    text=graph_tools.format_node_relationships(node_labels),
+                    type="text",
+                )
+            ]
         elif name == "pdbe_graph_example_queries":
             return [
                 types.TextContent(
@@ -150,11 +170,11 @@ in the PDBe database. Always make sure to understand the search schema before co
     async def call_tool(
         name: str, arguments: dict[str, Any]
     ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-        if name == "get_search_schema":
+        if name == "get_pdbe_search_schema":
             return [
                 types.TextContent(type="text", text=search_tools.get_search_schema())
             ]
-        elif name == "run_search_query":
+        elif name == "run_pdbe_search_query":
             return [
                 types.TextContent(
                     type="text",
