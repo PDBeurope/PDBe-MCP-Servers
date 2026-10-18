@@ -23,4 +23,4 @@ COPY pdbe_mcp_server/ ./pdbe_mcp_server/
 EXPOSE 8000
 
 # Run with uv
-CMD ["uv", "run", "pdbe-mcp-remote-server", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "pdbe-mcp-remote-server", "--host", "0.0.0.0", "--port", "8000", "--all"]
