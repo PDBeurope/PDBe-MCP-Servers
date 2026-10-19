@@ -1,3 +1,4 @@
+import os
 from typing import Any, Callable, Sequence
 
 import anyio
@@ -15,6 +16,8 @@ search_tools: SearchTools = SearchTools()
 graph_tools: GraphTools = GraphTools()
 
 conf: DictConfig = get_config()
+
+ROOT_PREFIX = os.getenv("ROOT_PREFIX", "")
 
 
 class MCPServerFactory:
@@ -70,6 +73,7 @@ def build_graph_server() -> Server:
             graph_tools.get_pdbe_graph_edges_tool(),
             graph_tools.get_pdbe_graph_node_relationships_tool(),
             graph_tools.get_pdbe_graph_example_queries_tool(),
+            graph_tools.get_pdbe_graph_indexes_tool(),
         ]
 
         # Add the cypher query tool only if Neo4j is configured
@@ -113,6 +117,8 @@ def build_graph_server() -> Server:
                     text=graph_tools.format_example_queries(), type="text"
                 )
             ]
+        elif name == "pdbe_graph_indexes":
+            return [types.TextContent(text=graph_tools.format_indexes(), type="text")]
         elif name == "pdbe_run_cypher_query":
             if not graph_tools:
                 return [
@@ -131,7 +137,7 @@ def build_graph_server() -> Server:
                 ]
 
             try:
-                result = graph_tools.execute_cypher_query(cypher_query)
+                result = await graph_tools.execute_cypher_query(cypher_query)
                 return [types.TextContent(type="text", text=result)]
             except ValueError as e:
                 return [types.TextContent(type="text", text=str(e))]
@@ -181,6 +187,71 @@ in the PDBe database. Always make sure to understand the search schema before co
     return search_server
 
 
+def build_all_server(servers: Sequence[Server] | None = None) -> Server:
+    """Build one MCP server that exposes the tools from every PDBe server."""
+    if servers is None:
+        servers = [
+            build_pdbe_api_server(),
+            build_pdbe_search_server(),
+            build_graph_server(),
+        ]
+
+    all_server = Server("pdbe-all-server")
+    tool_servers: dict[str, Server] = {}
+
+    async def get_tools() -> list[types.Tool]:
+        tools: list[types.Tool] = []
+        owners: dict[str, Server] = {}
+
+        for tool_server in servers:
+            handler = tool_server.request_handlers[types.ListToolsRequest]
+            result = await handler(types.ListToolsRequest())
+            tool_result = result.root
+            if not isinstance(tool_result, types.ListToolsResult):
+                raise RuntimeError(
+                    f"Unexpected tools/list response from {tool_server.name}"
+                )
+
+            for tool in tool_result.tools:
+                if tool.name in owners:
+                    raise ValueError(f"Duplicate tool name in all server: {tool.name}")
+                owners[tool.name] = tool_server
+                tools.append(tool)
+
+        tool_servers.clear()
+        tool_servers.update(owners)
+        return tools
+
+    @all_server.list_tools()
+    async def list_tools() -> list[types.Tool]:
+        return await get_tools()
+
+    @all_server.call_tool()
+    async def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        tool_server = tool_servers.get(name)
+        if tool_server is None:
+            # Ensure the owner map exists if a client calls a tool before listing.
+            await get_tools()
+            tool_server = tool_servers.get(name)
+        if tool_server is None:
+            raise ValueError(f"Unknown tool name: {name}")
+
+        handler = tool_server.request_handlers[types.CallToolRequest]
+        result = await handler(
+            types.CallToolRequest(
+                params=types.CallToolRequestParams(name=name, arguments=arguments)
+            )
+        )
+        tool_result = result.root
+        if not isinstance(tool_result, types.CallToolResult):
+            raise RuntimeError(
+                f"Unexpected tools/call response from {tool_server.name}"
+            )
+        return tool_result
+
+    return all_server
+
+
 factory.register("pdbe_graph_server", build_graph_server)
 factory.register("pdbe_api_server", build_pdbe_api_server)
 factory.register("pdbe_search_server", build_pdbe_search_server)
@@ -216,6 +287,12 @@ def main(port: int, transport: str, server_type: str) -> int:
 
         sse = SseServerTransport("/messages/")
 
+        root_paths = {
+            "pdbe_api_server": f"{ROOT_PREFIX}/api",
+            "pdbe_graph_server": f"{ROOT_PREFIX}/graph",
+            "pdbe_search_server": f"{ROOT_PREFIX}/search",
+        }
+
         async def handle_sse(request):
             async with sse.connect_sse(
                 request.scope,
@@ -230,12 +307,14 @@ def main(port: int, transport: str, server_type: str) -> int:
         starlette_app = Starlette(
             debug=True,
             routes=[
-                Route("/sse", endpoint=handle_sse, methods=["GET"]),
+                Route("/sse", endpoint=handle_sse, methods=["GET", "POST"]),
                 Mount("/messages/", app=sse.handle_post_message),
             ],
         )
 
-        uvicorn.run(starlette_app, host="0.0.0.0", port=port)
+        uvicorn.run(
+            starlette_app, host="0.0.0.0", port=port, root_path=root_paths[server_type]
+        )
 
     else:
         from mcp.server.stdio import stdio_server
