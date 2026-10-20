@@ -10,6 +10,187 @@ The package also includes an advanced PDBe Graph server for users who run their 
 - **PDBe Graph Server**: Inspect the graph schema and, with a local PDBe-KB Neo4j setup, query complex relationships and molecular interactions
 
 
+## Structure Explorer MCP App
+
+The Structure Explorer adds an embedded PDBe Mol* viewer to MCP Apps clients.
+Ask **“Open PDB 4HHB”**, then toggle chains, select a ligand instance or residue,
+focus the selection, and inspect its identifiers in the evidence panel. Clicking
+in 3D updates the panel and matching list entry. **Ask about selection** sends
+the selected identifiers back to your assistant for a follow-up question.
+Clients without app rendering receive structure metadata and ligand information
+as text.
+
+The interface uses plain TypeScript, HTML, and CSS with the official MCP Apps
+browser SDK. PDBe Mol* is embedded using its published browser bundle (Mol*
+internally uses React; this app has no React components or React app dependency).
+
+Build the UI with Node.js 22.12+ before starting the server or building a Python
+distribution:
+
+```bash
+cd apps/structure-explorer
+npm ci
+npm run build
+cd ../..
+uv sync
+```
+
+The build creates `pdbe_mcp_server/ui/structure-explorer.html` and
+`pdbe_mcp_server/ui/structure-comparison.html`, including the viewer, styles, SDK,
+and third-party license notices. Python wheels and source
+distributions include these artifacts when built. Rebuild them after UI
+changes; publishing a Python package requires this build step.
+
+For a local stdio connection, configure your MCP Apps client with:
+
+```json
+{
+  "mcpServers": {
+    "PDBe Structure Explorer": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/PDBe-MCP-Servers", "pdbe-mcp-server", "--server-type", "pdbe_apps_server"]
+    }
+  }
+}
+```
+
+For Streamable HTTP, run `uv run pdbe-mcp-remote-server` and connect the client
+to `http://127.0.0.1:8000/apps/`. With `--all`, the app tool and its UI resource
+are also available at `/all/`. `ROOT_PREFIX` applies to both paths. For legacy
+SSE, use `--server-type pdbe_apps_server --transport sse` on the stdio executable.
+
+When embedding these apps in a chatbot that supplies its own branding and entry
+input, configure the MCP connection URL with display options:
+
+| Connection URL | Header and logo | Entry lookup form |
+| --- | --- | --- |
+| `/all/` | Visible | Visible |
+| `/all/?internal=true` | Hidden | Hidden |
+| `/all/?show_header=false` | Hidden | Visible |
+| `/all/?show_search=false` | Visible | Hidden |
+
+These options also work at `/apps/`; include your deployment prefix, for example
+`/mcp/all/?internal=true`. Set this as the client's MCP connection URL so its HTTP
+requests retain the query parameters. Values must be `true` or `false`
+(case-insensitive). Explicit `show_header` and `show_search` values override the
+`internal` defaults: `?internal=true&show_search=true` hides only the header.
+Missing options and stdio connections keep the full interface.
+
+The preferences apply to the Structure Explorer and Structure Comparison Workbench.
+Only the branding header and top-level entry lookup area are hidden; viewer controls,
+filters, selections, and evidence panels remain available. Chat-supplied tool
+arguments still load the requested entry. This is a presentation preference.
+
+The server advertises a distinct `ui://` resource URI for each resolved display
+configuration. The resource URI carries its own settings, keeping cached HTML
+consistent and preferences separate between clients. After changing the connection
+URL, reconnect or refresh the client's tool list.
+
+The model-visible tool is `pdbe_open_structure(pdb_id, assembly_id?, chain_id?)`.
+`chain_id` is a **label chain ID** (`struct_asym_id`); the UI shows both author
+and label identifiers. Omit `assembly_id` to view the deposited asymmetric unit.
+The first coordinate model is loaded. Assembly views may omit entry chains or
+show symmetry copies; list selections apply to all copies, while 3D clicks retain
+the clicked instance. Residue lists come from deposited-entry PDBe annotations,
+and unobserved residues cannot be highlighted. Non-polymer selections use author
+residue numbers and insertion codes rather than PDBe's internal residue index.
+
+Only public PDBe endpoints on `https://www.ebi.ac.uk` are needed for browser
+network access. Their origin is declared in the UI resource CSP. The host needs
+MCP Apps support, WebGL, and network access to that origin. The evidence panel
+lists source endpoints and retrieval time. Missing optional annotations produce
+a warning; coordinate failures offer a retry through **Open structure**.
+
+Structure inspection and precomputed structure comparisons are available.
+
+### Structure Comparison Workbench
+
+`pdbe_compare_structures` opens `ui://pdbe/structure-comparison` in MCP Apps
+clients. For example, compare deoxyhaemoglobin and oxyhaemoglobin alpha chains:
+
+```json
+{
+  "reference_pdb_id": "4hhb",
+  "reference_chain_id": "A",
+  "mobile_pdb_id": "1hho",
+  "mobile_chain_id": "A"
+}
+```
+
+Chain selectors use exact, case-sensitive **label chain IDs**. Both chains must
+have a shared UniProt mapping and occur in the same PDBe superposition segment.
+If several mappings or segments qualify, supply `uniprot_accession` or the
+1-based `segment_index` reported in the error. Unsupported pairs return a clear
+unavailable result.
+
+The shared API executor retrieves chain metadata, the generated SIFTS mappings
+tool, and the registered `/uniprot/superposition/{uniprot_accession}` operation.
+The existing HTTP client retrieves PDBe's static matrix file at
+`https://www.ebi.ac.uk/pdbe/static/superpose/matrices/{accession}`; this file is
+outside the OpenAPI schema. Both source matrices are applied unchanged in Mol*.
+There is no additional structural fitting or coordinate-processing dependency.
+
+The plain TypeScript interface shows a two-chain overlay, visibility controls,
+per-residue displacement colours and an interactive chart/table. Selecting a
+mapped residue in either structure highlights its partner and shares the pair
+with the assistant. CSV export includes residue IDs, insertion codes, alternate
+locations, source links and retrieval time; selectable text is also provided.
+
+**PDBe supplies the alignment and Mol* supplies all geometric calculations.**
+Mol* `Mat4.ofRows` converts the supplied matrices for MolViewSpec, which applies
+them to the structures. The app reads displayed coordinates through Mol*
+`unit.conformation.position`, measures each pair with `Vec3.distance`, and uses
+Mol* `arrayRms` for the aligned Cα RMSD. No additional fitting is performed.
+Camera bounds and displacement colours also use Mol* functions.
+
+Scores use Mol*'s residue trace-atom selection in the first deposited model,
+retaining only occupied Cα atoms with finite positions. This follows Mol*'s
+alternate-location choice; the app does not choose alternates by occupancy.
+Only unambiguous, equal-length SIFTS segments establish residue correspondence.
+Coverage displays observed and mapped pair counts alongside the source segment
+range; the app does not calculate coverage percentages. Missing Cα pairs remain
+in the table and export; RMSD requires at least three observed pairs. Full chains
+are displayed, while scores cover the selected segment. Model context and CSV
+include the calculation providers. Non-UI clients receive mapping counts,
+transforms and provenance; Mol* metrics become available when the app loads.
+
+### API reuse and annotations
+
+The API MCP tools and Structure Explorer share the `OpenAPIToMCPGenerator`
+executor. It resolves registered GET operations from the configured OpenAPI
+schema and returns raw JSON with source and retrieval time. API tools format
+that JSON as text or TOON; the app normalizes it directly. The HTTP server
+shares one executor instance between `/api/`, `/apps/`, and `/all/`.
+`enableMCP` controls model-visible tools; schema GET operations such as residue
+listing can also be called internally by the app. This shares request handling
+and schema loading, but does not cache API responses across calls.
+
+For each polymer entity, the app retrieves domains, residue annotations,
+binding sites, and UniProt mapping tracks through that executor. Choose a source
+under **Domains & residue annotations** to colour the structure. Clicking a
+feature focuses its mapped segments. Hover tooltips and **Annotations at
+selection** retain source labels, accessions, scores, and evidence links.
+Selecting or clearing a residue preserves the chosen annotation colour layer.
+
+Track PDB indices are mapped to label residue positions, preserving separate
+segments of discontinuous domains. Tracks restricted to a best chain retain
+that chain scope. Binding-site segments carrying a bound molecule ID use that
+instance's author chain. UniProt positions are translated only through explicit,
+equal-length SIFTS segments covering the requested interval. Ambiguous,
+unsupported, or unmappable segments are omitted with a warning; missing optional
+annotation services do not prevent structure loading. The full annotation data
+is delivered in tool-result metadata; the model receives a compact summary and
+annotation evidence for the selected residue. Mol* renders the supplied data;
+its independent domain-annotation fetching is not enabled.
+
+Run the annotation mapping checks with:
+
+```bash
+uv run pytest tests/test_api_tools.py tests/test_apps.py -o addopts=''
+cd apps/structure-explorer
+node --experimental-strip-types --test tests/annotations.test.mjs
+```
+
 ## Worked Examples
 
 See the [`examples/`](examples/) directory for worked examples showing how an LLM can answer real structural-biology questions by combining PDBe API and PDBe Search MCP tools. These examples demonstrate:

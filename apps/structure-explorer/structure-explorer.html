@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDBe Structure Explorer</title>
+  </head>
+  <body>
+    <main>
+      <header class="brand-header">
+        <img class="pdbe-logo" src="./src/assets/pdbe-letterhead-white.webp" alt="PDBe — Protein Data Bank in Europe" width="145" height="50" />
+        <div class="header-title"><span class="eyebrow">Structural evidence</span><h1>Structure Explorer</h1></div>
+      </header>
+      <section class="search-strip" aria-label="Structure search">
+        <form id="open-form">
+          <label for="pdb-id">Explore a PDB structure</label>
+          <div class="input-row"><input id="pdb-id" value="4hhb" placeholder="PDB entry ID" pattern="[1-9][A-Za-z0-9]{3}" maxlength="4" required /><button id="open" type="submit" disabled>Open structure</button></div>
+        </form>
+        <p class="search-hint">Inspect chains, ligand instances, domains, and residue annotations.</p>
+      </section>
+      <p id="status" role="status" aria-live="polite">Connecting to your assistant…</p>
+      <section id="entry" hidden><h2 id="entry-title"></h2><p id="entry-meta"></p><p id="warnings"></p></section>
+      <div class="workspace">
+        <section class="viewer-panel" aria-label="Molecular viewer">
+          <div class="toolbar"><button id="reset" disabled>Reset view</button><button id="focus" disabled>Focus selection</button><button id="clear" disabled>Clear selection</button></div>
+          <div id="viewer"><p class="placeholder">Open a structure to inspect its chains, ligands, and residues.</p></div>
+        </section>
+        <aside id="evidence">
+          <section><h2>Selection</h2><p id="selection-summary">Select a residue or ligand in the viewer or the lists below.</p><dl id="selection-details"></dl><button id="ask" disabled>Ask about selection</button></section>
+          <section><h2>Annotations at selection</h2><div id="selection-annotations">Select a residue to inspect its evidence.</div></section>
+          <section><h2>Domains &amp; residue annotations</h2><label for="annotation-layer">Colour by annotation source</label><select id="annotation-layer" disabled><option value="">Original structure colours</option></select><label><input id="annotation-tooltips" type="checkbox" checked disabled /> Show annotation tooltips</label><p class="hint">Ranges use label residue numbering. Sources can overlap; only the selected source supplies colours.</p><div id="annotation-features"></div></section>
+          <section><h2>Chains</h2><p class="hint">Author ID / label ID · toggle visibility or focus a chain.</p><div id="chains"></div></section>
+          <section><h2>Ligand instances</h2><div id="ligands"><p class="hint">No structure loaded.</p></div></section>
+          <section><h2>Residues</h2><label for="residue-chain">Chain</label><select id="residue-chain" disabled></select><label for="residue-filter">Find residue</label><input id="residue-filter" placeholder="e.g. HIS or 87" disabled /><div id="residues" class="residue-list" role="list" aria-label="Residues"></div></section>
+          <section id="provenance" hidden><h2>Evidence sources</h2><p id="view-description" class="hint"></p><button id="source">Open PDBe entry</button><ul id="sources"></ul><p id="retrieved" class="hint"></p></section>
+        </aside>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

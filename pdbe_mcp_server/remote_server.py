@@ -11,10 +11,12 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 from starlette.types import Receive, Scope, Send
 
+from pdbe_mcp_server.api_tools import get_shared_api_generator
 from pdbe_mcp_server.server import (
     build_all_server,
     build_graph_server,
     build_pdbe_api_server,
+    build_pdbe_apps_server,
     build_pdbe_search_server,
 )
 
@@ -61,9 +63,17 @@ def create_app(include_all: bool | None = None) -> CORSMiddleware:
     # Build backend servers
     graph_server = build_graph_server()
     search_server = build_pdbe_search_server()
-    api_server = build_pdbe_api_server()
+    generator = get_shared_api_generator()
+    api_server = build_pdbe_api_server(generator)
+    apps_server = build_pdbe_apps_server(generator)
 
     session_managers = {
+        "apps": StreamableHTTPSessionManager(
+            app=apps_server,
+            event_store=None,
+            json_response=json_response,
+            stateless=True,
+        ),
         "graph": StreamableHTTPSessionManager(
             app=graph_server,
             event_store=None,
@@ -84,7 +94,9 @@ def create_app(include_all: bool | None = None) -> CORSMiddleware:
         ),
     }
     if include_all:
-        all_server = build_all_server([api_server, search_server, graph_server])
+        all_server = build_all_server(
+            [api_server, search_server, graph_server, apps_server]
+        )
         session_managers["all"] = StreamableHTTPSessionManager(
             app=all_server,
             event_store=None,
@@ -124,6 +136,7 @@ def create_app(include_all: bool | None = None) -> CORSMiddleware:
         return handler
 
     routes: list[Mount | Route] = [
+        Mount(f"{ROOT_PREFIX}/apps", app=create_handler(session_managers["apps"])),
         Mount(f"{ROOT_PREFIX}/graph", app=create_handler(session_managers["graph"])),
         Mount(f"{ROOT_PREFIX}/search", app=create_handler(session_managers["search"])),
         Mount(f"{ROOT_PREFIX}/api", app=create_handler(session_managers["api"])),

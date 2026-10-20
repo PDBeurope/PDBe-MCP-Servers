@@ -1,0 +1,601 @@
+"""MCP Apps resources and scientific data for the Structure Explorer."""
+
+import asyncio
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
+
+import mcp.types as types
+import requests
+from anyio.to_thread import run_sync
+from mcp.server.lowlevel import Server
+from mcp.server.lowlevel.helper_types import ReadResourceContents
+from pydantic import AnyUrl
+
+from pdbe_mcp_server.api_tools import OpenAPIToMCPGenerator, get_shared_api_generator
+from pdbe_mcp_server.comparison_tools import (
+    comparison_data,
+    comparison_input_schema,
+    comparison_text,
+)
+
+RESOURCE_URI = "ui://pdbe/structure-explorer"
+COMPARISON_RESOURCE_URI = "ui://pdbe/structure-comparison"
+APP_MIME_TYPE = "text/html;profile=mcp-app"
+UI_FILE = Path(__file__).parent / "ui" / "structure-explorer.html"
+COMPARISON_UI_FILE = UI_FILE.with_name("structure-comparison.html")
+APP_RESOURCES = {
+    RESOURCE_URI: "PDBe Structure Explorer",
+    COMPARISON_RESOURCE_URI: "PDBe Structure Comparison Workbench",
+}
+
+
+@dataclass(frozen=True)
+class AppDisplayOptions:
+    """Presentation preferences, isolated to a request or resource URI."""
+
+    show_header: bool = True
+    show_search: bool = True
+
+    @classmethod
+    def from_query(cls, query: Mapping[str, str]) -> "AppDisplayOptions":
+        def boolean(name: str, default: bool) -> bool:
+            value = query.get(name)
+            if value is None:
+                return default
+            if value.lower() not in {"true", "false"}:
+                raise ValueError(f"{name} must be true or false")
+            return value.lower() == "true"
+
+        visible = not boolean("internal", False)
+        return cls(boolean("show_header", visible), boolean("show_search", visible))
+
+    def resource_uri(self, base_uri: str) -> str:
+        if self == AppDisplayOptions():
+            return base_uri
+        return (
+            base_uri
+            + "?"
+            + urlencode(
+                {
+                    "show_header": str(self.show_header).lower(),
+                    "show_search": str(self.show_search).lower(),
+                }
+            )
+        )
+
+
+def app_resource_base_uri(uri: str) -> str | None:
+    """Identify app resources, including their display-specific variants."""
+    parts = urlsplit(uri)
+    base = urlunsplit(parts._replace(query="", fragment=""))
+    return base if base in APP_RESOURCES and not parts.fragment else None
+
+
+def request_display_options(server: Server) -> AppDisplayOptions:
+    """Read HTTP preferences; stdio and direct handler calls use full UI."""
+    try:
+        request = server.request_context.request
+    except LookupError:
+        request = None
+    return AppDisplayOptions.from_query(request.query_params if request else {})
+
+
+def normalize_annotations(
+    payloads: list[tuple[str, str, Any, str]],
+    chains: list[dict[str, Any]],
+    ligands: list[dict[str, Any]],
+    warnings: list[str],
+) -> list[dict[str, Any]]:
+    """Map v2 feature tracks to explicit label-chain and label-residue segments.
+
+    PDB track indices refer to the entity sequence, not author numbering.
+    UniProt positions are translated only through an explicit equal-length SIFTS
+    segment. Unsupported or ambiguous coordinates are reported and omitted.
+    """
+    features: dict[tuple[str, ...], dict[str, Any]] = {}
+    mappings = {
+        entity: data.get("data", [])
+        for kind, entity, data, _ in payloads
+        if kind == "uniprot_mapping" and isinstance(data, dict)
+    }
+    skipped = 0
+    for kind, entity_id, payload, source_url in payloads:
+        if not isinstance(payload, dict):
+            continue
+        for track in payload.get("data", []):
+            extra = track.get("additionalData") or {}
+            for region in track.get("residues", []):
+                detail = region.get("additionalData") or {}
+                chain_name = detail.get("bestChainId", extra.get("bestChainId"))
+                bound_id = detail.get("boundMoleculeId")
+                if bound_id:
+                    bound = next(
+                        (
+                            ligand
+                            for ligand in ligands
+                            if ligand.get("bound_molecule_id") == bound_id
+                        ),
+                        None,
+                    )
+                    if bound is None:
+                        skipped += 1
+                        continue
+                    chain_name = bound["auth_asym_id"]
+                candidates = [
+                    chain
+                    for chain in chains
+                    if chain["entity_id"] == entity_id
+                    and chain["auth_asym_id"] == chain_name
+                ]
+                if len(candidates) != 1:
+                    skipped += 1
+                    continue
+                chain = candidates[0]
+                start, end = region.get("startIndex"), region.get("endIndex")
+                if (
+                    not isinstance(start, int)
+                    or not isinstance(end, int)
+                    or start > end
+                ):
+                    skipped += 1
+                    continue
+                index_type = str(region.get("indexType", "")).upper()
+                if index_type in {"UNIPROT", "UNP"}:
+                    accession = detail.get(
+                        "uniprotAccession", extra.get("uniprotAccession")
+                    )
+                    translated: set[tuple[int, int]] = set()
+                    for mapping in mappings.get(entity_id, []):
+                        if accession and mapping.get("accession") != accession:
+                            continue
+                        if (
+                            mapping.get("additionalData", {}).get("bestChainId")
+                            != chain_name
+                        ):
+                            continue
+                        for segment in mapping.get("residues", []):
+                            ps, pe = segment.get("startIndex"), segment.get("endIndex")
+                            us, ue = (
+                                segment.get("unpStartIndex"),
+                                segment.get("unpEndIndex"),
+                            )
+                            if all(isinstance(v, int) for v in [ps, pe, us, ue]):
+                                if pe - ps == ue - us and us <= start <= end <= ue:
+                                    translated.add((ps + start - us, ps + end - us))
+                    if len(translated) != 1:
+                        skipped += 1
+                        continue
+                    start, end = translated.pop()
+                elif index_type != "PDB":
+                    skipped += 1
+                    continue
+                known = {r["label_seq_id"] for r in chain["residues"]}
+                if start not in known or end not in known:
+                    skipped += 1
+                    continue
+                provider = str(track.get("dataType", kind))
+                accession = str(detail.get("domainId", track.get("accession", "")))
+                instance = str(detail.get("domain", detail.get("groupLabel", "")))
+                name = str(detail.get("domainName", track.get("name", accession)))
+                key = (kind, entity_id, provider, accession, instance)
+                if key not in features:
+                    features[key] = {
+                        "id": f"feature-{len(features)}",
+                        "kind": kind,
+                        "source": provider,
+                        "accession": accession,
+                        "name": name,
+                        "description": instance,
+                        "source_url": source_url,
+                        "entity_id": entity_id,
+                        "segments": [],
+                    }
+                segment = {
+                    "label_asym_id": chain["label_asym_id"],
+                    "auth_asym_id": chain["auth_asym_id"],
+                    "start": start,
+                    "end": end,
+                    "details": detail,
+                    "original_index_type": index_type,
+                    "original_start": region["startIndex"],
+                    "original_end": region["endIndex"],
+                }
+                if segment not in features[key]["segments"]:
+                    features[key]["segments"].append(segment)
+    if skipped:
+        warnings.append(
+            f"Omitted {skipped} annotation segments with unsupported or ambiguous residue/chain mappings."
+        )
+    return list(features.values())
+
+
+async def get_structure_data(
+    arguments: dict[str, Any],
+    generator: OpenAPIToMCPGenerator | None = None,
+    include_annotations: bool = True,
+) -> dict[str, Any]:
+    """Normalize entry metadata while preserving author and label identifiers."""
+    pdb_id = str(arguments["pdb_id"]).lower()
+    if not re.fullmatch(r"[1-9][a-z0-9]{3}", pdb_id):
+        raise ValueError("pdb_id must be a four-character PDB accession, e.g. 4hhb")
+
+    sources: list[str] = []
+    warnings: list[str] = []
+    if generator is None:
+        generator = await run_sync(get_shared_api_generator)
+    executor = generator
+    operation_sources: dict[tuple[str, str | None], str] = {}
+    semaphore = asyncio.Semaphore(4)
+
+    async def fetch(
+        endpoint: str, entity_id: str | None = None, optional: bool = False
+    ) -> Any:
+        path = f"/pdb/entry/{endpoint}/{{pdb_id}}"
+        parameters: dict[str, Any] = {"pdb_id": pdb_id}
+        if entity_id is not None:
+            path += "/{entity_id}"
+            parameters["entity_id"] = entity_id
+        try:
+            async with semaphore:
+                result = await run_sync(
+                    lambda: executor.execute_operation("GET", path, parameters)
+                )
+            data = result["data"][pdb_id]
+            sources.append(result["source"])
+            operation_sources[(endpoint, entity_id)] = result["source"]
+            return data
+        except (requests.RequestException, ValueError, KeyError) as error:
+            if isinstance(error, requests.HTTPError) and error.response is not None:
+                if error.response.status_code == 404 and endpoint == "ligand_monomers":
+                    return []
+            if not optional:
+                raise ValueError(
+                    f"Could not retrieve {endpoint} for {pdb_id.upper()} from PDBe. "
+                    "Check the accession and try again."
+                ) from None
+            warnings.append(
+                f"PDBe {endpoint} data is unavailable"
+                + (f" for entity {entity_id}." if entity_id else ".")
+            )
+            return {} if endpoint == "residue_listing" else []
+
+    summary, molecules = await asyncio.gather(fetch("summary"), fetch("molecules"))
+    listing, ligand_records = await asyncio.gather(
+        fetch("residue_listing", optional=True), fetch("ligand_monomers", optional=True)
+    )
+
+    assemblies = summary[0].get("assemblies", [])
+    assembly_id = arguments.get("assembly_id")
+    if assembly_id and assembly_id not in {
+        str(item["assembly_id"]) for item in assemblies
+    }:
+        raise ValueError(f"Assembly {assembly_id!r} is not listed for {pdb_id.upper()}")
+
+    entities = {str(m["entity_id"]): m for m in molecules}
+    chains = []
+    for molecule in listing.get("molecules", []):
+        entity_id = str(molecule["entity_id"])
+        entity = entities.get(entity_id, {})
+        for chain in molecule.get("chains", []):
+            chains.append(
+                {
+                    "entity_id": entity_id,
+                    "label_asym_id": chain["struct_asym_id"],
+                    "auth_asym_id": chain["chain_id"],
+                    "name": ", ".join(entity.get("molecule_name", [])),
+                    "molecule_type": entity.get("molecule_type", "unknown"),
+                    "residues": [
+                        {
+                            "label_seq_id": r["residue_number"],
+                            "auth_seq_id": r.get("author_residue_number"),
+                            "insertion_code": r.get("author_insertion_code", ""),
+                            "comp_id": r["residue_name"],
+                            "observed_ratio": r.get("observed_ratio"),
+                        }
+                        for r in chain.get("residues", [])
+                    ],
+                }
+            )
+
+    # Basic chain controls still work when the residue listing is unavailable.
+    if not chains:
+        for entity_id, entity in entities.items():
+            for auth, label in zip(
+                entity.get("in_chains", []), entity.get("in_struct_asyms", [])
+            ):
+                chains.append(
+                    {
+                        "entity_id": entity_id,
+                        "label_asym_id": label,
+                        "auth_asym_id": auth,
+                        "name": ", ".join(entity.get("molecule_name", [])),
+                        "molecule_type": entity.get("molecule_type", "unknown"),
+                        "residues": [],
+                    }
+                )
+
+    chain_id = arguments.get("chain_id")
+    if chain_id and chain_id not in {c["label_asym_id"] for c in chains}:
+        raise ValueError("chain_id must match a label chain ID (struct_asym_id)")
+
+    ligands = [
+        {
+            "entity_id": str(ligand["entity_id"]),
+            "label_asym_id": ligand["struct_asym_id"],
+            "auth_asym_id": ligand["chain_id"],
+            # Non-polymer label_seq_id is undefined in mmCIF. PDBe's
+            # residue_number here is not a usable mmCIF label_seq_id.
+            "label_seq_id": None,
+            "auth_seq_id": ligand["author_residue_number"],
+            "insertion_code": ligand.get("author_insertion_code", ""),
+            "comp_id": ligand["chem_comp_id"],
+            "name": ligand.get("chem_comp_name", ""),
+            "bound_molecule_id": ligand.get("bm_id"),
+        }
+        for ligand in ligand_records
+    ]
+    entity_ids = [
+        key
+        for key, entity in entities.items()
+        if entity.get("molecule_type") not in {"water", "bound"}
+        and entity.get("sequence")
+    ]
+    tracks = ["domains", "annotations", "binding_sites", "uniprot_mapping"]
+    jobs = (
+        [(track, entity_id) for entity_id in entity_ids for track in tracks]
+        if include_annotations
+        else []
+    )
+    results = await asyncio.gather(
+        *(fetch(track, entity_id, optional=True) for track, entity_id in jobs)
+    )
+    payloads = [
+        (track, entity_id, data, operation_sources.get((track, entity_id), ""))
+        for (track, entity_id), data in zip(jobs, results)
+    ]
+    annotations = normalize_annotations(payloads, chains, ligands, warnings)
+    return {
+        "pdb_id": pdb_id,
+        "title": summary[0].get("title", pdb_id.upper()),
+        "experimental_methods": summary[0].get("experimental_method", []),
+        "assembly_id": assembly_id,
+        "assemblies": assemblies,
+        "initial_chain_id": chain_id,
+        "model_index": 0,
+        "chains": chains,
+        "ligands": ligands,
+        "annotations": annotations,
+        "entry_url": f"https://www.ebi.ac.uk/pdbe/entry/pdb/{pdb_id}",
+        "coordinate_url": f"https://www.ebi.ac.uk/pdbe/entry-files/download/{pdb_id}.bcif",
+        "sources": sorted(sources),
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "warnings": warnings,
+    }
+
+
+def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Server:
+    server = Server("pdbe-apps-server")
+
+    @server.list_tools()
+    async def list_tools() -> list[types.Tool]:
+        display = request_display_options(server)
+        return [
+            types.Tool(
+                name="pdbe_compare_structures",
+                description=(
+                    "Compare two protein label chains using PDBe's precomputed "
+                    "superposition matrices and SIFTS residue correspondence. "
+                    "Requires a shared UniProt accession and PDBe segment containing "
+                    "both chains. Opens a two-chain overlay with Mol*-calculated Cα RMSD "
+                    "and per-residue displacement, observed/mapped pair counts and CSV export. "
+                    "PDBe supplies the alignment; Mol* supplies all geometric calculations. "
+                    "No additional fitting is performed."
+                ),
+                inputSchema=comparison_input_schema(),
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=True
+                ),
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(COMPARISON_RESOURCE_URI)}
+                },
+            ),
+            types.Tool(
+                name="pdbe_open_structure",
+                description=(
+                    "Open an experimental PDB structure in an interactive 3D viewer. "
+                    "Inspect chains, ligand instances and residues. Displays the first "
+                    "coordinate model; defaults to the deposited asymmetric unit."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "pdb_id": {
+                            "type": "string",
+                            "pattern": "^[1-9][A-Za-z0-9]{3}$",
+                            "description": "Four-character PDB accession, e.g. 4hhb",
+                        },
+                        "assembly_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Biological assembly ID; omit for asymmetric unit",
+                        },
+                        "chain_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Label chain ID (struct_asym_id) to focus initially",
+                        },
+                    },
+                    "required": ["pdb_id"],
+                    "additionalProperties": False,
+                },
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=True
+                ),
+                _meta={"ui": {"resourceUri": display.resource_uri(RESOURCE_URI)}},
+            ),
+        ]
+
+    @server.call_tool()
+    async def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        if name == "pdbe_compare_structures":
+            if not COMPARISON_UI_FILE.is_file():
+                return types.CallToolResult(
+                    isError=True,
+                    content=[
+                        types.TextContent(
+                            type="text",
+                            text="Build the comparison UI with npm run build in apps/structure-explorer.",
+                        )
+                    ],
+                )
+            try:
+                executor = generator or await run_sync(get_shared_api_generator)
+                structures = await asyncio.gather(
+                    *[
+                        get_structure_data(
+                            {"pdb_id": arguments[f"{side}_pdb_id"]},
+                            executor,
+                            include_annotations=False,
+                        )
+                        for side in ("reference", "mobile")
+                    ]
+                )
+                data = await run_sync(
+                    lambda: comparison_data(arguments, list(structures), executor)
+                )
+            except (ValueError, requests.RequestException) as error:
+                return types.CallToolResult(
+                    isError=True,
+                    content=[
+                        types.TextContent(
+                            type="text", text=f"PDBe comparison unavailable: {error}"
+                        )
+                    ],
+                )
+            return types.CallToolResult(
+                content=[types.TextContent(type="text", text=comparison_text(data))],
+                structuredContent={k: v for k, v in data.items() if k != "pairs"},
+                _meta={"comparison": data},
+            )
+        if name != "pdbe_open_structure":
+            raise ValueError(f"Unknown tool name: {name}")
+        if not UI_FILE.is_file():
+            return types.CallToolResult(
+                isError=True,
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text=(
+                            "Structure Explorer UI is not built. Run npm ci and npm run build "
+                            "in apps/structure-explorer before starting the server."
+                        ),
+                    )
+                ],
+            )
+        try:
+            data = await get_structure_data(arguments, generator)
+        except ValueError as error:
+            return types.CallToolResult(
+                isError=True,
+                content=[types.TextContent(type="text", text=str(error))],
+            )
+        compact = {
+            **{key: value for key, value in data.items() if key != "annotations"},
+            "annotation_summary": {
+                "features": len(data["annotations"]),
+                "sources": sorted({a["source"] for a in data["annotations"]}),
+            },
+            "chains": [
+                {k: v for k, v in c.items() if k != "residues"} for c in data["chains"]
+            ],
+        }
+        ligand_text = (
+            ", ".join(
+                f"{ligand['comp_id']} (author chain {ligand['auth_asym_id']}, "
+                f"label chain {ligand['label_asym_id']}, residue "
+                f"{ligand['auth_seq_id']}{ligand['insertion_code']})"
+                for ligand in data["ligands"]
+            )
+            or "none reported"
+        )
+        text = (
+            f"{data['pdb_id'].upper()}: {data['title']}\n"
+            f"Method: {', '.join(data['experimental_methods'])}\n"
+            f"View: assembly {data['assembly_id'] or 'asymmetric unit'}; first coordinate model.\n"
+            f"Chains (label IDs): {', '.join(c['label_asym_id'] for c in data['chains'])}\n"
+            f"Ligands: {ligand_text}\nAnnotation features: {len(data['annotations'])}\nSource: {data['entry_url']}"
+        )
+        if data["warnings"]:
+            text += "\n" + "\n".join(data["warnings"])
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=text)],
+            structuredContent=compact,
+            # Full residue lists go to the app without consuming model context.
+            _meta={"structure": data},
+        )
+
+    @server.list_resources()
+    async def list_resources() -> list[types.Resource]:
+        display = request_display_options(server)
+        return [
+            types.Resource(
+                uri=AnyUrl(display.resource_uri(uri)),
+                name=title,
+                mimeType=APP_MIME_TYPE,
+            )
+            for uri, title in APP_RESOURCES.items()
+        ]
+
+    @server.read_resource()
+    async def read_resource(uri: AnyUrl) -> list[ReadResourceContents]:
+        base_uri = app_resource_base_uri(str(uri))
+        if base_uri is None:
+            raise ValueError(f"Unknown resource: {uri}")
+        query = parse_qs(urlsplit(str(uri)).query, keep_blank_values=True)
+        if any(
+            key not in {"show_header", "show_search"} or len(values) != 1
+            for key, values in query.items()
+        ):
+            raise ValueError("Invalid app resource display options")
+        # The URI alone determines the HTML, even if the connection changes.
+        display = AppDisplayOptions.from_query(
+            {key: values[0] for key, values in query.items()}
+        )
+        ui_file = {
+            COMPARISON_RESOURCE_URI: COMPARISON_UI_FILE,
+        }.get(base_uri, UI_FILE)
+        if not ui_file.is_file():
+            raise ValueError(
+                "Build the UI with npm run build in apps/structure-explorer"
+            )
+        html = ui_file.read_text(encoding="utf-8").replace(
+            "<html",
+            '<html data-pdbe-show-header="'
+            + str(display.show_header).lower()
+            + '" data-pdbe-show-search="'
+            + str(display.show_search).lower()
+            + '"',
+            1,
+        )
+        return [
+            ReadResourceContents(
+                content=html,
+                mime_type=APP_MIME_TYPE,
+                meta={
+                    "ui": {
+                        "prefersBorder": True,
+                        "csp": {
+                            "connectDomains": ["https://www.ebi.ac.uk"],
+                            "resourceDomains": ["data:", "blob:"],
+                        },
+                    }
+                },
+            )
+        ]
+
+    return server
