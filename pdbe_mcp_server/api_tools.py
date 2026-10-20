@@ -2,7 +2,6 @@ import hashlib
 import json
 import logging
 import os
-import time
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
@@ -13,6 +12,7 @@ import requests
 from omegaconf import DictConfig
 
 from pdbe_mcp_server import get_config
+from pdbe_mcp_server.execution import ToolDeadlineExceeded
 from pdbe_mcp_server.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
@@ -108,30 +108,19 @@ class OpenAPIToMCPGenerator:
             for name in operation["query_params"]
             if name in arguments
         }
-        for attempt in range(3):
-            try:
-                if operation["method"] == "GET":
-                    data = HTTPClient.get(url, params=params or None)
-                elif operation["method"] == "POST":
-                    data = HTTPClient.post(url)
-                else:
-                    raise ValueError(f"Unsupported method: {operation['method']}")
-                return {
-                    "data": data,
-                    "source": url,
-                    "parameters": params,
-                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
-                }
-            except requests.RequestException as error:
-                response = error.response
-                if attempt == 2 or (
-                    response is not None
-                    and 400 <= response.status_code < 500
-                    and response.status_code != 429
-                ):
-                    raise
-                time.sleep(0.5)
-        raise RuntimeError("API request did not complete")
+        # HTTPClient owns the retry policy and inherits the tool's deadline.
+        if operation["method"] == "GET":
+            data = HTTPClient.get(url, params=params or None)
+        elif operation["method"] == "POST":
+            data = HTTPClient.post(url)
+        else:
+            raise ValueError(f"Unsupported method: {operation['method']}")
+        return {
+            "data": data,
+            "source": url,
+            "parameters": params,
+            "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     def load_openapi_spec(self) -> dict[str, Any]:
         """
@@ -423,6 +412,8 @@ class OpenAPIToMCPGenerator:
 
         try:
             data = self._execute_request(tool_info, arguments)["data"]
+        except ToolDeadlineExceeded:
+            raise
         except requests.RequestException as error:
             error_message = f"API request failed: {error}"
             if error.response is not None:

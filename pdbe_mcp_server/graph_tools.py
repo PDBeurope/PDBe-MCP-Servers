@@ -127,13 +127,11 @@ class GraphTools:
         Initialize the GraphTools object, load the graph schema, and prepare node and edge lists.
         Also initializes the Neo4j driver for reuse across all tool calls.
         """
+        self._neo4j_driver: Any = None
         self.graph_schema: dict[str, Any] = self._get_graph_schema()
         self.node_dict: dict[Any, str] = {}
         self.nodes: list[dict[str, Any]] = self.get_nodes()
         self.edges: list[dict[str, Any]] = self.get_edges()
-
-        # Initialize Neo4j driver once for reuse
-        self._neo4j_driver: Any = None
 
     @property
     def neo4j_enabled(self) -> bool:
@@ -832,26 +830,24 @@ class GraphTools:
             logger.error("Neo4j query execution failed: %s", e)
             raise RuntimeError(f"Neo4j query execution failed: {e}") from e
 
-    def close(self):
-        """
-        Close the Neo4j driver connection.
-        """
+    async def aclose(self) -> None:
+        """Close the asynchronous Neo4j driver after active sessions finish."""
         if self._neo4j_driver is not None:
             try:
-                self._neo4j_driver.close()
+                await self._neo4j_driver.close()
             except Exception:
                 logger.warning("Error closing Neo4j driver", exc_info=True)
             finally:
                 self._neo4j_driver = None
 
-    def __del__(self) -> None:
-        """Cleanup on destruction."""
-        self.close()
+    async def close(self) -> None:
+        """Async compatibility alias; callers must await driver cleanup."""
+        await self.aclose()
 
-    def __enter__(self) -> "GraphTools":
+    async def __aenter__(self) -> "GraphTools":
         """Enter context manager."""
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit context manager, ensuring cleanup."""
-        self.close()
+        await self.aclose()

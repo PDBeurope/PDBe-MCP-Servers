@@ -1,8 +1,11 @@
+import asyncio
 import contextlib
 import logging
+import math
 import os
 import sys
 
+import anyio
 import click
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
@@ -12,6 +15,12 @@ from starlette.routing import Mount, Route
 from starlette.types import Receive, Scope, Send
 
 from pdbe_mcp_server.api_tools import get_shared_api_generator
+from pdbe_mcp_server.execution import (
+    drain_blocking_tools,
+    run_blocking_tool,
+    tool_timeout_seconds,
+)
+from pdbe_mcp_server.graph_tools import GraphTools
 from pdbe_mcp_server.server import (
     build_all_server,
     build_graph_server,
@@ -19,6 +28,7 @@ from pdbe_mcp_server.server import (
     build_pdbe_apps_server,
     build_pdbe_search_server,
 )
+from pdbe_mcp_server.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
 ROOT_PREFIX = os.getenv("ROOT_PREFIX", "")
@@ -38,7 +48,11 @@ async def handle_health(request) -> JSONResponse:
 
 
 async def handle_ready(request) -> JSONResponse:
-    return JSONResponse({"status": "ready"})
+    ready = getattr(request.app.state, "ready", False)
+    return JSONResponse(
+        {"status": "ready" if ready else "not ready"},
+        status_code=200 if ready else 503,
+    )
 
 
 # -------------------------
@@ -60,61 +74,112 @@ def create_app(include_all: bool | None = None) -> CORSMiddleware:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    # Build backend servers
-    graph_server = build_graph_server()
-    search_server = build_pdbe_search_server()
-    generator = get_shared_api_generator()
-    api_server = build_pdbe_api_server(generator)
-    apps_server = build_pdbe_apps_server(generator)
+    session_managers: dict[str, StreamableHTTPSessionManager] = {}
+    request_limiter: anyio.CapacityLimiter | None = None
 
-    session_managers = {
-        "apps": StreamableHTTPSessionManager(
-            app=apps_server,
-            event_store=None,
-            json_response=json_response,
-            stateless=True,
-        ),
-        "graph": StreamableHTTPSessionManager(
-            app=graph_server,
-            event_store=None,
-            json_response=json_response,
-            stateless=True,
-        ),
-        "search": StreamableHTTPSessionManager(
-            app=search_server,
-            event_store=None,
-            json_response=json_response,
-            stateless=True,
-        ),
-        "api": StreamableHTTPSessionManager(
-            app=api_server,
-            event_store=None,
-            json_response=json_response,
-            stateless=True,
-        ),
-    }
-    if include_all:
-        all_server = build_all_server(
-            [api_server, search_server, graph_server, apps_server]
-        )
-        session_managers["all"] = StreamableHTTPSessionManager(
-            app=all_server,
-            event_store=None,
-            json_response=json_response,
-            stateless=True,
-        )
+    def build_backends():
+        # Includes schema downloads and indexing: run once in a startup worker,
+        # not during import or on the serving event loop.
+        graph = GraphTools()
+        generator = get_shared_api_generator()
+        servers = {
+            "graph": build_graph_server(graph),
+            "search": build_pdbe_search_server(),
+            "api": build_pdbe_api_server(generator),
+            "apps": build_pdbe_apps_server(generator),
+        }
+        if include_all:
+            servers["all"] = build_all_server(list(servers.values()))
+        return graph, servers
 
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette):
-        async with contextlib.AsyncExitStack() as stack:
-            for name, manager in session_managers.items():
-                await stack.enter_async_context(manager.run())
-                logger.info(f"Started session manager for '{name}'")
-            yield
-            logger.info("Shutting down...")
+        nonlocal request_limiter
+        app.state.ready = False
+        graph = None
+        # Validate before allocating resources, including for invalid tool config.
+        tool_timeout_seconds()
+        drain_timeout = float(os.getenv("SHUTDOWN_DRAIN_TIMEOUT_SECONDS", "30"))
+        if not math.isfinite(drain_timeout) or drain_timeout <= 0:
+            raise ValueError(
+                "SHUTDOWN_DRAIN_TIMEOUT_SECONDS must be positive and finite"
+            )
+        max_requests = int(os.getenv("MAX_CONCURRENT_MCP_REQUESTS", "64"))
+        if max_requests < 1:
+            raise ValueError("MAX_CONCURRENT_MCP_REQUESTS must be a positive integer")
+        request_limiter = anyio.CapacityLimiter(max_requests)
 
-    def create_handler(manager: StreamableHTTPSessionManager):
+        async def cleanup():
+            drained = await drain_blocking_tools(drain_timeout)
+            try:
+                if graph is not None:
+                    await graph.aclose()
+            finally:
+                if drained:
+                    # Closing pooled sockets is synchronous too.
+                    from anyio.to_thread import run_sync
+
+                    await run_sync(HTTPClient.close_session)
+                else:
+                    logger.warning(
+                        "Worker drain exceeded %.1fs; leaving HTTP pools open "
+                        "for active workers until process exit",
+                        drain_timeout,
+                    )
+
+        try:
+            graph, servers = await run_blocking_tool(build_backends)
+            async with contextlib.AsyncExitStack() as stack:
+                for name, server in servers.items():
+                    manager = StreamableHTTPSessionManager(
+                        app=server,
+                        event_store=None,
+                        json_response=json_response,
+                        stateless=True,
+                    )
+                    session_managers[name] = manager
+                    await stack.enter_async_context(manager.run())
+                    logger.info("Started session manager for '%s'", name)
+                app.state.ready = True
+                try:
+                    yield
+                finally:
+                    app.state.ready = False
+                    logger.info("Shutting down...")
+        finally:
+            app.state.ready = False
+            session_managers.clear()
+            request_limiter = None
+            # Retain cleanup if the ASGI lifespan task is cancelled. The worker
+            # drain has its own bounded wait and does not cancel live threads.
+            cleanup_task = asyncio.create_task(cleanup())
+            try:
+                await asyncio.shield(cleanup_task)
+            except asyncio.CancelledError:
+                await cleanup_task
+                raise
+
+    def create_handler(name: str):
         async def handler(scope: Scope, receive: Receive, send: Send):
+            if not app.state.ready:
+                await JSONResponse({"error": "Server is not ready"}, status_code=503)(
+                    scope, receive, send
+                )
+                return
+            # Limit MCP requests separately from health routes. Applying a
+            # Uvicorn-wide limit here would also reject Kubernetes probes.
+            limiter = request_limiter
+            assert limiter is not None
+            try:
+                limiter.acquire_nowait()
+            except anyio.WouldBlock:
+                await JSONResponse(
+                    {"error": "Server is busy; retry later"},
+                    status_code=503,
+                    headers={"Retry-After": "1"},
+                )(scope, receive, send)
+                return
+            manager = session_managers[name]
             try:
                 await manager.handle_request(scope, receive, send)
             except Exception as e:
@@ -132,19 +197,19 @@ def create_app(include_all: bool | None = None) -> CORSMiddleware:
                         "body": b'{"error": "Internal server error"}',
                     }
                 )
+            finally:
+                limiter.release()
 
         return handler
 
     routes: list[Mount | Route] = [
-        Mount(f"{ROOT_PREFIX}/apps", app=create_handler(session_managers["apps"])),
-        Mount(f"{ROOT_PREFIX}/graph", app=create_handler(session_managers["graph"])),
-        Mount(f"{ROOT_PREFIX}/search", app=create_handler(session_managers["search"])),
-        Mount(f"{ROOT_PREFIX}/api", app=create_handler(session_managers["api"])),
+        Mount(f"{ROOT_PREFIX}/apps", app=create_handler("apps")),
+        Mount(f"{ROOT_PREFIX}/graph", app=create_handler("graph")),
+        Mount(f"{ROOT_PREFIX}/search", app=create_handler("search")),
+        Mount(f"{ROOT_PREFIX}/api", app=create_handler("api")),
     ]
     if include_all:
-        routes.append(
-            Mount(f"{ROOT_PREFIX}/all", app=create_handler(session_managers["all"]))
-        )
+        routes.append(Mount(f"{ROOT_PREFIX}/all", app=create_handler("all")))
     routes.extend(
         [
             Route(f"{ROOT_PREFIX}/health", endpoint=handle_health),
@@ -157,6 +222,7 @@ def create_app(include_all: bool | None = None) -> CORSMiddleware:
         routes=routes,
         lifespan=lifespan,
     )
+    app.state.ready = False
 
     return CORSMiddleware(
         app,
@@ -172,20 +238,53 @@ starlette_app = create_app()
 @click.command()
 @click.option("--host", default="127.0.0.1")
 @click.option("--port", default=8000)
-@click.option("--log-level", default="INFO")
-@click.option("--json-response", is_flag=True, default=False)
-@click.option("--cors-origins", default="*")
-@click.option("--workers", default=1, type=int)
+@click.option("--log-level", default="INFO", envvar="LOG_LEVEL")
+@click.option("--json-response", is_flag=True, default=False, envvar="JSON_RESPONSE")
+@click.option("--cors-origins", default="*", envvar="CORS_ORIGINS")
+@click.option(
+    "--workers", default=1, type=click.IntRange(min=1), envvar="WEB_CONCURRENCY"
+)
+@click.option(
+    "--max-concurrent-mcp-requests",
+    default=64,
+    type=click.IntRange(min=1),
+    envvar="MAX_CONCURRENT_MCP_REQUESTS",
+    help="Maximum concurrent MCP requests per worker; health routes are exempt.",
+)
+@click.option(
+    "--timeout-graceful-shutdown",
+    default=50,
+    type=click.IntRange(min=0),
+    envvar="UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN",
+    help="Seconds to let active requests finish before lifespan shutdown.",
+)
+@click.option(
+    "--timeout-keep-alive",
+    default=5,
+    type=click.IntRange(min=0),
+    envvar="UVICORN_TIMEOUT_KEEP_ALIVE",
+)
 @click.option("--reload", is_flag=True, default=False)
 @click.option(
     "--all",
     "include_all",
     is_flag=True,
     default=False,
+    envvar="ALL_SERVERS",
     help="Expose all PDBe tools at the /all endpoint.",
 )
 def main(
-    host, port, log_level, json_response, cors_origins, workers, reload, include_all
+    host,
+    port,
+    log_level,
+    json_response,
+    cors_origins,
+    workers,
+    max_concurrent_mcp_requests,
+    timeout_graceful_shutdown,
+    timeout_keep_alive,
+    reload,
+    include_all,
 ):
     # Validate combination
     if reload and workers > 1:
@@ -196,13 +295,7 @@ def main(
     os.environ["JSON_RESPONSE"] = str(json_response).lower()
     os.environ["CORS_ORIGINS"] = cors_origins
     os.environ["ALL_SERVERS"] = str(include_all).lower()
-
-    # The module-level app is created before Click invokes main(). Rebuild it
-    # when --all is enabled so the selected endpoint is present in this process;
-    # workers and reload subprocesses read ALL_SERVERS during module import.
-    if include_all:
-        global starlette_app
-        starlette_app = create_app(include_all=True)
+    os.environ["MAX_CONCURRENT_MCP_REQUESTS"] = str(max_concurrent_mcp_requests)
 
     import uvicorn
 
@@ -213,12 +306,15 @@ def main(
     )
 
     uvicorn.run(
-        "pdbe_mcp_server.remote_server:starlette_app",
+        "pdbe_mcp_server.remote_server:create_app",
+        factory=True,
         host=host,
         port=port,
         workers=workers if not reload else 1,
         reload=reload,
         log_level=log_level.lower(),
+        timeout_graceful_shutdown=timeout_graceful_shutdown,
+        timeout_keep_alive=timeout_keep_alive,
     )
 
 

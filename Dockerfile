@@ -14,6 +14,17 @@ RUN pip install uv
 
 WORKDIR /app
 
+# Production defaults. The container orchestrator manages replicas; worker
+# count and admission/shutdown settings remain configurable at runtime.
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    WEB_CONCURRENCY=1 \
+    MAX_CONCURRENT_MCP_REQUESTS=64 \
+    TOOL_TIMEOUT_SECONDS=45 \
+    SHUTDOWN_DRAIN_TIMEOUT_SECONDS=30 \
+    UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN=50 \
+    UVICORN_TIMEOUT_KEEP_ALIVE=5
+
 # Install the complete package, including the freshly built app resources.
 COPY pyproject.toml README.md ./
 COPY pdbe_mcp_server/ ./pdbe_mcp_server/
@@ -29,6 +40,8 @@ RUN uv build --wheel --out-dir /tmp/pdbe-dist \
 
 # Expose port
 EXPOSE 8000
+
+STOPSIGNAL SIGTERM
 
 # Use the installed package without a dependency sync at container startup.
 CMD ["/app/.venv/bin/pdbe-mcp-remote-server", "--host", "0.0.0.0", "--port", "8000", "--all"]

@@ -11,7 +11,6 @@ from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 import mcp.types as types
 import requests
-from anyio.to_thread import run_sync
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from pydantic import AnyUrl
@@ -22,6 +21,7 @@ from pdbe_mcp_server.comparison_tools import (
     comparison_input_schema,
     comparison_text,
 )
+from pdbe_mcp_server.execution import run_blocking_tool, tool_deadline
 
 RESOURCE_URI = "ui://pdbe/structure-explorer"
 COMPARISON_RESOURCE_URI = "ui://pdbe/structure-comparison"
@@ -227,7 +227,7 @@ async def get_structure_data(
     sources: list[str] = []
     warnings: list[str] = []
     if generator is None:
-        generator = await run_sync(get_shared_api_generator)
+        generator = await run_blocking_tool(get_shared_api_generator)
     executor = generator
     operation_sources: dict[tuple[str, str | None], str] = {}
     semaphore = asyncio.Semaphore(4)
@@ -242,7 +242,7 @@ async def get_structure_data(
             parameters["entity_id"] = entity_id
         try:
             async with semaphore:
-                result = await run_sync(
+                result = await run_blocking_tool(
                     lambda: executor.execute_operation("GET", path, parameters)
                 )
             data = result["data"][pdb_id]
@@ -441,6 +441,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
         ]
 
     @server.call_tool()
+    @tool_deadline
     async def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         if name == "pdbe_compare_structures":
             if not COMPARISON_UI_FILE.is_file():
@@ -454,7 +455,9 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     ],
                 )
             try:
-                executor = generator or await run_sync(get_shared_api_generator)
+                executor = generator or await run_blocking_tool(
+                    get_shared_api_generator
+                )
                 structures = await asyncio.gather(
                     *[
                         get_structure_data(
@@ -465,7 +468,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                         for side in ("reference", "mobile")
                     ]
                 )
-                data = await run_sync(
+                data = await run_blocking_tool(
                     lambda: comparison_data(arguments, list(structures), executor)
                 )
             except (ValueError, requests.RequestException) as error:

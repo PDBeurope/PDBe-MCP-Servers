@@ -287,7 +287,7 @@ class TestOpenAPIToMCPGenerator:
         error = requests.RequestException("Server Error")
         error.response = mock_response
 
-        mock_get.side_effect = [mock_openapi_spec, error, error, error]
+        mock_get.side_effect = [mock_openapi_spec, error]
 
         generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
         generator.list_tools()
@@ -302,7 +302,8 @@ class TestOpenAPIToMCPGenerator:
         assert isinstance(result[0], TextContent)
         assert "API request failed" in result[0].text
         assert "500" in result[0].text
-        assert mock_get.call_count == 4
+        # Retries belong exclusively to HTTPClient, not the tool generator.
+        assert mock_get.call_count == 2
 
     def test_extract_parameters(self) -> None:
         """Test parameter extraction."""

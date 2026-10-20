@@ -85,7 +85,7 @@ class TestBuildPDBeAPIServer:
 class TestBuildGraphServer:
     """Tests for build_graph_server function."""
 
-    @patch("pdbe_mcp_server.server.graph_tools")
+    @patch("pdbe_mcp_server.server.GraphTools")
     def test_build_graph_server(self, mock_graph_tools: MagicMock) -> None:
         """Test building graph server."""
         mock_graph_tools.get_pdbe_graph_nodes_tool.return_value = MagicMock()

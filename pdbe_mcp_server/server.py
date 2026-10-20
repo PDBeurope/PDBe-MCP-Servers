@@ -14,11 +14,11 @@ from pdbe_mcp_server.api_tools import (
     get_shared_api_generator,
 )
 from pdbe_mcp_server.apps import app_resource_base_uri, build_pdbe_apps_server
+from pdbe_mcp_server.execution import run_blocking_tool
 from pdbe_mcp_server.graph_tools import GraphTools
 from pdbe_mcp_server.search_tools import SearchTools
 
 search_tools: SearchTools = SearchTools()
-graph_tools: GraphTools = GraphTools()
 
 conf: DictConfig = get_config()
 
@@ -66,12 +66,17 @@ def build_pdbe_api_server(generator: OpenAPIToMCPGenerator | None = None) -> Ser
     ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
         if arguments is None:
             arguments = {}
-        return generator.call_tool(name, arguments)
+        # These tools use requests (including synchronous retries). Keep the
+        # entire operation, including response formatting, off the event loop.
+        return await run_blocking_tool(generator.call_tool, name, arguments)
 
     return api_server
 
 
-def build_graph_server() -> Server:
+def build_graph_server(graph_tools: GraphTools | None = None) -> Server:
+    # Construct explicitly at startup, never while importing this module.
+    if graph_tools is None:
+        graph_tools = GraphTools()
     graph_server = Server("pdbe-graph-server")
 
     @graph_server.list_tools()
@@ -179,14 +184,15 @@ in the PDBe database. Always make sure to understand the search schema before co
         name: str, arguments: dict[str, Any]
     ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
         if name == "get_pdbe_search_schema":
-            return [
-                types.TextContent(type="text", text=search_tools.get_search_schema())
-            ]
+            schema = await run_blocking_tool(search_tools.get_search_schema)
+            return [types.TextContent(type="text", text=schema)]
         elif name == "run_pdbe_search_query":
             return [
                 types.TextContent(
                     type="text",
-                    text=search_tools.run_search_query(arguments),
+                    text=await run_blocking_tool(
+                        search_tools.run_search_query, arguments
+                    ),
                 )
             ]
         else:
