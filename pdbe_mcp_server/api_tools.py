@@ -3,8 +3,10 @@ import json
 import logging
 import os
 import time
+from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 import mcp.types as types
 import requests
@@ -34,6 +36,102 @@ class OpenAPIToMCPGenerator:
         self.openapi_spec: dict[str, Any] = {}
         self.base_url: str = str(conf.api.base_url)
         self.tools: list[dict[str, Any]] = []
+        self.operations: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def index_operations(self) -> None:
+        """Index schema GET operations independently of model tool visibility."""
+        if not self.openapi_spec:
+            self.load_openapi_spec()
+        self.operations.clear()
+        for path, item in self.openapi_spec.get("paths", {}).items():
+            operation = item.get("get")
+            if not isinstance(operation, dict):
+                continue
+            parameters = {
+                (p.get("in"), p.get("name")): p
+                for p in [*item.get("parameters", []), *operation.get("parameters", [])]
+                if isinstance(p, dict) and "name" in p
+            }
+            self.operations[("GET", path)] = {
+                "method": "GET",
+                "path": path,
+                "path_params": [
+                    p["name"] for p in parameters.values() if p.get("in") == "path"
+                ],
+                "query_params": [
+                    p["name"] for p in parameters.values() if p.get("in") == "query"
+                ],
+            }
+
+    def execute_operation(
+        self, method: str, path: str, arguments: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Return raw JSON and provenance for a registered read-only operation."""
+        if not self.operations:
+            self.index_operations()
+        operation = self.operations.get((method.upper(), path))
+        if operation is None:
+            raise ValueError(f"Unknown read-only OpenAPI operation: {method} {path}")
+        return self._execute_request(operation, arguments)
+
+    def execute_api_tool(self, path: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Execute a generated GET tool as raw data, preserving API provenance.
+
+        Resolve by schema path so shortened tool names are not coupled to apps.
+        Operations without enableMCP must use execute_operation explicitly.
+        """
+        if not self.tools:
+            self.list_tools()
+        tool = next(
+            (
+                item
+                for item in self.tools
+                if item["method"] == "GET" and item["path"] == path
+            ),
+            None,
+        )
+        if tool is None:
+            raise ValueError(f"No generated API tool for GET {path}")
+        return self._execute_request(tool, arguments)
+
+    def _execute_request(
+        self, operation: dict[str, Any], arguments: dict[str, Any]
+    ) -> dict[str, Any]:
+        path = operation["path"]
+        for name in operation["path_params"]:
+            if name not in arguments:
+                raise ValueError(f"Missing required path parameter: {name}")
+            path = path.replace(f"{{{name}}}", quote(str(arguments[name]), safe=""))
+        url = urljoin(self.base_url, path.lstrip("/"))
+        params = {
+            name: arguments[name]
+            for name in operation["query_params"]
+            if name in arguments
+        }
+        for attempt in range(3):
+            try:
+                if operation["method"] == "GET":
+                    data = HTTPClient.get(url, params=params or None)
+                elif operation["method"] == "POST":
+                    data = HTTPClient.post(url)
+                else:
+                    raise ValueError(f"Unsupported method: {operation['method']}")
+                return {
+                    "data": data,
+                    "source": url,
+                    "parameters": params,
+                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                }
+            except requests.RequestException as error:
+                response = error.response
+                if attempt == 2 or (
+                    response is not None
+                    and 400 <= response.status_code < 500
+                    and response.status_code != 429
+                ):
+                    raise
+                time.sleep(0.5)
+        raise RuntimeError("API request did not complete")
 
     def load_openapi_spec(self) -> dict[str, Any]:
         """
@@ -220,13 +318,15 @@ class OpenAPIToMCPGenerator:
         if not self.openapi_spec:
             self.load_openapi_spec()
 
+        self.index_operations()
+        self.tools.clear()
         tools = []
         paths = self.openapi_spec.get("paths", {})
 
         for path, path_item in paths.items():
             for method, operation in path_item.items():
                 # Skip POST methods and non-HTTP methods
-                if method.upper() == "POST" or method.startswith("x-"):
+                if method.lower() != "get" or not isinstance(operation, dict):
                     continue
 
                 # skip APIs which are not enabled for MCP
@@ -321,49 +421,13 @@ class OpenAPIToMCPGenerator:
         if not tool_info:
             raise ValueError(f"Unknown tool: {name}")
 
-        # Build the URL
-        url_path = tool_info["path"]
-
-        # Replace path parameters
-        for param_name in tool_info["path_params"]:
-            if param_name not in arguments:
-                raise ValueError(f"Missing required path parameter: {param_name}")
-            url_path = url_path.replace(f"{{{param_name}}}", str(arguments[param_name]))
-
-        # Build full URL
-        full_url = urljoin(self.base_url, url_path.lstrip("/"))
-
-        query_params = {}
-        for param_name in tool_info["query_params"]:
-            if param_name in arguments:
-                query_params[param_name] = arguments[param_name]
-
-        last_error: requests.RequestException | None = None
-        data = None
-        for attempt in range(3):
-            try:
-                if tool_info["method"] == "GET":
-                    data = HTTPClient.get(
-                        full_url, params=query_params if query_params else None
-                    )
-                elif tool_info["method"] == "POST":
-                    data = HTTPClient.post(full_url)
-                else:
-                    # unsupported method, raise an error
-                    raise ValueError(f"Unsupported method: {tool_info['method']}")
-                last_error = None
-                break
-            except requests.RequestException as e:
-                last_error = e
-                if attempt < 2:
-                    time.sleep(0.5)
-
-        if last_error is not None:
-            error_message = f"API request failed: {last_error}"
-            if hasattr(last_error, "response") and last_error.response is not None:
-                error_message += f"\nStatus Code: {last_error.response.status_code}"
-                error_message += f"\nResponse: {last_error.response.text}"
-
+        try:
+            data = self._execute_request(tool_info, arguments)["data"]
+        except requests.RequestException as error:
+            error_message = f"API request failed: {error}"
+            if error.response is not None:
+                error_message += f"\nStatus Code: {error.response.status_code}"
+                error_message += f"\nResponse: {error.response.text}"
             return [types.TextContent(type="text", text=error_message)]
 
         if _toon_enabled():
@@ -398,3 +462,10 @@ def create_mcp_tools_from_openapi(
     generator = OpenAPIToMCPGenerator(openapi_url)
     tools = generator.list_tools()
     return generator, tools
+
+
+@lru_cache(maxsize=1)
+def get_shared_api_generator() -> OpenAPIToMCPGenerator:
+    """One schema and operation registry per server process."""
+    generator, _ = create_mcp_tools_from_openapi(str(conf.api.openapi_url))
+    return generator

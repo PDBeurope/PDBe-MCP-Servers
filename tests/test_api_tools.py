@@ -336,6 +336,46 @@ class TestOpenAPIToMCPGenerator:
         assert "limit" not in required
 
 
+class TestRawOpenAPIExecution:
+    def test_internal_get_preserves_model_visibility(self, mock_openapi_spec):
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+        generator.openapi_spec = mock_openapi_spec
+        names = [tool.name for tool in generator.list_tools()]
+        assert generator._shorten_tool_name("disabled_endpoint") not in names
+        with patch(
+            "pdbe_mcp_server.api_tools.HTTPClient.get", return_value={"value": 7}
+        ) as get:
+            raw = generator.execute_operation("GET", "/disabled", {})
+        assert raw["data"] == {"value": 7}
+        assert raw["source"].endswith("/disabled")
+        assert raw["retrieved_at"]
+        get.assert_called_once_with(raw["source"], params=None)
+        with pytest.raises(ValueError, match="Unknown read-only"):
+            generator.execute_operation("POST", "/disabled", {})
+
+    def test_tool_and_app_use_same_request_executor(self, mock_openapi_spec):
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+        generator.openapi_spec = mock_openapi_spec
+        tools = generator.list_tools()
+        with patch.object(
+            generator, "_execute_request", return_value={"data": {"value": 9}}
+        ) as execute:
+            assert "9" in generator.call_tool(tools[0].name, {"id": "one"})[0].text
+            assert generator.execute_operation("GET", "/test/{id}", {"id": "one"})[
+                "data"
+            ] == {"value": 9}
+        assert execute.call_count == 2
+        generator.list_tools()
+        assert len(generator.tools) == 1
+
+    def test_path_arguments_are_encoded(self, mock_openapi_spec):
+        generator = OpenAPIToMCPGenerator("https://example.com/openapi.json")
+        generator.openapi_spec = mock_openapi_spec
+        with patch("pdbe_mcp_server.api_tools.HTTPClient.get", return_value={}) as get:
+            generator.execute_operation("GET", "/test/{id}", {"id": "a/b?x=1"})
+        assert get.call_args.args[0].endswith("/test/a%2Fb%3Fx%3D1")
+
+
 class TestCreateMCPToolsFromOpenAPI:
     """Tests for create_mcp_tools_from_openapi function."""
 
