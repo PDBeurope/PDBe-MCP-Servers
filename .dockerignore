@@ -50,6 +50,10 @@ tests/
 .mypy_cache/
 .pyright/
 
+# Frontend dependencies and generated bundles are built inside the image
+**/node_modules/
+pdbe_mcp_server/ui/
+
 # Build tools
 .hatch/
 .hypothesis/
