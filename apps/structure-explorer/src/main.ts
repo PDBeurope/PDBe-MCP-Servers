@@ -521,7 +521,7 @@ el("open-form").addEventListener("submit", event => {
   requesting = true;
   setControls();
   status(`Retrieving ${pdbId.toUpperCase()} metadata…`);
-  void app.callServerTool({ name: "pdbe_open_structure", arguments: { pdb_id: pdbId } })
+  void app.callServerTool({ name: "ebi.pdbe.open_structure", arguments: { pdb_id: pdbId } })
     .then(receiveResult).catch(showError).finally(() => { requesting = false; setControls(); });
 });
 el("reset").addEventListener("click", () => { void viewer?.visual.reset({ camera: true }).catch(showError); });

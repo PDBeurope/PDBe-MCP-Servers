@@ -22,6 +22,7 @@ from pdbe_mcp_server.comparison_tools import (
     comparison_text,
 )
 from pdbe_mcp_server.execution import run_blocking_tool, tool_deadline
+from pdbe_mcp_server.tool_names import PDBeServer
 
 RESOURCE_URI = "ui://pdbe/structure-explorer"
 COMPARISON_RESOURCE_URI = "ui://pdbe/structure-comparison"
@@ -379,7 +380,7 @@ async def get_structure_data(
 
 
 def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Server:
-    server = Server("pdbe-apps-server")
+    server = PDBeServer("pdbe-apps-server")
 
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:

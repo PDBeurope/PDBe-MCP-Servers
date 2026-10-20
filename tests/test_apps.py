@@ -2,7 +2,7 @@
 
 import asyncio
 from contextlib import AsyncExitStack
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import mcp.types as types
@@ -324,7 +324,7 @@ async def test_display_preferences_are_isolated_between_clients(app_client):
         tool = next(
             tool
             for tool in result["result"]["tools"]
-            if tool["name"] == "pdbe_open_structure"
+            if tool["name"] == "ebi.pdbe.open_structure"
         )
         suffix = [
             "?show_header=false&show_search=false",
@@ -357,12 +357,44 @@ async def test_stdio_tools_keep_original_resource_uris():
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("endpoint", ["apps", "all"])
+@pytest.mark.parametrize("name", ["pdbe_open_structure", "ebi.pdbe.open_structure"])
+async def test_structure_aliases_preserve_app_results(
+    app_client, monkeypatch, endpoint, name
+):
+    data = {
+        "pdb_id": "1cbs",
+        "title": "Test structure",
+        "experimental_methods": [],
+        "assembly_id": None,
+        "chains": [],
+        "ligands": [],
+        "annotations": [],
+        "entry_url": "https://www.ebi.ac.uk/pdbe/entry/pdb/1cbs",
+        "warnings": [],
+    }
+    fetch = AsyncMock(return_value=data)
+    monkeypatch.setattr(apps, "get_structure_data", fetch)
+    response = await rpc(
+        app_client,
+        f"/mcp/{endpoint}/",
+        "tools/call",
+        {"name": name, "arguments": {"pdb_id": "1cbs"}},
+    )
+    result = response["result"]
+    assert not result["isError"]
+    assert result["structuredContent"]["pdb_id"] == "1cbs"
+    assert result["_meta"]["structure"] == data
+    fetch.assert_awaited_once()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("endpoint", ["apps", "all"])
 async def test_removed_apps_are_unavailable(app_client, endpoint):
     path = f"/mcp/{endpoint}/?internal=true"
     tools = (await rpc(app_client, path, "tools/list"))["result"]["tools"]
     assert {tool["name"] for tool in tools} == {
-        "pdbe_open_structure",
-        "pdbe_compare_structures",
+        "ebi.pdbe.open_structure",
+        "ebi.pdbe.compare_structures",
     }
     for name in (
         "pdbe_explore_ligand",

@@ -17,6 +17,7 @@ from pdbe_mcp_server.apps import app_resource_base_uri, build_pdbe_apps_server
 from pdbe_mcp_server.execution import run_blocking_tool
 from pdbe_mcp_server.graph_tools import GraphTools
 from pdbe_mcp_server.search_tools import SearchTools
+from pdbe_mcp_server.tool_names import PDBeServer
 
 search_tools: SearchTools = SearchTools()
 
@@ -50,7 +51,7 @@ factory = MCPServerFactory()
 
 
 def build_pdbe_api_server(generator: OpenAPIToMCPGenerator | None = None) -> Server:
-    api_server = Server("pdbe-api-server")
+    api_server = PDBeServer("pdbe-api-server")
     if generator is None:
         generator, available_tools = create_mcp_tools_from_openapi(conf.api.openapi_url)
     else:
@@ -77,7 +78,7 @@ def build_graph_server(graph_tools: GraphTools | None = None) -> Server:
     # Construct explicitly at startup, never while importing this module.
     if graph_tools is None:
         graph_tools = GraphTools()
-    graph_server = Server("pdbe-graph-server")
+    graph_server = PDBeServer("pdbe-graph-server")
 
     @graph_server.list_tools()
     async def list_tools() -> list[types.Tool]:
@@ -163,7 +164,7 @@ def build_graph_server(graph_tools: GraphTools | None = None) -> Server:
 
 
 def build_pdbe_search_server() -> Server:
-    search_server = Server(
+    search_server = PDBeServer(
         name="pdbe-search-server",
         instructions="""
 You are a PDBe search assistant. You have access to tools that allow you to retrieve the Solr search schema
@@ -212,7 +213,7 @@ def build_all_server(servers: Sequence[Server] | None = None) -> Server:
             build_pdbe_apps_server(generator),
         ]
 
-    all_server = Server("pdbe-all-server")
+    all_server = PDBeServer("pdbe-all-server")
     tool_servers: dict[str, Server] = {}
 
     @all_server.list_resources()

@@ -235,7 +235,7 @@ el<HTMLFormElement>("compare-form").addEventListener("submit", event => {
   }
   if (el<HTMLInputElement>("uniprot").value.trim()) args.uniprot_accession = el<HTMLInputElement>("uniprot").value.trim();
   if (el<HTMLInputElement>("segment").value) args.segment_index = Number(el<HTMLInputElement>("segment").value);
-  void app.callServerTool({ name: "pdbe_compare_structures", arguments: args }).then(receive).catch(fail)
+  void app.callServerTool({ name: "ebi.pdbe.compare_structures", arguments: args }).then(receive).catch(fail)
     .finally(() => { requesting = false; controls(); });
 });
 for (const id of ["reference-pdb", "reference-chain", "mobile-pdb", "mobile-chain"]) {
