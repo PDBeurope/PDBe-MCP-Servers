@@ -266,6 +266,11 @@ async def skill_http_request(catalog, server_name, scope, receive, send) -> bool
         if len(body) > 65536:
             raise ValueError("Request too large")
         request = types.JSONRPCRequest.model_validate_json(body)
+        logging.getLogger(__name__).debug(
+            "Skills HTTP dispatch: method=%s protocol=%s",
+            request.method,
+            headers.get(b"mcp-protocol-version"),
+        )
         reply = catalog.dispatch(request, server_name)
         status = 400 if isinstance(reply, types.JSONRPCError) else 200
         response = reply.model_dump(mode="json", by_alias=True, exclude_none=True)
