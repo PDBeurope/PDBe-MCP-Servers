@@ -188,7 +188,12 @@ def create_app(include_all: bool | None = None) -> CORSMiddleware:
                     backend is not None
                     and catalog is not None
                     and await skill_http_request(
-                        catalog, backend.name, scope, receive, send
+                        catalog,
+                        backend.name,
+                        scope,
+                        receive,
+                        send,
+                        manager.handle_request,
                     )
                 ):
                     return

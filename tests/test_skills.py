@@ -6,7 +6,11 @@ import anyio
 import httpx
 import mcp.types as types
 import pytest
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.shared.message import SessionMessage
+from mcp.types import LATEST_PROTOCOL_VERSION
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from pdbe_mcp_server.apps import build_pdbe_apps_server
 from pdbe_mcp_server.skills import (
@@ -95,8 +99,13 @@ def test_unknown_files_and_invalid_cursors_fail(method, params):
 async def test_modern_http_skills_without_initialize():
     catalog = SkillCatalog()
 
+    async def fallback(scope, receive, send):
+        await JSONResponse({"handled_by": "sdk"})(scope, receive, send)
+
     async def app(scope, receive, send):
-        assert await skill_http_request(catalog, "pdbe-apps", scope, receive, send)
+        assert await skill_http_request(
+            catalog, "pdbe-apps", scope, receive, send, fallback
+        )
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://localhost"
@@ -115,6 +124,71 @@ async def test_modern_http_skills_without_initialize():
         )
         assert response.status_code == 400
         assert response.json()["error"]["code"] == -32602
+
+
+@pytest.mark.anyio
+async def test_modern_http_standard_method_reaches_sdk_with_replayed_body():
+    catalog = SkillCatalog()
+    forwarded = {}
+
+    async def fallback(scope, receive, send):
+        forwarded["protocol"] = dict(scope["headers"])[b"mcp-protocol-version"].decode()
+        forwarded["body"] = await Request(scope, receive).json()
+        await JSONResponse({"handled_by": "sdk"})(scope, receive, send)
+
+    async def app(scope, receive, send):
+        assert await skill_http_request(
+            catalog, "pdbe-apps", scope, receive, send, fallback
+        )
+
+    payload = request("tools/list").model_dump(by_alias=True)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://localhost"
+    ) as client:
+        response = await client.post(
+            "/",
+            json=payload,
+            headers={"MCP-Protocol-Version": PROTOCOL},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"handled_by": "sdk"}
+    assert forwarded["protocol"] == LATEST_PROTOCOL_VERSION
+    assert forwarded["body"] == payload
+
+
+@pytest.mark.anyio
+async def test_modern_http_tools_list_works_through_mcp_sdk():
+    server = build_pdbe_apps_server(Mock())
+    manager = StreamableHTTPSessionManager(
+        app=server, json_response=True, stateless=True
+    )
+
+    async def app(scope, receive, send):
+        assert await skill_http_request(
+            server.skill_catalog,
+            server.name,
+            scope,
+            receive,
+            send,
+            manager.handle_request,
+        )
+
+    async with manager.run():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://localhost"
+        ) as client:
+            response = await client.post(
+                "/",
+                json=request("tools/list").model_dump(by_alias=True),
+                headers={
+                    "Accept": "application/json",
+                    "MCP-Protocol-Version": PROTOCOL,
+                },
+            )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["tools"]
 
 
 @pytest.mark.anyio
