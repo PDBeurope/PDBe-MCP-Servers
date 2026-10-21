@@ -198,7 +198,12 @@ class SkillCatalog:
                     },
                 },
             )
-        except (ValueError, TypeError, KeyError):
+        except (ValueError, TypeError, KeyError) as error:
+            logging.getLogger(__name__).debug(
+                "Invalid Skills request: method=%s reason=%s",
+                request.method,
+                error,
+            )
             return types.JSONRPCError(
                 jsonrpc="2.0",
                 id=request.id,
