@@ -16,7 +16,7 @@ The Structure Explorer adds an embedded PDBe Mol* viewer to MCP Apps clients.
 Ask **“Open PDB 4HHB”**, then toggle chains, select a ligand instance or residue,
 focus the selection, and inspect its identifiers in the evidence panel. Clicking
 in 3D updates the panel and matching list entry. **Ask about selection** sends
-the selected identifiers back to your assistant for a follow-up question.
+the selected identifiers to the MCP client for follow-up prompts.
 Clients without app rendering receive structure metadata and ligand information
 as text.
 
@@ -35,8 +35,9 @@ cd ../..
 uv sync
 ```
 
-The build creates `pdbe_mcp_server/ui/structure-explorer.html` and
-`pdbe_mcp_server/ui/structure-comparison.html`, including the viewer, styles, SDK,
+The build creates `pdbe_mcp_server/ui/structure-explorer.html`,
+`pdbe_mcp_server/ui/structure-comparison.html`, and
+`pdbe_mcp_server/ui/mvs-viewer.html`, including the viewer, styles, SDK,
 and third-party license notices. Python wheels and source
 distributions include these artifacts when built. Rebuild them after UI
 changes; publishing a Python package requires this build step.
@@ -59,33 +60,6 @@ to `http://127.0.0.1:8000/apps/`. With `--all`, the app tool and its UI resource
 are also available at `/all/`. `ROOT_PREFIX` applies to both paths. For legacy
 SSE, use `--server-type pdbe_apps_server --transport sse` on the stdio executable.
 
-When embedding these apps in a chatbot that supplies its own branding and entry
-input, configure the MCP connection URL with display options:
-
-| Connection URL | Header and logo | Entry lookup form |
-| --- | --- | --- |
-| `/all/` | Visible | Visible |
-| `/all/?internal=true` | Hidden | Hidden |
-| `/all/?show_header=false` | Hidden | Visible |
-| `/all/?show_search=false` | Visible | Hidden |
-
-These options also work at `/apps/`; include your deployment prefix, for example
-`/mcp/all/?internal=true`. Set this as the client's MCP connection URL so its HTTP
-requests retain the query parameters. Values must be `true` or `false`
-(case-insensitive). Explicit `show_header` and `show_search` values override the
-`internal` defaults: `?internal=true&show_search=true` hides only the header.
-Missing options and stdio connections keep the full interface.
-
-The preferences apply to the Structure Explorer and Structure Comparison Workbench.
-Only the branding header and top-level entry lookup area are hidden; viewer controls,
-filters, selections, and evidence panels remain available. Chat-supplied tool
-arguments still load the requested entry. This is a presentation preference.
-
-The server advertises a distinct `ui://` resource URI for each resolved display
-configuration. The resource URI carries its own settings, keeping cached HTML
-consistent and preferences separate between clients. After changing the connection
-URL, reconnect or refresh the client's tool list.
-
 The model-visible tool is `pdbe_open_structure(pdb_id, assembly_id?, chain_id?)`.
 `chain_id` is a **label chain ID** (`struct_asym_id`); the UI shows both author
 and label identifiers. Omit `assembly_id` to view the deposited asymmetric unit.
@@ -101,7 +75,44 @@ MCP Apps support, WebGL, and network access to that origin. The evidence panel
 lists source endpoints and retrieval time. Missing optional annotations produce
 a warning; coordinate failures offer a retry through **Open structure**.
 
-Structure inspection and precomputed structure comparisons are available.
+Structure inspection, precomputed structure comparisons, and custom MVS scenes are available.
+
+### Custom MolViewSpec scenes
+
+`ebi-pdbe-build_mvs` builds and displays a custom molecular scene in the
+MolViewSpec App (`ui://pdbe/mvs-viewer`). Supply a PDB entry and scene components,
+such as a cartoon representation for the polymer and ball-and-stick for a ligand:
+
+```json
+{
+  "version": 1,
+  "builder": {
+    "pdb_id": "1cbs",
+    "title": "Protein and ligand",
+    "components": [
+      {"selector": "polymer", "representation": "cartoon"},
+      {"selector": "ligand", "representation": "ball_and_stick", "focus": true}
+    ]
+  }
+}
+```
+
+Scenes support common molecular representations, selection and styling options,
+annotations, camera settings, and additional structures or primitives. The App
+can restore and export scenes as MVSJ. See the `molview-spec` skill for supported
+builder fields and examples.
+
+### Molecular stories
+
+`ebi-pdbe-build_mvs_story` creates a multi-scene molecular story in the same App.
+Provide a title and an ordered set of scenes, each with its own scene definition.
+Stories support playback, transitions, and MVSJ export.
+
+### Remote molecular visualization skill
+
+The Apps and aggregate servers provide the `molview-spec` skill and its reference
+files as MCP resources. MCP clients can discover the skill and retrieve its
+guidance when needed.
 
 ### Structure Comparison Workbench
 
@@ -132,8 +143,8 @@ There is no additional structural fitting or coordinate-processing dependency.
 
 The plain TypeScript interface shows a two-chain overlay, visibility controls,
 per-residue displacement colours and an interactive chart/table. Selecting a
-mapped residue in either structure highlights its partner and shares the pair
-with the assistant. CSV export includes residue IDs, insertion codes, alternate
+mapped residue in either structure highlights its partner and makes the pair
+available in MCP context. CSV export includes residue IDs, insertion codes, alternate
 locations, source links and retrieval time; selectable text is also provided.
 
 **PDBe supplies the alignment and Mol* supplies all geometric calculations.**
@@ -150,7 +161,7 @@ Only unambiguous, equal-length SIFTS segments establish residue correspondence.
 Coverage displays observed and mapped pair counts alongside the source segment
 range; the app does not calculate coverage percentages. Missing Cα pairs remain
 in the table and export; RMSD requires at least three observed pairs. Full chains
-are displayed, while scores cover the selected segment. Model context and CSV
+are displayed, while scores cover the selected segment. MCP context and CSV
 include the calculation providers. Non-UI clients receive mapping counts,
 transforms and provenance; Mol* metrics become available when the app loads.
 
