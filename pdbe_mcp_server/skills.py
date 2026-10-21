@@ -10,6 +10,7 @@ import logging
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import anyio
 import mcp.types as types
@@ -199,10 +200,24 @@ class SkillCatalog:
                 },
             )
         except (ValueError, TypeError, KeyError) as error:
+            params = request.params or {}
+            uri = params.get("uri") if request.method == "resources/read" else None
+            if isinstance(uri, str):
+                parsed_uri = urlsplit(uri)
+                debug_uri = (
+                    f"skill://{parsed_uri.hostname or ''}{parsed_uri.path}"[:256]
+                    if parsed_uri.scheme == "skill"
+                    else f"{parsed_uri.scheme}://{parsed_uri.hostname or ''}/<redacted>"
+                    if parsed_uri.scheme
+                    else "<non-URI>"
+                )
+            else:
+                debug_uri = "<missing-or-non-string>"
             logging.getLogger(__name__).debug(
-                "Invalid Skills request: method=%s reason=%s",
+                "Invalid Skills request: method=%s reason=%s uri=%s",
                 request.method,
                 error,
+                debug_uri,
             )
             return types.JSONRPCError(
                 jsonrpc="2.0",
