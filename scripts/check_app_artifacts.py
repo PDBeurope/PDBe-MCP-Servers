@@ -1,11 +1,15 @@
-"""Fail packaging if either MCP App bundle is absent, empty, or stale."""
+"""Fail packaging if an MCP App bundle is absent, empty, or stale."""
 
 import argparse
 import tarfile
 import zipfile
 from pathlib import Path
 
-EXPECTED = {"structure-explorer.html", "structure-comparison.html"}
+EXPECTED = {
+    "structure-explorer.html",
+    "structure-comparison.html",
+    "mvs-viewer.html",
+}
 
 
 def check_members(artifact: Path, members: dict[str, int]) -> None:
@@ -16,10 +20,10 @@ def check_members(artifact: Path, members: dict[str, int]) -> None:
     }
     if set(ui_members) != EXPECTED or not all(ui_members.values()):
         raise SystemExit(
-            f"{artifact.name}: expected non-empty bundles {sorted(EXPECTED)}, "
+            f"{artifact.name}: expected non-empty MCP App bundles {sorted(EXPECTED)}, "
             f"found {ui_members}. Run npm ci and npm run build in apps/structure-explorer."
         )
-    print(f"{artifact.name}: both MCP App resources are present")
+    print(f"{artifact.name}: all MCP App resources are present")
 
 
 def main() -> None:
