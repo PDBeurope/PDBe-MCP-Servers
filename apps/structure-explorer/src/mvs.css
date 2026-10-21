@@ -1,0 +1,21 @@
+@import "molstar-mvs/build/viewer/molstar.css";
+@import "./brand.css";
+:root{--pdbe-brand-margin:0;font:14px/1.5 system-ui,sans-serif;color:#173448;background:#fff}
+*{box-sizing:border-box}body{margin:0}main{width:100%}
+.toolbar{display:flex;align-items:center;gap:10px;padding:12px 16px}.toolbar div{flex:1;min-width:0}h1{font-size:18px;margin:0}p{margin:4px 0}button{font:inherit;border:1px solid #9bb8c4;background:#f4f9fb;color:inherit;border-radius:6px;padding:7px 10px;cursor:pointer}button:disabled{opacity:.5;cursor:default}
+#status{padding:0 16px 10px}#status.error{color:#a22}#viewer{position:relative;height:490px;min-height:300px}#legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin:0 0 8px;padding-left:18px}#warnings,small{color:#536875}a{color:#086a92}html[data-theme="dark"]{color:#dbe7ed;background:#14232c}html[data-theme="dark"] button{background:#203b49;border-color:#55727e}html[data-theme="dark"] #warnings,html[data-theme="dark"] small{color:#adc1cb}
+@media(max-width:550px){.toolbar{flex-wrap:wrap}.toolbar div{flex-basis:100%}#viewer{height:410px}}
+
+.scene-details { padding:16px; border-top:1px solid #dce7ec; background:#f6faf9; color:#173448; }
+#legend { display:flex; flex-wrap:wrap; gap:8px; list-style:none; padding:0; margin:0 0 12px; }
+#legend li { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border:1px solid #c8ded8; border-radius:16px; background:#e6f2ee; color:#165542; font-size:12px; font-weight:600; }
+.legend-swatch { display:inline-block; flex:0 0 12px; width:12px; height:12px; border-radius:50%; border:1px solid rgb(0 0 0 / 30%); box-shadow:0 0 0 1px rgb(255 255 255 / 60%); }
+#selection { margin:0; padding:10px 12px; border-left:3px solid #087c5b; border-radius:4px; background:#fff; overflow-wrap:anywhere; }
+#warnings { font-size:12px; margin:12px 0 0; color:#566b76; }
+#source { margin:8px 0; color:#566b76; font-size:12px; overflow-wrap:anywhere; }
+.scene-details small { display:block; font-size:11px; color:#566b76; }
+#warnings:empty, #source:empty { display:none; }
+html[data-theme="dark"] .scene-details { background:#172e37; border-color:#36525c; color:#dbe7ed; }
+html[data-theme="dark"] #legend li { background:#21483e; border-color:#397465; color:#c8eee0; }
+html[data-theme="dark"] #selection { background:#203b49; border-color:#56bd99; }
+html[data-theme="dark"] #source, html[data-theme="dark"] .scene-details small { color:#adc1cb; }

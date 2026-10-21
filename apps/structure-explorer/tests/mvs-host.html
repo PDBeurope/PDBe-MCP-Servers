@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><title>MVS App smoke test</title></head>
+<body style="margin:0;font:14px system-ui">
+<p id="host-status">Connecting the App…</p>
+<button id="empty">Test empty selection</button><button id="failure">Test coordinate failure</button><button id="restore">Restore scene</button>
+<p id="context"></p><p id="download"></p>
+<iframe id="app" title="MVS App" sandbox="allow-scripts allow-downloads" style="width:100%;height:850px;border:0"></iframe>
+<script type="module">
+import { AppBridge, PostMessageTransport } from '@modelcontextprotocol/ext-apps/app-bridge';
+const frame = document.querySelector('#app');
+const scene = await (await fetch('/scene.json')).json();
+const bridge = new AppBridge(null, { name: 'MVS test host', version: '1' }, {
+  updateModelContext: { text: {} }, downloadFile: {},
+}, { hostContext: { theme: 'light', platform: 'web', displayMode: 'inline', availableDisplayModes: ['inline'], containerDimensions: { width: 1000, maxHeight: 1500 } } });
+bridge.onupdatemodelcontext = async ({ structuredContent }) => {
+  document.querySelector('#context').textContent = JSON.stringify(structuredContent);
+  return {};
+};
+bridge.ondownloadfile = async ({ contents }) => {
+  const resource = contents[0].resource;
+  const parsed = JSON.parse(resource.text);
+  document.querySelector('#download').textContent = `Downloaded ${resource.uri}: ${parsed.kind} MVSJ, ${parsed.root.children.length} root nodes`;
+  return {};
+};
+bridge.oninitialized = async () => {
+  document.querySelector('#host-status').textContent = 'App connected';
+  await bridge.sendToolResult({ _meta: { mvs: scene } });
+};
+bridge.onerror = error => { document.querySelector('#host-status').textContent = String(error); };
+await bridge.connect(new PostMessageTransport(frame.contentWindow, frame.contentWindow));
+frame.srcdoc = await (await fetch('/mvs-viewer.html')).text();
+document.querySelector('#restore').onclick = () => bridge.sendToolResult({ _meta: { mvs: scene } });
+document.querySelector('#failure').onclick = async () => {
+  const data = structuredClone(scene);
+  data.mvsj.root.children.find(n => n.kind === 'download').params.url = 'https://www.ebi.ac.uk/pdbe/entry-files/download/mvs-test-does-not-exist.bcif';
+  await bridge.sendToolResult({ _meta: { mvs: data } });
+};
+document.querySelector('#empty').onclick = async () => {
+  const data = structuredClone(scene);
+  const visit = n => { if (n.kind === 'component') n.params.selector = { label_asym_id: 'DOES_NOT_EXIST' }; n.children?.forEach(visit); };
+  visit(data.mvsj.root);
+  await bridge.sendToolResult({ _meta: { mvs: data } });
+};
+</script></body></html>

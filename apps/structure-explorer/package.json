@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "test": "node --experimental-strip-types --test tests/annotations.test.mjs tests/comparison.test.mjs",
-    "build": "tsc --noEmit && vite build && vite build --mode comparison"
+    "test": "node --experimental-strip-types --test tests/annotations.test.mjs tests/comparison.test.mjs tests/mvs.test.mjs",
+    "build": "tsc --noEmit && vite build && vite build --mode comparison && vite build --mode mvs"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^2.0.3",
     "molstar": "5.8.0",
+    "molstar-mvs": "npm:molstar@5.13.1",
     "pdbe-molstar": "^3.12.0"
   },
   "devDependencies": {

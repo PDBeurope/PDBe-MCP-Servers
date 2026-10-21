@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [viteSingleFile()],
   build: {
     rollupOptions: {
-      input: mode === "comparison" ? "structure-comparison.html" : "structure-explorer.html",
+      input: mode === "smoke" ? "tests/mvs-host.html" : mode === "mvs" ? "mvs-viewer.html" : mode === "comparison" ? "structure-comparison.html" : "structure-explorer.html",
       output: { banner: `/*! ${license.replaceAll("*/", "* /")} */` },
     },
     outDir: fileURLToPath(new URL("../../pdbe_mcp_server/ui", import.meta.url)),

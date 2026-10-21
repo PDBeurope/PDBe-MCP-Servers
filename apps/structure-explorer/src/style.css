@@ -1,3 +1,4 @@
+@import "./brand.css";
 :root {
   --pdbe-header: #066649;
   --pdbe-green: #00805a;
@@ -14,14 +15,9 @@
 * { box-sizing: border-box; }
 body { margin: 0; color-scheme: light; color: var(--pdbe-text); background: #fff; }
 main { padding: 18px; max-width: 1400px; margin: auto; }
-.brand-header { display: flex; align-items: center; gap: 28px; min-height: 100px; margin: -18px -18px 0; padding: 22px 24px; color: #fff; background: var(--pdbe-header); }
-html[data-pdbe-show-header="false"] .brand-header { display: none; }
 html[data-pdbe-show-search="false"] .search-strip { display: none; }
-.pdbe-logo { display: block; width: 145px; height: 50px; object-fit: contain; flex: 0 0 auto; }
-.header-title { padding-left: 24px; border-left: 1px solid #ffffff40; }
 h1 { font-size: 24px; margin: 4px 0; letter-spacing: -.5px; font-weight: 600; }
 h2 { font-size: 15px; margin: 0 0 10px; }
-.eyebrow { color: #e2f0e9; font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; font-weight: 600; }
 p { line-height: 1.5; }
 .search-strip { margin: 0 -18px 18px; padding: 16px 24px; background: var(--pdbe-green); color: #fff; }
 .search-strip label { margin: 0 0 8px; font-size: 13px; }
@@ -80,9 +76,6 @@ dd { margin: 0; overflow-wrap: anywhere; }
 #sources button:hover, #source:hover, .annotation-evidence button:hover { color: #24568e; }
 #ask { color: var(--pdbe-dark); background: #fff; border-color: var(--pdbe-dark); font-weight: 600; }
 @media (max-width: 720px) {
-  .brand-header { gap: 16px; padding: 18px; }
-  .pdbe-logo { width: 125px; height: 44px; }
-  .header-title { padding-left: 16px; }
   h1 { font-size: 20px; }
   .search-strip { padding: 16px 18px; }
   .input-row { gap: 12px; }
@@ -90,8 +83,4 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .workspace { grid-template-columns: 1fr; }
   #viewer { height: 420px; }
   aside { max-height: none; }
-}
-@media (max-width: 380px) {
-  .brand-header { flex-wrap: wrap; gap: 12px; }
-  .header-title { border-left: 0; padding-left: 0; }
 }
