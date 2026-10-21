@@ -1,4 +1,5 @@
 import hashlib
+import json
 from builtins import ExceptionGroup
 from unittest.mock import Mock
 
@@ -158,10 +159,11 @@ async def test_modern_http_standard_method_reaches_sdk_with_replayed_body():
 
 
 @pytest.mark.anyio
-async def test_modern_http_tools_list_works_through_mcp_sdk():
+@pytest.mark.parametrize("json_response", [True, False])
+async def test_modern_http_tools_list_works_through_mcp_sdk(json_response):
     server = build_pdbe_apps_server(Mock())
     manager = StreamableHTTPSessionManager(
-        app=server, json_response=True, stateless=True
+        app=server, json_response=json_response, stateless=True
     )
 
     async def app(scope, receive, send):
@@ -174,6 +176,17 @@ async def test_modern_http_tools_list_works_through_mcp_sdk():
             manager.handle_request,
         )
 
+    def response_payload(response):
+        if json_response:
+            return response.json()
+        return json.loads(
+            next(
+                line.removeprefix("data: ")
+                for line in response.text.splitlines()
+                if line.startswith("data: ")
+            )
+        )
+
     async with manager.run():
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://localhost"
@@ -182,11 +195,11 @@ async def test_modern_http_tools_list_works_through_mcp_sdk():
                 "/",
                 json=request("tools/list").model_dump(by_alias=True),
                 headers={
-                    "Accept": "application/json",
+                    "Accept": "application/json, text/event-stream",
                     "MCP-Protocol-Version": PROTOCOL,
                 },
             )
-            tools = tools_response.json()["result"]["tools"]
+            tools = response_payload(tools_response)["result"]["tools"]
             app_uri = next(
                 tool["_meta"]["ui"]["resourceUri"]
                 for tool in tools
@@ -196,7 +209,7 @@ async def test_modern_http_tools_list_works_through_mcp_sdk():
                 "/",
                 json=request("resources/list").model_dump(by_alias=True),
                 headers={
-                    "Accept": "application/json",
+                    "Accept": "application/json, text/event-stream",
                     "MCP-Protocol-Version": PROTOCOL,
                 },
             )
@@ -204,7 +217,20 @@ async def test_modern_http_tools_list_works_through_mcp_sdk():
                 "/",
                 json=request("resources/read", uri=app_uri).model_dump(by_alias=True),
                 headers={
-                    "Accept": "application/json",
+                    "Accept": "application/json, text/event-stream",
+                    "MCP-Protocol-Version": PROTOCOL,
+                },
+            )
+
+            legacy_payload = request("resources/read", uri=app_uri).model_dump(
+                by_alias=True
+            )
+            legacy_payload["params"].pop("_meta")
+            legacy_response = await client.post(
+                "/",
+                json=legacy_payload,
+                headers={
+                    "Accept": "application/json, text/event-stream",
                     "MCP-Protocol-Version": PROTOCOL,
                 },
             )
@@ -213,10 +239,20 @@ async def test_modern_http_tools_list_works_through_mcp_sdk():
     assert tools
     assert resources_response.status_code == 200
     assert app_uri in {
-        resource["uri"] for resource in resources_response.json()["result"]["resources"]
+        resource["uri"]
+        for resource in response_payload(resources_response)["result"]["resources"]
     }
     assert read_response.status_code == 200
-    assert len(read_response.json()["result"]["contents"][0]["text"]) > 1000
+    read_result = response_payload(read_response)["result"]
+    assert len(read_result["contents"][0]["text"]) > 1000
+    assert read_result["resultType"] == "complete"
+    assert read_result["ttlMs"] == 300000
+    assert read_result["cacheScope"] == "public"
+
+    assert legacy_response.status_code == 200
+    legacy_result = response_payload(legacy_response)["result"]
+    assert legacy_result["contents"] == read_result["contents"]
+    assert not {"resultType", "ttlMs", "cacheScope"} & legacy_result.keys()
 
 
 @pytest.mark.anyio

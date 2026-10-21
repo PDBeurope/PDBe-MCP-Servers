@@ -332,3 +332,33 @@ async def skill_http_request(
         status = 400
     await JSONResponse(response, status_code=status)(scope, receive, send)
     return True
+
+
+def add_skill_read_metadata(server):
+    """Adapt public App resource results before the SDK serializes them."""
+    handler = server.request_handlers[types.ReadResourceRequest]
+
+    async def read_resource(request):
+        response = await handler(request)
+        meta = request.params.meta
+        if (
+            meta is not None
+            and getattr(meta, "io.modelcontextprotocol/protocolVersion", None)
+            == PROTOCOL
+            and isinstance(response.root, types.ReadResourceResult)
+        ):
+            defaults = {
+                "resultType": "complete",
+                "ttlMs": 300000,
+                "cacheScope": "public",
+            }
+            # A shallow model copy preserves the existing contents and metadata.
+            updates = {
+                key: value
+                for key, value in defaults.items()
+                if key not in (response.root.model_extra or {})
+            }
+            return types.ServerResult(response.root.model_copy(update=updates))
+        return response
+
+    server.request_handlers[types.ReadResourceRequest] = read_resource
