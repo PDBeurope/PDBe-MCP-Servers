@@ -103,12 +103,17 @@ class SkillCatalog:
         }
 
     def handles(self, request: types.JSONRPCRequest) -> bool:
+        if request.method in METHODS:
+            return True
         params = request.params or {}
         meta = params.get("_meta")
-        return request.method in METHODS or (
-            isinstance(meta, dict)
+        uri = params.get("uri")
+        return (
+            request.method == "resources/read"
+            and isinstance(meta, dict)
             and meta.get("io.modelcontextprotocol/protocolVersion") == PROTOCOL
-            and request.method in {"resources/list", "resources/read"}
+            and isinstance(uri, str)
+            and (uri == self.root_uri or uri.startswith(self.root_uri + "/"))
         )
 
     def dispatch(

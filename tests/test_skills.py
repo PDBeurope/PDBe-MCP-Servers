@@ -178,7 +178,7 @@ async def test_modern_http_tools_list_works_through_mcp_sdk():
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://localhost"
         ) as client:
-            response = await client.post(
+            tools_response = await client.post(
                 "/",
                 json=request("tools/list").model_dump(by_alias=True),
                 headers={
@@ -186,9 +186,37 @@ async def test_modern_http_tools_list_works_through_mcp_sdk():
                     "MCP-Protocol-Version": PROTOCOL,
                 },
             )
+            tools = tools_response.json()["result"]["tools"]
+            app_uri = next(
+                tool["_meta"]["ui"]["resourceUri"]
+                for tool in tools
+                if tool.get("_meta", {}).get("ui", {}).get("resourceUri")
+            )
+            resources_response = await client.post(
+                "/",
+                json=request("resources/list").model_dump(by_alias=True),
+                headers={
+                    "Accept": "application/json",
+                    "MCP-Protocol-Version": PROTOCOL,
+                },
+            )
+            read_response = await client.post(
+                "/",
+                json=request("resources/read", uri=app_uri).model_dump(by_alias=True),
+                headers={
+                    "Accept": "application/json",
+                    "MCP-Protocol-Version": PROTOCOL,
+                },
+            )
 
-    assert response.status_code == 200
-    assert response.json()["result"]["tools"]
+    assert tools_response.status_code == 200
+    assert tools
+    assert resources_response.status_code == 200
+    assert app_uri in {
+        resource["uri"] for resource in resources_response.json()["result"]["resources"]
+    }
+    assert read_response.status_code == 200
+    assert len(read_response.json()["result"]["contents"][0]["text"]) > 1000
 
 
 @pytest.mark.anyio
