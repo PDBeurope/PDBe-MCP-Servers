@@ -1,14 +1,20 @@
 """Tests for server module."""
 
-from unittest.mock import MagicMock, patch
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from click.testing import CliRunner
 
 from pdbe_mcp_server.server import (
+    ROOT_PREFIX,
     MCPServerFactory,
+    build_all_server,
     build_graph_server,
     build_pdbe_api_server,
     build_pdbe_search_server,
+    factory,
+    main,
 )
 
 
@@ -111,3 +117,46 @@ class TestBuildPDBeSearchServer:
         # Check that instructions are provided
         assert server.instructions is not None
         assert "search" in server.instructions.lower()
+
+
+def test_all_server_is_registered_and_advertised_in_cli():
+    assert factory._builders["all"] is build_all_server
+    result = CliRunner().invoke(main, ["--help"])
+    assert result.exit_code == 0
+    assert "|all]" in result.output
+
+
+@pytest.mark.parametrize("explicit_stdio", [False, True])
+def test_cli_all_runs_the_aggregate_server_over_stdio(monkeypatch, explicit_stdio):
+    server = MagicMock()
+    server.run = AsyncMock()
+    monkeypatch.setitem(factory._builders, "all", lambda: server)
+    streams = (MagicMock(), MagicMock())
+    opened = []
+
+    @asynccontextmanager
+    async def stdio():
+        opened.append(True)
+        yield streams
+
+    monkeypatch.setattr("mcp.server.stdio.stdio_server", stdio)
+    args = ["--server-type=all"]
+    if explicit_stdio:
+        args.extend(["--transport", "stdio"])
+    result = CliRunner().invoke(main, args)
+    assert result.exit_code == 0, result.output
+    assert opened == [True]
+    server.run.assert_awaited_once_with(
+        *streams, server.create_initialization_options.return_value
+    )
+
+
+def test_cli_all_has_a_valid_sse_path(monkeypatch):
+    server = MagicMock()
+    monkeypatch.setitem(factory._builders, "all", lambda: server)
+    run = MagicMock()
+    monkeypatch.setattr("uvicorn.run", run)
+    result = CliRunner().invoke(main, ["--server-type=all", "--transport", "sse"])
+    assert result.exit_code == 0, result.output
+    run.assert_called_once()
+    assert run.call_args.kwargs["root_path"] == f"{ROOT_PREFIX}/all"

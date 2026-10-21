@@ -222,7 +222,7 @@ async def app_client(tmp_path, monkeypatch):
     ):
         from pdbe_mcp_server.server import build_all_server
 
-    for name in ("UI_FILE", "COMPARISON_UI_FILE"):
+    for name in ("UI_FILE", "COMPARISON_UI_FILE", "MVS_UI_FILE"):
         path = tmp_path / f"{name}.html"
         path.write_text(
             '<!doctype html><html lang="en"><head></head><body>'
@@ -288,8 +288,10 @@ async def test_display_preferences_over_http(
         if "resourceUri" in tool["_meta"]["ui"]
     }
     listed = (await rpc(app_client, path, "resources/list"))["result"]["resources"]
-    assert uris == {item["uri"] for item in listed}
-    assert len(uris) == 2
+    assert uris == {
+        item["uri"] for item in listed if item["mimeType"] == apps.APP_MIME_TYPE
+    }
+    assert len(uris) == 3
     assert (uris == set(APP_RESOURCES)) == (header and search)
 
     for uri in uris:
@@ -304,12 +306,26 @@ async def test_display_preferences_over_http(
         assert f'data-pdbe-show-header="{str(header).lower()}"' in html
         assert f'data-pdbe-show-search="{str(search).lower()}"' in html
         expected_bundle = (
-            "COMPARISON_UI_FILE" if "structure-comparison" in uri else "UI_FILE"
+            "MVS_UI_FILE"
+            if "mvs-viewer" in uri
+            else "COMPARISON_UI_FILE"
+            if "structure-comparison" in uri
+            else "UI_FILE"
         )
         assert f'data-bundle="{expected_bundle}"' in html
         assert '<div id="viewer">' in html
         assert resource["_meta"]["ui"]["csp"] == {
-            "connectDomains": ["https://www.ebi.ac.uk"],
+            "connectDomains": (
+                [
+                    "https://www.ebi.ac.uk",
+                    "https://ebi.ac.uk",
+                    "https://*.ebi.ac.uk",
+                    "https://wwpdb.org",
+                    "https://*.wwpdb.org",
+                ]
+                if "mvs-viewer" in uri
+                else ["https://www.ebi.ac.uk"]
+            ),
             "resourceDomains": ["data:", "blob:"],
         }
 
@@ -324,7 +340,7 @@ async def test_display_preferences_are_isolated_between_clients(app_client):
         tool = next(
             tool
             for tool in result["result"]["tools"]
-            if tool["name"] == "ebi.pdbe.open_structure"
+            if tool["name"] == "ebi-pdbe-open_structure"
         )
         suffix = [
             "?show_header=false&show_search=false",
@@ -357,7 +373,7 @@ async def test_stdio_tools_keep_original_resource_uris():
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("endpoint", ["apps", "all"])
-@pytest.mark.parametrize("name", ["pdbe_open_structure", "ebi.pdbe.open_structure"])
+@pytest.mark.parametrize("name", ["pdbe_open_structure", "ebi-pdbe-open_structure"])
 async def test_structure_aliases_preserve_app_results(
     app_client, monkeypatch, endpoint, name
 ):
@@ -393,8 +409,10 @@ async def test_removed_apps_are_unavailable(app_client, endpoint):
     path = f"/mcp/{endpoint}/?internal=true"
     tools = (await rpc(app_client, path, "tools/list"))["result"]["tools"]
     assert {tool["name"] for tool in tools} == {
-        "ebi.pdbe.open_structure",
-        "ebi.pdbe.compare_structures",
+        "ebi-pdbe-open_structure",
+        "ebi-pdbe-compare_structures",
+        "ebi-pdbe-build_mvs",
+        "ebi-pdbe-build_mvs_story",
     }
     for name in (
         "pdbe_explore_ligand",
@@ -408,6 +426,61 @@ async def test_removed_apps_are_unavailable(app_client, endpoint):
     for uri in ("ui://pdbe/ligand-explorer", "ui://pdbe/sequence-coverage"):
         response = await rpc(app_client, path, "resources/read", {"uri": uri})
         assert "Unknown resource" in response["error"]["message"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("endpoint", ["apps", "all"])
+@pytest.mark.parametrize("name", ["pdbe_build_mvs", "ebi-pdbe-build_mvs"])
+async def test_mvs_scene_delivery_and_replacement(app_client, endpoint, name):
+    path = f"/mcp/{endpoint}/"
+    await rpc(app_client, path, "tools/list")
+    first = (
+        await rpc(
+            app_client,
+            path,
+            "tools/call",
+            {
+                "name": name,
+                "arguments": {"builder": {"pdb_id": "1cbs"}},
+            },
+        )
+    )["result"]
+    assert not first.get("isError")
+    assert "mvsj" not in first["structuredContent"]
+    assert first["_meta"]["mvs"]["mvsj"]["kind"] == "single"
+    builder = first["structuredContent"]["builder"]
+    builder["components"][0]["color"] = "blue"
+    replacement = (
+        await rpc(
+            app_client,
+            path,
+            "tools/call",
+            {
+                "name": name,
+                "arguments": {"version": 1, "builder": builder},
+            },
+        )
+    )["result"]
+    assert not replacement.get("isError")
+    assert replacement["structuredContent"]["builder"]["components"][0]["color"] == {
+        "color": "blue"
+    }
+    # Python builder errors remain readable even through the aggregate endpoint.
+    failed = (
+        await rpc(
+            app_client,
+            path,
+            "tools/call",
+            {
+                "name": name,
+                "arguments": {
+                    "builder": {"pdb_id": "1cbs", "components": [{"selector": "water"}]}
+                },
+            },
+        )
+    )["result"]
+    assert failed["isError"]
+    assert "include_water" in failed["content"][0]["text"]
 
 
 @pytest.mark.anyio

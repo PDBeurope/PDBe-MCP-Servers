@@ -1,0 +1,210 @@
+import hashlib
+from builtins import ExceptionGroup
+from unittest.mock import Mock
+
+import anyio
+import httpx
+import mcp.types as types
+import pytest
+from mcp.shared.message import SessionMessage
+
+from pdbe_mcp_server.apps import build_pdbe_apps_server
+from pdbe_mcp_server.skills import (
+    EXTENSION,
+    PROTOCOL,
+    SkillCatalog,
+    run_with_skills,
+    skill_http_request,
+)
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+def request(method, **params):
+    return types.JSONRPCRequest(
+        jsonrpc="2.0",
+        id=1,
+        method=method,
+        params={
+            **params,
+            "_meta": {
+                "io.modelcontextprotocol/protocolVersion": PROTOCOL,
+                "io.modelcontextprotocol/clientCapabilities": {},
+            },
+        },
+    )
+
+
+def result(catalog, method, **params):
+    reply = catalog.dispatch(request(method, **params), "test")
+    assert isinstance(reply, types.JSONRPCResponse), reply
+    assert reply.result["resultType"] == "complete"
+    return reply.result
+
+
+def test_manifests_match_served_bytes_and_direct_lookup():
+    catalog = SkillCatalog()
+    entry = result(catalog, "skills/get", uri=catalog.skill_uri)["skill"]
+    assert result(catalog, "skills/list")["skills"] == [entry]
+    for file in entry["resources"]:
+        text = result(catalog, "resources/read", uri=file["uri"])["contents"][0]["text"]
+        assert len(text.encode()) == file["size"]
+        assert "sha256:" + hashlib.sha256(text.encode()).hexdigest() == file["digest"]
+
+
+def test_directory_listing_and_discovery():
+    catalog = SkillCatalog()
+    capabilities = result(catalog, "server/discover")["capabilities"]
+    assert capabilities["extensions"][EXTENSION] == {"directoryRead": True}
+    children = result(catalog, "resources/directory/read", uri=catalog.root_uri)[
+        "resources"
+    ]
+    assert {item["name"] for item in children} == {"SKILL.md", "references"}
+    refs = result(
+        catalog, "resources/directory/read", uri=catalog.root_uri + "/references"
+    )["resources"]
+    assert {item["name"] for item in refs} == {
+        "scenes.md",
+        "stories.md",
+        "builder-api.md",
+        "molql-symbols.json",
+        "scene.schema.json",
+        "story.schema.json",
+    }
+
+
+@pytest.mark.parametrize(
+    "method,params",
+    [
+        ("skills/get", {"uri": "skill://pdbe/missing/SKILL.md"}),
+        ("resources/read", {"uri": "skill://pdbe/molview-spec/../secrets"}),
+        ("resources/directory/read", {"uri": "skill://pdbe/molview-spec/"}),
+        ("skills/list", {"cursor": "invalid"}),
+    ],
+)
+def test_unknown_files_and_invalid_cursors_fail(method, params):
+    reply = SkillCatalog().dispatch(request(method, **params), "test")
+    assert isinstance(reply, types.JSONRPCError)
+    assert reply.error.code == -32602
+
+
+@pytest.mark.anyio
+async def test_modern_http_skills_without_initialize():
+    catalog = SkillCatalog()
+
+    async def app(scope, receive, send):
+        assert await skill_http_request(catalog, "pdbe-apps", scope, receive, send)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://localhost"
+    ) as client:
+        response = await client.post(
+            "/",
+            json=request("skills/list").model_dump(by_alias=True),
+            headers={"MCP-Protocol-Version": PROTOCOL},
+        )
+        assert response.status_code == 200
+        assert response.json()["result"]["skills"][0]["uri"] == catalog.skill_uri
+        bad = request("skills/list").model_dump(by_alias=True)
+        bad["params"].pop("_meta")
+        response = await client.post(
+            "/", json=bad, headers={"MCP-Protocol-Version": PROTOCOL}
+        )
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == -32602
+
+
+@pytest.mark.anyio
+async def test_stdio_extension_probe_and_file_read_without_initialize():
+    server = build_pdbe_apps_server(Mock())
+    to_server, from_client = anyio.create_memory_object_stream(0)
+    to_client, from_server = anyio.create_memory_object_stream(0)
+    async with anyio.create_task_group() as group:
+
+        async def run():
+            await server.run(
+                from_client, to_client, server.create_initialization_options()
+            )
+
+        group.start_soon(run)
+        try:
+            with anyio.fail_after(5):
+                for query in [
+                    request("server/discover"),
+                    request("skills/list"),
+                    request("resources/read", uri="skill://pdbe/molview-spec/SKILL.md"),
+                ]:
+                    await to_server.send(SessionMessage(types.JSONRPCMessage(query)))
+                    response = (await from_server.receive()).message.root
+                    assert isinstance(response, types.JSONRPCResponse)
+                    assert response.result["resultType"] == "complete"
+        finally:
+            group.cancel_scope.cancel()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("closure", ["read", "write", "peer"])
+async def test_transport_shutdown_finishes_skills_and_sdk(closure):
+    server = build_pdbe_apps_server(Mock())
+    to_server, from_client = anyio.create_memory_object_stream(0)
+    to_client, from_server = anyio.create_memory_object_stream(0)
+    finished = anyio.Event()
+
+    async def run():
+        await server.run(
+            from_client,
+            to_client,
+            server.create_initialization_options(),
+            stateless=True,
+        )
+        finished.set()
+
+    async with to_server, from_client, to_client, from_server:
+        with anyio.fail_after(5):
+            async with anyio.create_task_group() as group:
+                group.start_soon(run)
+                # A response proves the forwarding loop and SDK are running.
+                await to_server.send(
+                    SessionMessage(types.JSONRPCMessage(request("skills/list")))
+                )
+                assert isinstance(
+                    (await from_server.receive()).message.root, types.JSONRPCResponse
+                )
+                if closure == "read":
+                    await from_client.aclose()
+                else:
+                    await (to_client if closure == "write" else from_server).aclose()
+                    await to_server.send(
+                        SessionMessage(types.JSONRPCMessage(request("skills/list")))
+                    )
+                await finished.wait()
+
+
+@pytest.mark.anyio
+async def test_skills_forwarding_does_not_hide_unexpected_errors():
+    catalog = Mock()
+    catalog.handles.side_effect = ValueError("unexpected catalog failure")
+    to_server, from_client = anyio.create_memory_object_stream(1)
+    to_client, from_server = anyio.create_memory_object_stream(0)
+
+    async def run(receiver, writer, options):
+        async with receiver, writer:
+            async for _ in receiver:
+                pass
+
+    async with to_server, from_client, to_client, from_server:
+        await to_server.send(
+            SessionMessage(types.JSONRPCMessage(request("skills/list")))
+        )
+        with anyio.fail_after(5):
+            with pytest.raises(ExceptionGroup) as caught:
+                await run_with_skills(
+                    catalog, "test", run, from_client, to_client, None
+                )
+        assert any(
+            isinstance(error, ValueError) and str(error) == "unexpected catalog failure"
+            for error in caught.value.exceptions
+        )

@@ -6,7 +6,9 @@ from typing import Awaitable, Callable, cast
 import mcp.types as types
 from mcp.server.lowlevel import Server
 
-TOOL_NAMESPACE = "ebi.pdbe."
+from pdbe_mcp_server.skills import SkillCatalog, run_with_skills
+
+TOOL_NAMESPACE = "ebi-pdbe-"
 _ListToolsCallback = (
     Callable[[], Awaitable[list[types.Tool]]]
     | Callable[[types.ListToolsRequest], Awaitable[types.ListToolsResult]]
@@ -14,6 +16,9 @@ _ListToolsCallback = (
 _CURATED_NAMES = {
     "pdbe_open_structure": "open_structure",
     "pdbe_compare_structures": "compare_structures",
+    "pdbe_build_mvs": "build_mvs",
+    "pdbe_build_mvs_story": "build_mvs_story",
+    "pdbe_get_ai_summary": "get_ai_summary",
     "get_pdbe_search_schema": "search_schema",
     "run_pdbe_search_query": "search",
     "pdbe_graph_nodes": "graph_nodes",
@@ -43,6 +48,35 @@ class PDBeServer(Server):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._internal_tool_names: dict[str, str] = {}
+        self.skill_catalog: SkillCatalog | None = None
+        self.tool_input_normalizers: dict[str, Callable] = {}
+
+    async def run(
+        self,
+        read_stream,
+        write_stream,
+        initialization_options,
+        raise_exceptions=False,
+        stateless=False,
+    ):
+        if self.skill_catalog is None:
+            return await super().run(
+                read_stream,
+                write_stream,
+                initialization_options,
+                raise_exceptions=raise_exceptions,
+                stateless=stateless,
+            )
+        return await run_with_skills(
+            self.skill_catalog,
+            self.name,
+            super().run,
+            read_stream,
+            write_stream,
+            initialization_options,
+            raise_exceptions=raise_exceptions,
+            stateless=stateless,
+        )
 
     def list_tools(self):
         decorate = super().list_tools()
@@ -91,10 +125,19 @@ class PDBeServer(Server):
 
             async def accept_alias(request: types.CallToolRequest):
                 canonical = public_tool_name(request.params.name)
+                arguments = request.params.arguments or {}
+                normalizer = self.tool_input_normalizers.get(canonical)
+                if normalizer is not None:
+                    normalized = normalizer(arguments)
+                    if isinstance(normalized, types.CallToolResult):
+                        return types.ServerResult(normalized)
+                    arguments = normalized
                 # Copy rather than mutate requests forwarded through /all.
                 request = request.model_copy(
                     update={
-                        "params": request.params.model_copy(update={"name": canonical})
+                        "params": request.params.model_copy(
+                            update={"name": canonical, "arguments": arguments}
+                        )
                     }
                 )
                 return await handler(request)

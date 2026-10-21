@@ -1,8 +1,10 @@
 """MCP Apps resources and scientific data for the Structure Explorer."""
 
 import asyncio
+import json
 import re
 from collections.abc import Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,7 +15,7 @@ import mcp.types as types
 import requests
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
-from pydantic import AnyUrl
+from pydantic import AnyUrl, ValidationError
 
 from pdbe_mcp_server.api_tools import OpenAPIToMCPGenerator, get_shared_api_generator
 from pdbe_mcp_server.comparison_tools import (
@@ -22,16 +24,26 @@ from pdbe_mcp_server.comparison_tools import (
     comparison_text,
 )
 from pdbe_mcp_server.execution import run_blocking_tool, tool_deadline
+from pdbe_mcp_server.mvs import (
+    BuildMvsInput,
+    BuildStoryInput,
+    build_mvs,
+    build_mvs_story,
+)
+from pdbe_mcp_server.skills import SkillCatalog
 from pdbe_mcp_server.tool_names import PDBeServer
 
 RESOURCE_URI = "ui://pdbe/structure-explorer"
 COMPARISON_RESOURCE_URI = "ui://pdbe/structure-comparison"
+MVS_RESOURCE_URI = "ui://pdbe/mvs-viewer"
 APP_MIME_TYPE = "text/html;profile=mcp-app"
 UI_FILE = Path(__file__).parent / "ui" / "structure-explorer.html"
 COMPARISON_UI_FILE = UI_FILE.with_name("structure-comparison.html")
+MVS_UI_FILE = UI_FILE.with_name("mvs-viewer.html")
 APP_RESOURCES = {
     RESOURCE_URI: "PDBe Structure Explorer",
     COMPARISON_RESOURCE_URI: "PDBe Structure Comparison Workbench",
+    MVS_RESOURCE_URI: "PDBe Custom Molecular View",
 }
 
 
@@ -70,6 +82,11 @@ class AppDisplayOptions:
         )
 
 
+app_display_defaults: ContextVar[AppDisplayOptions] = ContextVar(
+    "app_display_defaults", default=AppDisplayOptions()
+)
+
+
 def app_resource_base_uri(uri: str) -> str | None:
     """Identify app resources, including their display-specific variants."""
     parts = urlsplit(uri)
@@ -83,7 +100,11 @@ def request_display_options(server: Server) -> AppDisplayOptions:
         request = server.request_context.request
     except LookupError:
         request = None
-    return AppDisplayOptions.from_query(request.query_params if request else {})
+    return (
+        AppDisplayOptions.from_query(request.query_params)
+        if request
+        else app_display_defaults.get()
+    )
 
 
 def normalize_annotations(
@@ -379,13 +400,123 @@ async def get_structure_data(
     }
 
 
+def mvs_validation_failure(error: ValueError) -> types.CallToolResult:
+    if isinstance(error, ValidationError):
+        issues = []
+        for issue in error.errors(
+            include_url=False, include_input=False, include_context=False
+        )[:8]:
+            path = list(map(str, issue["loc"]))
+            detail = {"field": ".".join(path), "message": issue["msg"][:300]}
+            component_opacity = len(path) >= 3 and path[-3] in (
+                "components",
+                "annotations",
+            )
+            representation_opacity = (
+                len(path) >= 4
+                and path[-4] in ("components", "annotations")
+                and path[-2] == "representation"
+            )
+            if (
+                path
+                and path[-1] == "opacity"
+                and (component_opacity or representation_opacity)
+            ):
+                if len(path) < 2 or path[-2] != "representation":
+                    path.insert(len(path) - 1, "representation")
+                detail["suggested_field"] = ".".join(path)
+                detail["hint"] = (
+                    "Set opacity only in representation.opacity to a number from 0 (transparent) to 1 (opaque); remove any conflicting component-level opacity."
+                )
+            issues.append(detail)
+    else:
+        issues = [{"field": "builder", "message": str(error)[:1000]}]
+    details = "\n".join(
+        f"{issue['field']}: {issue['message']}"
+        + (f" Correction: {issue['hint']}" if "hint" in issue else "")
+        for issue in issues
+    )
+    return types.CallToolResult(
+        isError=True,
+        content=[
+            types.TextContent(
+                type="text",
+                text="MVS validation failed. No view was created. Correct these fields and retry once with a changed specification; do not repeat the same input.\n"
+                + details,
+            )
+        ],
+        structuredContent={
+            "status": "validation_failed",
+            "retryable": True,
+            "issues": issues,
+        },
+    )
+
+
+def normalize_mvs_arguments(arguments, *, story=False):
+    try:
+        model = (BuildStoryInput if story else BuildMvsInput).model_validate(arguments)
+        return model.model_dump(
+            mode="json", by_alias=True, exclude_none=True, exclude_unset=True
+        )
+    except ValueError as error:
+        return mvs_validation_failure(error)
+
+
 def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Server:
     server = PDBeServer("pdbe-apps-server")
+    server.tool_input_normalizers = {
+        "ebi-pdbe-build_mvs": normalize_mvs_arguments,
+        "ebi-pdbe-build_mvs_story": lambda arguments: normalize_mvs_arguments(
+            arguments, story=True
+        ),
+    }
+    catalog = SkillCatalog()
+    server.skill_catalog = catalog
 
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:
         display = request_display_options(server)
         return [
+            types.Tool(
+                name="pdbe_build_mvs_story",
+                description=(
+                    "Build a guided molecular story with 2–20 ordered scenes and open it in Mol* 5.13.1. "
+                    "Each scene has a unique id, title, description and complete builder specification "
+                    "using the same schema as build_mvs. Set component opacity inside representation.opacity, never directly on a component. Ground all narrative claims and selections "
+                    "in PDBe evidence. Returns one native multi-state MVSJ with timed playback, "
+                    "scene navigation and download. The host can update the originating viewer or open a new result. "
+                    "Default duration is 6500 ms per scene and camera transition is 1500 ms. "
+                    "Stop after a compiled result. On validation failure, correct the input and retry once; never repeat identical input. Compilation does not establish coordinate availability or verify biological claims."
+                ),
+                inputSchema=BuildStoryInput.model_json_schema(),
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=False
+                ),
+                _meta={"ui": {"resourceUri": display.resource_uri(MVS_RESOURCE_URI)}},
+            ),
+            types.Tool(
+                name="pdbe_build_mvs",
+                description=(
+                    "Build a custom single-scene molecular visualization with MolViewSpec "
+                    "and open it in Mol* 5.13.1. Supply a complete builder specification, "
+                    "including existing choices for follow-up changes; the host routes each result to an existing viewer or a new one. "
+                    "Supports chains, residue ranges, ligand instances, representations, colors, "
+                    "opacity, inline annotations, labels, tooltips, focus and camera. Set component opacity inside representation.opacity, never directly on a component. "
+                    "Ground selections in PDBe data; use label_seq_id for polymer residues "
+                    "and auth_seq_id with insertion code for non-polymers. "
+                    "Water is excluded from broad all selections unless include_water=true. "
+                    "Supports density isosurfaces and clipping; structure transforms/instances, multiple structures per scene, annotation tables, primitives and serialized MolQL selectors. No raw MVS trees, executable code or PyMOL text. "
+                    "Returns the complete normalized builder in structuredContent for follow-ups; "
+                    "full MVSJ is delivered to the App with download support. "
+                    "A compiled result completes the build; do not rebuild while waiting for viewer loading. Compilation does not verify biological claims or coordinate availability."
+                ),
+                inputSchema=BuildMvsInput.model_json_schema(),
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=False
+                ),
+                _meta={"ui": {"resourceUri": display.resource_uri(MVS_RESOURCE_URI)}},
+            ),
             types.Tool(
                 name="pdbe_compare_structures",
                 description=(
@@ -410,7 +541,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 description=(
                     "Open an experimental PDB structure in an interactive 3D viewer. "
                     "Inspect chains, ligand instances and residues. Displays the first "
-                    "coordinate model; defaults to the deposited asymmetric unit."
+                    "coordinate model; defaults to the deposited asymmetric unit. A successful result completes the viewing request; stop calling this tool and let the App load coordinates."
                 ),
                 inputSchema={
                     "type": "object",
@@ -444,6 +575,46 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
     @server.call_tool()
     @tool_deadline
     async def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        if name in {"pdbe_build_mvs", "pdbe_build_mvs_story"}:
+            is_story = name == "pdbe_build_mvs_story"
+            try:
+                data = await run_blocking_tool(
+                    lambda: build_mvs_story(arguments)
+                    if is_story
+                    else build_mvs(arguments)
+                )
+            except ValueError as error:
+                return mvs_validation_failure(error)
+            compact = {
+                key: value
+                for key, value in data.items()
+                if key not in {"mvsj", "scenes"}
+            }
+            compact.update(status="compiled", render_status="pending")
+            title = data["story"]["title"] if is_story else data["builder"]["title"]
+            spec = {
+                "version": 1,
+                "story" if is_story else "builder": data[
+                    "story" if is_story else "builder"
+                ],
+            }
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text=(
+                            f"Compiled {title} successfully. The build is complete; stop building and summarize the result. "
+                            "The compiled MVSJ is attached to the viewer artifact; the normalized specification below is not a placeholder. "
+                            "The App loads coordinates separately. Pending viewer loading is not a build error and must not trigger another build.\n"
+                            # The chatbot's App wrapper currently forwards text only to the agent.
+                            f"Replacement specification: {json.dumps(spec)}\n"
+                            + "\n".join(data["warnings"])
+                        ),
+                    )
+                ],
+                structuredContent=compact,
+                _meta={"mvs": data},
+            )
         if name == "pdbe_compare_structures":
             if not COMPARISON_UI_FILE.is_file():
                 return types.CallToolResult(
@@ -518,6 +689,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 {k: v for k, v in c.items() if k != "residues"} for c in data["chains"]
             ],
         }
+        compact.update(status="prepared", render_status="pending")
         ligand_text = (
             ", ".join(
                 f"{ligand['comp_id']} (author chain {ligand['auth_asym_id']}, "
@@ -528,6 +700,8 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
             or "none reported"
         )
         text = (
+            "Structure Explorer prepared successfully. The attached App contains the interactive viewer; this is not a placeholder. "
+            "The tool request is complete. Do not call open_structure again to wait for browser loading.\n"
             f"{data['pdb_id'].upper()}: {data['title']}\n"
             f"Method: {', '.join(data['experimental_methods'])}\n"
             f"View: assembly {data['assembly_id'] or 'asymmetric unit'}; first coordinate model.\n"
@@ -553,10 +727,17 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 mimeType=APP_MIME_TYPE,
             )
             for uri, title in APP_RESOURCES.items()
-        ]
+        ] + catalog.resources()
 
     @server.read_resource()
     async def read_resource(uri: AnyUrl) -> list[ReadResourceContents]:
+        if str(uri) in catalog.files:
+            resource = catalog.read(str(uri))
+            return [
+                ReadResourceContents(
+                    content=resource["text"], mime_type=resource["mimeType"]
+                )
+            ]
         base_uri = app_resource_base_uri(str(uri))
         if base_uri is None:
             raise ValueError(f"Unknown resource: {uri}")
@@ -572,6 +753,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
         )
         ui_file = {
             COMPARISON_RESOURCE_URI: COMPARISON_UI_FILE,
+            MVS_RESOURCE_URI: MVS_UI_FILE,
         }.get(base_uri, UI_FILE)
         if not ui_file.is_file():
             raise ValueError(
@@ -594,7 +776,17 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     "ui": {
                         "prefersBorder": True,
                         "csp": {
-                            "connectDomains": ["https://www.ebi.ac.uk"],
+                            "connectDomains": (
+                                [
+                                    "https://www.ebi.ac.uk",
+                                    "https://ebi.ac.uk",
+                                    "https://*.ebi.ac.uk",
+                                    "https://wwpdb.org",
+                                    "https://*.wwpdb.org",
+                                ]
+                                if base_uri == MVS_RESOURCE_URI
+                                else ["https://www.ebi.ac.uk"]
+                            ),
                             "resourceDomains": ["data:", "blob:"],
                         },
                     }

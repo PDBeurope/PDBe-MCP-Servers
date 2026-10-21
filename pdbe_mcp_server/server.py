@@ -8,12 +8,18 @@ from mcp.server.lowlevel import Server
 from omegaconf import DictConfig
 
 from pdbe_mcp_server import get_config
+from pdbe_mcp_server.ai_summary_tools import ai_summary_tool, get_ai_summary
 from pdbe_mcp_server.api_tools import (
     OpenAPIToMCPGenerator,
     create_mcp_tools_from_openapi,
     get_shared_api_generator,
 )
-from pdbe_mcp_server.apps import app_resource_base_uri, build_pdbe_apps_server
+from pdbe_mcp_server.apps import (
+    AppDisplayOptions,
+    app_display_defaults,
+    app_resource_base_uri,
+    build_pdbe_apps_server,
+)
 from pdbe_mcp_server.execution import run_blocking_tool
 from pdbe_mcp_server.graph_tools import GraphTools
 from pdbe_mcp_server.search_tools import SearchTools
@@ -56,6 +62,7 @@ def build_pdbe_api_server(generator: OpenAPIToMCPGenerator | None = None) -> Ser
         generator, available_tools = create_mcp_tools_from_openapi(conf.api.openapi_url)
     else:
         available_tools = generator.list_tools()
+    available_tools = [*available_tools, ai_summary_tool()]
 
     @api_server.list_tools()
     async def list_tools() -> list[types.Tool]:
@@ -67,6 +74,13 @@ def build_pdbe_api_server(generator: OpenAPIToMCPGenerator | None = None) -> Ser
     ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
         if arguments is None:
             arguments = {}
+        if name == "pdbe_get_ai_summary":
+            return [
+                types.TextContent(
+                    type="text",
+                    text=await run_blocking_tool(get_ai_summary, arguments),
+                )
+            ]
         # These tools use requests (including synchronous retries). Keep the
         # entire operation, including response formatting, off the event loop.
         return await run_blocking_tool(generator.call_tool, name, arguments)
@@ -214,6 +228,18 @@ def build_all_server(servers: Sequence[Server] | None = None) -> Server:
         ]
 
     all_server = PDBeServer("pdbe-all-server")
+    catalogs = [
+        getattr(child, "skill_catalog", None)
+        for child in servers
+        if getattr(child, "skill_catalog", None) is not None
+    ]
+    if len(catalogs) > 1:
+        raise ValueError("The aggregate server supports one Skills catalog")
+    all_server.skill_catalog = catalogs[0] if catalogs else None
+    for child in servers:
+        all_server.tool_input_normalizers.update(
+            getattr(child, "tool_input_normalizers", {})
+        )
     tool_servers: dict[str, Server] = {}
 
     @all_server.list_resources()
@@ -322,10 +348,17 @@ factory.register("pdbe_graph_server", build_graph_server)
 factory.register("pdbe_api_server", build_pdbe_api_server)
 factory.register("pdbe_search_server", build_pdbe_search_server)
 factory.register("pdbe_apps_server", build_pdbe_apps_server)
+factory.register("all", build_all_server)
 
 
 @click.command()
 @click.option("--port", default=8000, help="Port to run the server on")
+@click.option(
+    "--internal",
+    is_flag=True,
+    default=False,
+    help="Hide App branding and entry search in stdio (equivalent to HTTP ?internal=true).",
+)
 @click.option(
     "--transport",
     type=click.Choice(["sse", "stdio"]),
@@ -338,7 +371,11 @@ factory.register("pdbe_apps_server", build_pdbe_apps_server)
     default="pdbe_api_server",
     help="Type of server to run",
 )
-def main(port: int, transport: str, server_type: str) -> int:
+def main(port: int, transport: str, server_type: str, internal: bool = False) -> int:
+    token = app_display_defaults.set(
+        AppDisplayOptions(show_header=not internal, show_search=not internal)
+    )
+    click.get_current_context().call_on_close(lambda: app_display_defaults.reset(token))
     try:
         server = factory.create(server_type)
     except ValueError as e:
@@ -359,6 +396,7 @@ def main(port: int, transport: str, server_type: str) -> int:
             "pdbe_graph_server": f"{ROOT_PREFIX}/graph",
             "pdbe_search_server": f"{ROOT_PREFIX}/search",
             "pdbe_apps_server": f"{ROOT_PREFIX}/apps",
+            "all": f"{ROOT_PREFIX}/all",
         }
 
         async def handle_sse(request):

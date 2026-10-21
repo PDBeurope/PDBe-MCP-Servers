@@ -1,0 +1,1317 @@
+[
+  {
+    "name": "transforms and instances",
+    "input": {
+      "pdb_id": "1cbs",
+      "structure": {
+        "ref": "primary",
+        "transform": {
+          "translation": [
+            2,
+            3,
+            4
+          ]
+        },
+        "instances": [
+          {
+            "translation": [
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "translation": [
+              10,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "components": [
+        {
+          "selector": "polymer",
+          "representation": "putty"
+        }
+      ],
+      "additional_structures": [
+        {
+          "pdb_id": "1abc",
+          "structure": {
+            "ref": "other",
+            "transform": {
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                5,
+                0,
+                0,
+                1
+              ]
+            }
+          },
+          "components": [
+            {
+              "selector": "polymer",
+              "representation": "surface",
+              "color": "red"
+            }
+          ],
+          "focus": true
+        }
+      ]
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "transform",
+                        "params": {
+                          "translation": [
+                            2.0,
+                            3.0,
+                            4.0
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "instance",
+                        "params": {
+                          "translation": [
+                            0.0,
+                            0.0,
+                            0.0
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "instance",
+                        "params": {
+                          "translation": [
+                            10.0,
+                            0.0,
+                            0.0
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "putty"
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "ref": "primary"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1abc.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "transform",
+                        "params": {
+                          "matrix": [
+                            1.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0,
+                            0.0,
+                            5.0,
+                            0.0,
+                            0.0,
+                            1.0
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "surface"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "red"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "all"
+                        },
+                        "children": [
+                          {
+                            "kind": "focus",
+                            "params": {}
+                          }
+                        ]
+                      }
+                    ],
+                    "ref": "other"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-21T06:34:54.583448+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "external annotations",
+    "input": {
+      "pdb_id": "1cbs",
+      "components": [
+        {
+          "annotation": {
+            "uri": "https://www.ebi.ac.uk/annotations.json",
+            "format": "json",
+            "schema": "residue",
+            "field_name": "component",
+            "field_values": [
+              "site"
+            ]
+          },
+          "representation": "sticks",
+          "color_from": [
+            {
+              "uri": "https://www.ebi.ac.uk/annotations.json",
+              "format": "json",
+              "schema": "residue",
+              "field_name": "color"
+            }
+          ],
+          "label": {
+            "text": "Annotated site",
+            "scene": true
+          }
+        }
+      ],
+      "labels_from": [
+        {
+          "uri": "https://www.ebi.ac.uk/annotations.json",
+          "format": "json",
+          "schema": "residue",
+          "field_name": "label"
+        }
+      ],
+      "tooltips_from": [
+        {
+          "uri": "https://www.ebi.ac.uk/annotations.json",
+          "format": "json",
+          "schema": "residue",
+          "field_name": "tooltip"
+        }
+      ]
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "label_from_uri",
+                        "params": {
+                          "uri": "https://www.ebi.ac.uk/annotations.json",
+                          "format": "json",
+                          "schema": "residue",
+                          "field_name": "label"
+                        }
+                      },
+                      {
+                        "kind": "tooltip_from_uri",
+                        "params": {
+                          "uri": "https://www.ebi.ac.uk/annotations.json",
+                          "format": "json",
+                          "schema": "residue",
+                          "field_name": "tooltip"
+                        }
+                      },
+                      {
+                        "kind": "component_from_uri",
+                        "params": {
+                          "uri": "https://www.ebi.ac.uk/annotations.json",
+                          "format": "json",
+                          "schema": "residue",
+                          "field_name": "component",
+                          "field_values": [
+                            "site"
+                          ]
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "ball_and_stick"
+                            },
+                            "children": [
+                              {
+                                "kind": "color_from_uri",
+                                "params": {
+                                  "uri": "https://www.ebi.ac.uk/annotations.json",
+                                  "format": "json",
+                                  "schema": "residue",
+                                  "field_name": "color"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "kind": "label",
+                            "params": {
+                              "text": "Annotated site"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-21T06:34:54.583955+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "coordinate annotations",
+    "input": {
+      "pdb_id": "1cbs",
+      "components": [
+        {
+          "annotation": {
+            "schema": "residue",
+            "category_name": "site",
+            "field_values": [
+              "active"
+            ]
+          },
+          "color_from": [
+            {
+              "schema": "residue",
+              "category_name": "site",
+              "field_name": "color"
+            }
+          ]
+        }
+      ],
+      "labels_from": [
+        {
+          "schema": "residue",
+          "category_name": "site",
+          "field_name": "label"
+        }
+      ],
+      "tooltips_from": [
+        {
+          "schema": "residue",
+          "category_name": "site",
+          "field_name": "tooltip"
+        }
+      ]
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "label_from_source",
+                        "params": {
+                          "schema": "residue",
+                          "category_name": "site",
+                          "field_name": "label"
+                        }
+                      },
+                      {
+                        "kind": "tooltip_from_source",
+                        "params": {
+                          "schema": "residue",
+                          "category_name": "site",
+                          "field_name": "tooltip"
+                        }
+                      },
+                      {
+                        "kind": "component_from_source",
+                        "params": {
+                          "schema": "residue",
+                          "category_name": "site",
+                          "field_values": [
+                            "active"
+                          ]
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            },
+                            "children": [
+                              {
+                                "kind": "color_from_source",
+                                "params": {
+                                  "schema": "residue",
+                                  "category_name": "site",
+                                  "field_name": "color"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-21T06:34:54.584125+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "MolQL selections and colors",
+    "input": {
+      "pdb_id": "1cbs",
+      "components": [
+        {
+          "selector": {
+            "molql": {
+              "head": {
+                "name": "structure-query.generator.atom-groups"
+              },
+              "args": {
+                "residue-test": {
+                  "head": {
+                    "name": "core.rel.eq"
+                  },
+                  "args": [
+                    {
+                      "head": {
+                        "name": "structure-query.atom-property.macromolecular.auth_seq_id"
+                      }
+                    },
+                    1
+                  ]
+                }
+              }
+            }
+          },
+          "representation": "sticks",
+          "colors": [
+            {
+              "color": "red",
+              "selector": {
+                "molql": {
+                  "head": {
+                    "name": "structure-query.generator.atom-groups"
+                  },
+                  "args": {
+                    "residue-test": {
+                      "head": {
+                        "name": "core.rel.eq"
+                      },
+                      "args": [
+                        {
+                          "head": {
+                            "name": "structure-query.atom-property.macromolecular.auth_seq_id"
+                          }
+                        },
+                        1
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "focus": true
+        }
+      ]
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": {
+                            "molql": {
+                              "head": {
+                                "name": "structure-query.generator.atom-groups"
+                              },
+                              "args": {
+                                "residue-test": {
+                                  "head": {
+                                    "name": "core.rel.eq"
+                                  },
+                                  "args": [
+                                    {
+                                      "head": {
+                                        "name": "structure-query.atom-property.macromolecular.auth_seq_id"
+                                      }
+                                    },
+                                    1
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "ball_and_stick"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "selector": {
+                                    "molql": {
+                                      "head": {
+                                        "name": "structure-query.generator.atom-groups"
+                                      },
+                                      "args": {
+                                        "residue-test": {
+                                          "head": {
+                                            "name": "core.rel.eq"
+                                          },
+                                          "args": [
+                                            {
+                                              "head": {
+                                                "name": "structure-query.atom-property.macromolecular.auth_seq_id"
+                                              }
+                                            },
+                                            1
+                                          ]
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "color": "red"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "kind": "focus",
+                            "params": {}
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-21T06:34:54.585836+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "primitive shapes and measurements",
+    "input": {
+      "pdb_id": "1cbs",
+      "structure": {
+        "ref": "primary"
+      },
+      "primitives": [
+        {
+          "type": "sphere",
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "radius": 2
+        },
+        {
+          "type": "tube",
+          "start": [
+            0,
+            0,
+            0
+          ],
+          "end": [
+            1,
+            0,
+            0
+          ]
+        },
+        {
+          "type": "arrow",
+          "start": [
+            0,
+            0,
+            0
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "length": 4
+        },
+        {
+          "type": "distance",
+          "start": {
+            "label_asym_id": "A",
+            "label_seq_id": 1
+          },
+          "end": {
+            "expressions": [
+              {
+                "label_asym_id": "A",
+                "label_seq_id": 2
+              }
+            ],
+            "structure_ref": "other"
+          },
+          "label_color": "red"
+        },
+        {
+          "type": "angle",
+          "a": [
+            1,
+            0,
+            0
+          ],
+          "b": [
+            0,
+            0,
+            0
+          ],
+          "c": [
+            0,
+            1,
+            0
+          ],
+          "tooltip": "Synthetic angle"
+        },
+        {
+          "type": "label",
+          "position": {
+            "molql": {
+              "head": {
+                "name": "structure-query.generator.atom-groups"
+              },
+              "args": {
+                "residue-test": {
+                  "head": {
+                    "name": "core.rel.eq"
+                  },
+                  "args": [
+                    {
+                      "head": {
+                        "name": "structure-query.atom-property.macromolecular.auth_seq_id"
+                      }
+                    },
+                    1
+                  ]
+                }
+              }
+            }
+          },
+          "text": "Residue one"
+        },
+        {
+          "type": "ellipse",
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "major_axis": [
+            1,
+            0,
+            0
+          ],
+          "minor_axis": [
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "type": "ellipsoid",
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "radius": [
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "type": "box",
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "extent": [
+            1,
+            2,
+            3
+          ],
+          "show_edges": true
+        },
+        {
+          "type": "mesh",
+          "vertices": [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "indices": [
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "type": "lines",
+          "vertices": [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          "indices": [
+            0,
+            1
+          ]
+        }
+      ],
+      "additional_structures": [
+        {
+          "pdb_id": "1abc",
+          "structure": {
+            "ref": "other"
+          }
+        }
+      ]
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "kind": "ellipsoid",
+                              "center": [
+                                0.0,
+                                0.0,
+                                0.0
+                              ],
+                              "radius": 2.0
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "start": [
+                                0.0,
+                                0.0,
+                                0.0
+                              ],
+                              "end": [
+                                1.0,
+                                0.0,
+                                0.0
+                              ],
+                              "radius": 0.05,
+                              "kind": "tube"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "kind": "arrow",
+                              "start": [
+                                0.0,
+                                0.0,
+                                0.0
+                              ],
+                              "direction": [
+                                0.0,
+                                1.0,
+                                0.0
+                              ],
+                              "length": 4.0,
+                              "show_start_cap": false,
+                              "show_end_cap": true,
+                              "show_tube": true,
+                              "tube_radius": 0.05
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "start": {
+                                "label_asym_id": "A",
+                                "label_seq_id": 1
+                              },
+                              "end": {
+                                "structure_ref": "other",
+                                "expressions": [
+                                  {
+                                    "label_asym_id": "A",
+                                    "label_seq_id": 2
+                                  }
+                                ]
+                              },
+                              "radius": 0.05,
+                              "kind": "distance_measurement",
+                              "label_template": "{{distance}}",
+                              "label_color": "red"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {
+                          "tooltip": "Synthetic angle"
+                        },
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "kind": "angle_measurement",
+                              "a": [
+                                1.0,
+                                0.0,
+                                0.0
+                              ],
+                              "b": [
+                                0.0,
+                                0.0,
+                                0.0
+                              ],
+                              "c": [
+                                0.0,
+                                1.0,
+                                0.0
+                              ],
+                              "label_template": "{{angle}}",
+                              "show_vector": true,
+                              "vector_radius": 0.05,
+                              "show_section": true
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "kind": "label",
+                              "position": {
+                                "molql": {
+                                  "head": {
+                                    "name": "structure-query.generator.atom-groups"
+                                  },
+                                  "args": {
+                                    "residue-test": {
+                                      "head": {
+                                        "name": "core.rel.eq"
+                                      },
+                                      "args": [
+                                        {
+                                          "head": {
+                                            "name": "structure-query.atom-property.macromolecular.auth_seq_id"
+                                          }
+                                        },
+                                        1
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              "text": "Residue one",
+                              "label_size": 1.0,
+                              "label_offset": 0.0
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "kind": "ellipse",
+                              "center": [
+                                0.0,
+                                0.0,
+                                0.0
+                              ],
+                              "as_circle": false,
+                              "major_axis": [
+                                1.0,
+                                0.0,
+                                0.0
+                              ],
+                              "minor_axis": [
+                                0.0,
+                                1.0,
+                                0.0
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "kind": "ellipsoid",
+                              "center": [
+                                0.0,
+                                0.0,
+                                0.0
+                              ],
+                              "major_axis": [
+                                1.0,
+                                0.0,
+                                0.0
+                              ],
+                              "minor_axis": [
+                                0.0,
+                                1.0,
+                                0.0
+                              ],
+                              "radius": [
+                                1.0,
+                                2.0,
+                                3.0
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "kind": "box",
+                              "center": [
+                                0.0,
+                                0.0,
+                                0.0
+                              ],
+                              "extent": [
+                                1.0,
+                                2.0,
+                                3.0
+                              ],
+                              "show_faces": true,
+                              "show_edges": true,
+                              "edge_radius": 0.1
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "kind": "mesh",
+                              "vertices": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0,
+                                0.0
+                              ],
+                              "indices": [
+                                0,
+                                1,
+                                2
+                              ],
+                              "show_triangles": true,
+                              "show_wireframe": false
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "primitives",
+                        "params": {},
+                        "children": [
+                          {
+                            "kind": "primitive",
+                            "params": {
+                              "kind": "lines",
+                              "vertices": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0,
+                                0.0,
+                                0.0
+                              ],
+                              "indices": [
+                                0,
+                                1
+                              ],
+                              "width": 1.0
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "#91bfdb"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "ref": "primary"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1abc.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "#91bfdb"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "ref": "other"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-21T06:34:54.587019+00:00",
+        "version": "1.8"
+      }
+    }
+  }
+]

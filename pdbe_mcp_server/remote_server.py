@@ -28,6 +28,7 @@ from pdbe_mcp_server.server import (
     build_pdbe_apps_server,
     build_pdbe_search_server,
 )
+from pdbe_mcp_server.skills import skill_http_request
 from pdbe_mcp_server.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,16 @@ def create_app(include_all: bool | None = None) -> CORSMiddleware:
                 return
             manager = session_managers[name]
             try:
+                backend = getattr(manager, "app", None)
+                catalog = getattr(backend, "skill_catalog", None)
+                if (
+                    backend is not None
+                    and catalog is not None
+                    and await skill_http_request(
+                        catalog, backend.name, scope, receive, send
+                    )
+                ):
+                    return
                 await manager.handle_request(scope, receive, send)
             except Exception as e:
                 logger.error(f"Handler error: {e}")

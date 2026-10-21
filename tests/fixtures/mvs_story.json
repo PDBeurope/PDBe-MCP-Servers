@@ -1,0 +1,221 @@
+{
+  "input": {
+    "story": {
+      "title": "Protein and ligand",
+      "scenes": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "builder": {
+            "pdb_id": "1cbs",
+            "focus": true
+          }
+        },
+        {
+          "id": "ligand",
+          "title": "Ligand surface",
+          "description": "A ligand surface is added to the scene.",
+          "builder": {
+            "pdb_id": "1cbs",
+            "components": [
+              {
+                "selector": "polymer"
+              },
+              {
+                "selector": "ligand",
+                "representation": {
+                  "type": "surface",
+                  "opacity": 0.5
+                },
+                "focus": true
+              }
+            ]
+          },
+          "transition": {
+            "duration_ms": 2000,
+            "trajectory": "leap",
+            "easing": "sin-in-out"
+          },
+          "description_format": "markdown"
+        }
+      ],
+      "description_format": "markdown"
+    }
+  },
+  "mvsj": {
+    "kind": "multiple",
+    "metadata": {
+      "title": "Protein and ligand",
+      "timestamp": "2026-10-20T23:40:55.395163+00:00",
+      "version": "1.8",
+      "description_format": "markdown"
+    },
+    "snapshots": [
+      {
+        "root": {
+          "kind": "root",
+          "children": [
+            {
+              "kind": "canvas",
+              "params": {
+                "background_color": "white"
+              }
+            },
+            {
+              "kind": "download",
+              "params": {
+                "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+              },
+              "children": [
+                {
+                  "kind": "parse",
+                  "params": {
+                    "format": "bcif"
+                  },
+                  "children": [
+                    {
+                      "kind": "structure",
+                      "params": {
+                        "type": "model",
+                        "model_index": 0
+                      },
+                      "children": [
+                        {
+                          "kind": "component",
+                          "params": {
+                            "selector": "polymer"
+                          },
+                          "children": [
+                            {
+                              "kind": "representation",
+                              "params": {
+                                "type": "cartoon"
+                              },
+                              "children": [
+                                {
+                                  "kind": "color",
+                                  "params": {
+                                    "color": "#91bfdb"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "focus",
+              "params": {}
+            }
+          ]
+        },
+        "metadata": {
+          "key": "overview",
+          "title": "Overview",
+          "duration_ms": 6500,
+          "transition_duration_ms": 1500,
+          "description_format": "plaintext"
+        }
+      },
+      {
+        "root": {
+          "kind": "root",
+          "children": [
+            {
+              "kind": "canvas",
+              "params": {
+                "background_color": "white"
+              }
+            },
+            {
+              "kind": "download",
+              "params": {
+                "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+              },
+              "children": [
+                {
+                  "kind": "parse",
+                  "params": {
+                    "format": "bcif"
+                  },
+                  "children": [
+                    {
+                      "kind": "structure",
+                      "params": {
+                        "type": "model",
+                        "model_index": 0
+                      },
+                      "children": [
+                        {
+                          "kind": "component",
+                          "params": {
+                            "selector": "polymer"
+                          },
+                          "children": [
+                            {
+                              "kind": "representation",
+                              "params": {
+                                "type": "cartoon"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "component",
+                          "params": {
+                            "selector": "ligand"
+                          },
+                          "children": [
+                            {
+                              "kind": "representation",
+                              "params": {
+                                "type": "surface"
+                              },
+                              "children": [
+                                {
+                                  "kind": "opacity",
+                                  "params": {
+                                    "opacity": 0.5
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "kind": "focus",
+                              "params": {}
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "transition",
+              "params": {
+                "duration_ms": 2000,
+                "trajectory": "leap",
+                "easing": "sin-in-out"
+              }
+            }
+          ]
+        },
+        "metadata": {
+          "key": "ligand",
+          "title": "Ligand surface",
+          "duration_ms": 6500,
+          "transition_duration_ms": 2000,
+          "description_format": "markdown",
+          "description": "A ligand surface is added to the scene."
+        }
+      }
+    ]
+  }
+}

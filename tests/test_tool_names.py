@@ -65,21 +65,54 @@ async def test_all_builders_advertise_only_unique_namespaced_tools(servers):
         names = {tool.name for tool in listed}
         assert len(names) == len(listed)
         assert all(
-            name.startswith("ebi.pdbe.") and name.count("ebi.pdbe.") == 1
+            name.startswith("ebi-pdbe-") and name.count("ebi-pdbe-") == 1
             for name in names
         )
-        assert all(re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", name) for name in names)
+        # Bedrock Converse accepts this narrower subset of MCP tool names.
+        assert all(re.fullmatch(r"[A-Za-z0-9_-]{1,64}", name) for name in names)
         if endpoint != "all":
             child_names.update(names)
         else:
             assert names == child_names
     generated_name = generator.list_tools()[0].name
     api_names = {tool.name for tool in await tools(endpoints["api"])}
-    assert api_names == {"ebi.pdbe." + generated_name}
-    assert {tool.name for tool in await tools(endpoints["apps"])} == {
-        "ebi.pdbe.open_structure",
-        "ebi.pdbe.compare_structures",
+    assert api_names == {
+        "ebi-pdbe-" + generated_name,
+        "ebi-pdbe-get_ai_summary",
     }
+    assert {tool.name for tool in await tools(endpoints["apps"])} == {
+        "ebi-pdbe-open_structure",
+        "ebi-pdbe-compare_structures",
+        "ebi-pdbe-build_mvs",
+        "ebi-pdbe-build_mvs_story",
+    }
+
+
+@pytest.mark.asyncio
+async def test_ai_summary_tool_is_available_through_api_and_aggregate(
+    servers, monkeypatch
+):
+    endpoints, _ = servers
+    monkeypatch.setattr(
+        "pdbe_mcp_server.ai_summary_tools.HTTPClient.get",
+        lambda url, **kwargs: {
+            "summary_sections": [
+                {"section": "introduction", "text": "Entry overview <<ref:1>>"}
+            ],
+            "abstract_key_points": ["Key point <<ref:1>>"],
+            "references": [],
+        },
+    )
+
+    for endpoint in ("api", "all"):
+        result = await call(
+            endpoints[endpoint],
+            "ebi-pdbe-get_ai_summary",
+            {"pdb_id": "1RIO"},
+        )
+        assert not result.isError, result
+        assert result.content[0].type == "text"
+        assert "## Abstract key points" in result.content[0].text
 
 
 @pytest.mark.asyncio
@@ -158,7 +191,7 @@ async def test_namespace_preserves_metadata_and_output_validation():
         exclude={"name"}
     )
     assert original.name == "sample"
-    for name in ("sample", "ebi.pdbe.sample"):
+    for name in ("sample", "ebi-pdbe-sample"):
         result = await call(server, name, {})
         assert result.isError
         assert "Output validation error" in result.content[0].text
@@ -172,7 +205,7 @@ async def test_duplicate_canonical_names_are_rejected():
     async def list_tools():
         return [
             types.Tool(name=name, inputSchema={})
-            for name in ("pdbe_open_structure", "ebi.pdbe.open_structure")
+            for name in ("pdbe_open_structure", "ebi-pdbe-open_structure")
         ]
 
     with pytest.raises(ValueError, match="Duplicate public tool name"):
@@ -183,7 +216,7 @@ def test_generated_suffix_stays_stable_and_short():
     generator = OpenAPIToMCPGenerator("https://example.test/openapi.json")
     shortened = generator._shorten_tool_name("long_operation_" * 30)
     name = public_tool_name(shortened)
-    assert name == "ebi.pdbe." + shortened
+    assert name == "ebi-pdbe-" + shortened
     assert public_tool_name(name) == name
     assert len(name) <= 59
 
@@ -201,7 +234,7 @@ async def test_request_aware_lists_preserve_pagination():
     result = (
         await server.request_handlers[types.ListToolsRequest](types.ListToolsRequest())
     ).root
-    assert result.tools[0].name == "ebi.pdbe.sample"
+    assert result.tools[0].name == "ebi-pdbe-sample"
     assert result.nextCursor == "next"
 
 

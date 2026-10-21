@@ -1,0 +1,1180 @@
+{
+  "core.flags.has-all": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.flags.has-any": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.list.equal": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.list.get-at": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.logic.and": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.logic.not": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.logic.or": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.math.abs": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.acos": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.add": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.math.asin": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.atan": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.atan2": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.math.cantor-pairing": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.math.cbrt": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.ceil": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.cos": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.cosh": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.div": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.math.exp": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.floor": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.invert-cantor-pairing": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.log": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.log10": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.max": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.math.min": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.math.mod": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.math.mult": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.math.pow": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.math.round-int": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.sign": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.sin": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.sinh": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.sorted-cantor-pairing": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.math.sqrt": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.sub": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.math.tan": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.tanh": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.math.trunc": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.rel.eq": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.rel.gr": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.rel.gre": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.rel.in-range": {
+    "args": [
+      "0",
+      "1",
+      "2"
+    ],
+    "required": [
+      "0",
+      "1",
+      "2"
+    ],
+    "query": false
+  },
+  "core.rel.lt": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.rel.lte": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.rel.neq": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.set.has": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.set.is-subset": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.str.concat": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.str.match": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0",
+      "1"
+    ],
+    "query": false
+  },
+  "core.type.bitflags": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.type.bool": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.type.composite-key": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.type.list": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.type.num": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.type.regex": {
+    "args": [
+      "0",
+      "1"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "core.type.set": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "core.type.str": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "internal.generator.bundle": {
+    "args": [
+      "elements"
+    ],
+    "required": [
+      "elements"
+    ],
+    "query": true
+  },
+  "internal.generator.bundle-element": {
+    "args": [
+      "groupedUnits",
+      "set",
+      "ranges"
+    ],
+    "required": [
+      "groupedUnits",
+      "set",
+      "ranges"
+    ],
+    "query": false
+  },
+  "internal.generator.current": {
+    "args": [],
+    "required": [],
+    "query": true
+  },
+  "structure-query.atom-property.core.atom-key": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.atomic-number": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.element-symbol": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.instance-id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.mass": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.model-entry-id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.model-index": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.model-label": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.operator-key": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.operator-name": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.source-index": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.vdw": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.x": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.y": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.core.z": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.ihm.has-seq-id": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "structure-query.atom-property.ihm.overlaps-seq-id-range": {
+    "args": [
+      "beg",
+      "end"
+    ],
+    "required": [
+      "beg",
+      "end"
+    ],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.auth_asym_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.auth_atom_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.auth_comp_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.auth_seq_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.B_iso_or_equiv": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.chain-key": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.chem-comp-type": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.entity-description": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.entity-key": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.entity-prd-id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.entity-subtype": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.entity-type": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.is-het": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.is-non-standard": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.label_alt_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.label_asym_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.label_atom_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.label_comp_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.label_entity_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.label_seq_id": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.object-primitive": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.occupancy": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.pdbx_formal_charge": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.pdbx_PDB_ins_code": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.residue-key": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.residue-source-index": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.secondary-structure-flags": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-property.macromolecular.secondary-structure-key": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-set.atom-count": {
+    "args": [],
+    "required": [],
+    "query": false
+  },
+  "structure-query.atom-set.count-query": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "structure-query.atom-set.property-set": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "structure-query.bond-property.atom-a": {
+    "args": [],
+    "required": [],
+    "query": false
+  },
+  "structure-query.bond-property.atom-b": {
+    "args": [],
+    "required": [],
+    "query": false
+  },
+  "structure-query.bond-property.flags": {
+    "args": [],
+    "required": [],
+    "query": false
+  },
+  "structure-query.bond-property.key": {
+    "args": [],
+    "required": [],
+    "query": false
+  },
+  "structure-query.bond-property.length": {
+    "args": [],
+    "required": [],
+    "query": false
+  },
+  "structure-query.bond-property.order": {
+    "args": [],
+    "required": [],
+    "query": false
+  },
+  "structure-query.combinator.merge": {
+    "args": null,
+    "required": [],
+    "query": true
+  },
+  "structure-query.filter.first": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": true
+  },
+  "structure-query.filter.intersected-by": {
+    "args": [
+      "0",
+      "by"
+    ],
+    "required": [
+      "0",
+      "by"
+    ],
+    "query": true
+  },
+  "structure-query.filter.is-connected-to": {
+    "args": [
+      "0",
+      "target",
+      "bond-test",
+      "disjunct",
+      "invert"
+    ],
+    "required": [
+      "0",
+      "target"
+    ],
+    "query": true
+  },
+  "structure-query.filter.pick": {
+    "args": [
+      "0",
+      "test"
+    ],
+    "required": [
+      "0",
+      "test"
+    ],
+    "query": true
+  },
+  "structure-query.filter.with-same-atom-properties": {
+    "args": [
+      "0",
+      "source",
+      "property"
+    ],
+    "required": [
+      "0",
+      "source",
+      "property"
+    ],
+    "query": true
+  },
+  "structure-query.filter.within": {
+    "args": [
+      "0",
+      "target",
+      "min-radius",
+      "max-radius",
+      "atom-radius",
+      "invert"
+    ],
+    "required": [
+      "0",
+      "target",
+      "max-radius"
+    ],
+    "query": true
+  },
+  "structure-query.generator.all": {
+    "args": [],
+    "required": [],
+    "query": true
+  },
+  "structure-query.generator.atom-groups": {
+    "args": [
+      "entity-test",
+      "chain-test",
+      "residue-test",
+      "atom-test",
+      "group-by"
+    ],
+    "required": [],
+    "query": true
+  },
+  "structure-query.generator.bonded-atomic-pairs": {
+    "args": [
+      "0"
+    ],
+    "required": [],
+    "query": true
+  },
+  "structure-query.generator.empty": {
+    "args": [],
+    "required": [],
+    "query": true
+  },
+  "structure-query.generator.query-in-selection": {
+    "args": [
+      "0",
+      "query",
+      "in-complement"
+    ],
+    "required": [
+      "0",
+      "query"
+    ],
+    "query": true
+  },
+  "structure-query.generator.rings": {
+    "args": [
+      "fingerprint",
+      "only-aromatic"
+    ],
+    "required": [],
+    "query": true
+  },
+  "structure-query.modifier.except-by": {
+    "args": [
+      "0",
+      "by"
+    ],
+    "required": [
+      "0",
+      "by"
+    ],
+    "query": true
+  },
+  "structure-query.modifier.expand-property": {
+    "args": [
+      "0",
+      "property"
+    ],
+    "required": [
+      "0",
+      "property"
+    ],
+    "query": true
+  },
+  "structure-query.modifier.include-connected": {
+    "args": [
+      "0",
+      "bond-test",
+      "layer-count",
+      "fixed-point",
+      "as-whole-residues"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": true
+  },
+  "structure-query.modifier.include-surroundings": {
+    "args": [
+      "0",
+      "radius",
+      "atom-radius",
+      "as-whole-residues"
+    ],
+    "required": [
+      "0",
+      "radius"
+    ],
+    "query": true
+  },
+  "structure-query.modifier.intersect-by": {
+    "args": [
+      "0",
+      "by"
+    ],
+    "required": [
+      "0",
+      "by"
+    ],
+    "query": true
+  },
+  "structure-query.modifier.surrounding-ligands": {
+    "args": [
+      "0",
+      "radius",
+      "include-water"
+    ],
+    "required": [
+      "0",
+      "radius"
+    ],
+    "query": true
+  },
+  "structure-query.modifier.union": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": true
+  },
+  "structure-query.modifier.whole-residues": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": true
+  },
+  "structure-query.type.atom-name": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "structure-query.type.bond-flags": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "structure-query.type.element-symbol": {
+    "args": [
+      "0"
+    ],
+    "required": [
+      "0"
+    ],
+    "query": false
+  },
+  "structure-query.type.ring-fingerprint": {
+    "args": null,
+    "required": [],
+    "query": false
+  },
+  "structure-query.type.secondary-structure-flags": {
+    "args": null,
+    "required": [],
+    "query": false
+  }
+}
