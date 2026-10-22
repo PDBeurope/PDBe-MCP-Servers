@@ -229,4 +229,3 @@ uv run pytest tests/test_api_tools.py tests/test_apps.py tests/test_workspace.py
 cd apps/structure-explorer
 npm test
 ```
-
