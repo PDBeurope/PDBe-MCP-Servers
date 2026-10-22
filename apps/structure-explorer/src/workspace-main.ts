@@ -70,7 +70,7 @@ function workspaceControls() {
   const disabled = !connected || !workspace || !viewer || updating || disposed || !["loaded", "empty"].includes(loadState);
   for (const id of ["save-workspace", "export-comparison"]) el<HTMLButtonElement>(id).disabled = disabled;
   for (const input of el("workspace-panel").querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.disabled = disabled;
-  el("workspace-panel").hidden = !workspace;
+  el("workspace-panel").hidden = !workspace || !!scene?.story;
   el("comparison-panel").hidden = !activeWorkspaceScene()?.comparison;
   el<HTMLButtonElement>("export-comparison").disabled = disabled || !activeWorkspaceScene()?.comparison;
   el<HTMLButtonElement>("ask-selection").disabled = !selectionContext || !app.getHostCapabilities()?.message;
