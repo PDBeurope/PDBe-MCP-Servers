@@ -2,7 +2,7 @@
 name: molview-spec
 description: Build or replace custom molecular views and guided molecular stories with PDBe evidence and MolViewSpec. Use for explicit visualization, representation, coloring, highlighting, or story requests.
 metadata:
-  version: "4"
+  version: "5"
 ---
 
 # Molecular views and stories
@@ -15,6 +15,13 @@ A successful explorer result (`status: "prepared"`) completes that viewing
 request. Stop calling visualization tools; do not repeatedly reopen the entry
 or switch to another viewer tool to wait for browser rendering.
 
+The App displays supplied scientific data. Preserve PDBe/SIFTS residue
+correspondence and supplied alignment transforms. Do not calculate RMSD,
+per-residue displacement, distance-cutoff ligand neighbourhoods or inferred
+binding sites. Highlight binding-site residues only from explicit source
+annotations with provenance; if absent, report the annotation as unavailable.
+Coordinate loading and camera navigation do not establish new scientific results.
+
 Ground biological claims, residue mappings, ligand instances and scene choices
 in PDBe evidence. Read [scene guidance](references/scenes.md) when building or
 modifying a scene, and [story guidance](references/stories.md) for a tour or story.
@@ -24,18 +31,21 @@ when exact field details are needed. Read the [builder API reference](references
 for transforms, instances, additional structures, primitives, annotation tables
 and serialized MolQL. The same operations work inside each story scene.
 
-For a follow-up such as “add surface to the ligands”, recover the latest complete
-builder from conversation or host scene context, preserve the entry and existing
-components, add the requested ligand surface, and **call the builder tool again**.
-For “add”, preserve existing representations unless the user asks to replace them.
-If the prior viewer was the ordinary explorer, create a custom scene for that
-same entry. Each call compiles a complete replacement. The host routes it according to
-`pdbe_visualization_request.mode`: `replace_in_place` updates the originating
-viewer, while `new_viewer` opens a separate viewer below the new chat response.
-For a viewer edit, use the supplied context for that exact viewer, even if a
-newer viewer exists elsewhere in the conversation. Do not pass host routing
-fields to the builder tools.
-If the entry or scene is unavailable, retrieve the missing context before building.
+On servers advertising `ebi-pdbe-update_workspace`, recover the latest complete
+workspace for the exact target viewer from App context or structured tool output.
+For follow-up changes, call that tool with the workspace, its revision as
+`expected_revision`, and a suitable operation batch. Preserve unrelated layers,
+structures, source annotations and transforms. Upserts replace complete named
+definitions. Use only component/annotation layers with explicit data selections;
+calculated `binding_site` layers and cutoff fields are unsupported. Use the
+source PDBe/SIFTS residue correspondence table and export without adding geometric
+measurements. A shared resource URI alone does not route results to an existing
+viewer: the host must match the target workspace ID.
+
+On older servers without workspace updates, recover the complete builder and
+use the established full-replacement builder workflow. Do not pass host routing
+fields such as `pdbe_visualization_request.mode` to PDBe tools. If the requested
+viewer state is unavailable, recover it before constructing the edit.
 
 Only report that a replacement or story was created after a successful tool
 result in the current turn. A prose description or a skill-reference read does
