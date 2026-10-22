@@ -1,5 +1,12 @@
 import { App, applyDocumentTheme, applyHostStyleVariables, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { Viewer } from "molstar-mvs/lib/apps/viewer/app.js";
+import { createViewerSpec } from "molstar-mvs/lib/apps/viewer/plugin-spec.js";
+import { ViewerAutoPreset } from "molstar-mvs/lib/apps/viewer/presets.js";
+import { createPluginUI } from "molstar-mvs/lib/mol-plugin-ui/index.js";
+import { renderReact18 } from "molstar-mvs/lib/mol-plugin-ui/react18.js";
+import { ViewportSnapshotDescription } from "molstar-mvs/lib/mol-plugin-ui/controls.js";
+import { createElement } from "react";
+import { createPortal } from "react-dom";
 import { StructureElement, StructureProperties } from "molstar-mvs/lib/mol-model/structure.js";
 import { OrderedSet } from "molstar-mvs/lib/mol-data/int.js";
 import "./mvs.css";
@@ -46,10 +53,39 @@ let disposed = false;
 let revision = 0;
 let work = Promise.resolve();
 let downloadUrl: string | undefined;
+let navigating = false;
+
+function updateStoryControls(): void {
+  const snapshots = viewer?.plugin.managers.snapshot;
+  const busy = !snapshots || snapshots.state.isPlaying || viewer?.plugin.behaviors.state.isBusy.value || navigating;
+  for (const id of ["story-prev", "story-next"]) {
+    el<HTMLButtonElement>(id).disabled = !!busy || (snapshots?.state.entries.size ?? 0) < 2;
+  }
+  const entry = snapshots?.getEntry(snapshots.state.current!);
+  el("story-title").textContent = entry?.name ?? currentScene()?.title ?? "Story";
+}
+
+async function navigateStory(direction: -1 | 1): Promise<void> {
+  if (!viewer || el<HTMLButtonElement>("story-next").disabled) return;
+  navigating = true;
+  updateStoryControls();
+  try {
+    await viewer.plugin.managers.snapshot.applyNext(direction);
+  } catch (error) {
+    status(`Could not change story scene: ${String(error)}`, true);
+  } finally {
+    navigating = false;
+    updateStoryControls();
+  }
+}
 
 function buttons(ready: boolean): void {
   el<HTMLButtonElement>("reset").disabled = !ready;
   el<HTMLButtonElement>("download").disabled = !ready;
+  if (!ready) {
+    el<HTMLButtonElement>("story-prev").disabled = true;
+    el<HTMLButtonElement>("story-next").disabled = true;
+  }
 }
 
 function currentScene() {
@@ -94,6 +130,8 @@ async function publish(data: Record<string, unknown>): Promise<void> {
 async function load(result: SceneResult, token: number): Promise<void> {
   if (disposed || token !== revision) return;
   scene = result;
+  el("story-panel").hidden = !result.story;
+  el("story-layout").classList.toggle("has-story", !!result.story);
   buttons(false);
   status("Loading coordinates and constructing the molecular view…");
   el("title").textContent = result.story?.title ?? result.builder?.title ?? "Molecular view";
@@ -105,14 +143,28 @@ async function load(result: SceneResult, token: number): Promise<void> {
     viewer?.dispose();
     viewer = undefined;
     el("viewer").replaceChildren();
-    const created = await Viewer.create(el("viewer"), {
+    const spec = createViewerSpec({
       layoutIsExpanded: false, layoutShowControls: false, layoutShowSequence: false,
       layoutShowLog: false, layoutShowLeftPanel: false, viewportShowExpand: false,
       viewportShowToggleFullscreen: false, volumeStreamingDisabled: true,
       extensions: ["mvs"], pdbProvider: "pdbe",
     });
+    // Render Mol*'s own caption in the sidebar, preserving its React context,
+    // Markdown extensions and snapshot links without a second caption instance.
+    spec.components = { ...spec.components, viewport: {
+      ...spec.components?.viewport,
+      snapshotDescription: () => scene?.story
+        ? createPortal(createElement(ViewportSnapshotDescription), el("story-text"))
+        : null,
+    } };
+    const plugin = await createPluginUI({
+      target: el("viewer"), spec, render: renderReact18,
+      onBeforeUIRender: p => { p.builders.structure.representation.registerPreset(ViewerAutoPreset); },
+    });
+    const created = new Viewer(plugin);
     if (disposed || token !== revision) { created.dispose(); return; }
     viewer = created;
+    created.subscribe(created.plugin.behaviors.state.isBusy, updateStoryControls);
     await created.loadMvsData(JSON.stringify(result.mvsj), "mvsj", { sanityChecks: true });
     if (disposed || token !== revision) return;
     const structures = created.plugin.managers.structure.hierarchy.current.structures;
@@ -128,10 +180,12 @@ async function load(result: SceneResult, token: number): Promise<void> {
     created.subscribe(created.plugin.managers.snapshot.events.changed, () => {
       if (disposed || token !== revision) return;
       showSceneDetails();
+      updateStoryControls();
       const active = currentScene();
       if (active) void publish({ status: "story_scene", scene_id: active.id, pdb_id: active.builder.pdb_id, playing: created.plugin.managers.snapshot.state.isPlaying });
     });
     showSceneDetails();
+    updateStoryControls();
     created.subscribe(created.plugin.behaviors.interaction.click, event => {
       if (!StructureElement.Loci.is(event.current.loci) || StructureElement.Loci.isEmpty(event.current.loci)) return;
       const loci = event.current.loci;
@@ -178,6 +232,8 @@ function receive(result: ToolResult): void {
 }
 
 el("reset").addEventListener("click", () => { if (scene) receive({ _meta: { mvs: scene } }); });
+el("story-prev").addEventListener("click", () => { void navigateStory(-1); });
+el("story-next").addEventListener("click", () => { void navigateStory(1); });
 el("download").addEventListener("click", () => {
   if (!scene) return;
   const current = scene;

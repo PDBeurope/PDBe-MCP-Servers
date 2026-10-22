@@ -12,7 +12,17 @@
       <button id="download" type="button" disabled>Save MVSJ</button>
     </section>
     <p id="status" role="status" aria-live="polite">Waiting for a scene…</p>
-    <div id="viewer" aria-label="Interactive molecular structure"></div>
+    <div id="story-layout">
+      <div id="viewer" aria-label="Interactive molecular structure"></div>
+      <aside id="story-panel" aria-label="Story" hidden>
+        <nav class="story-navigation" aria-label="Story scenes">
+          <button id="story-prev" type="button" disabled>Previous</button>
+          <button id="story-next" type="button" disabled>Next</button>
+        </nav>
+        <h2 id="story-title">Story</h2>
+        <div id="story-text"></div>
+      </aside>
+    </div>
     <section class="scene-details"><ul id="legend" aria-label="Scene components"></ul><p id="selection">Select a residue or atom to inspect it.</p>
       <p id="warnings"></p><p id="source"></p><small>Mol* 5.13.1 · Complete scenes and stories support host-directed viewer updates.</small></section>
   </main>
