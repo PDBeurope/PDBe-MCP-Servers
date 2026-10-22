@@ -194,6 +194,7 @@ def create_app(include_all: bool | None = None) -> CORSMiddleware:
                         receive,
                         send,
                         manager.handle_request,
+                        capabilities=backend.create_initialization_options().capabilities,
                     )
                 ):
                     return

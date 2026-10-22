@@ -23,6 +23,7 @@ from pdbe_mcp_server.apps import (
 from pdbe_mcp_server.execution import run_blocking_tool
 from pdbe_mcp_server.graph_tools import GraphTools
 from pdbe_mcp_server.search_tools import SearchTools
+from pdbe_mcp_server.skills import add_skill_result_metadata
 from pdbe_mcp_server.tool_names import PDBeServer
 
 search_tools: SearchTools = SearchTools()
@@ -341,6 +342,7 @@ def build_all_server(servers: Sequence[Server] | None = None) -> Server:
             )
         return tool_result
 
+    add_skill_result_metadata(all_server)
     return all_server
 
 

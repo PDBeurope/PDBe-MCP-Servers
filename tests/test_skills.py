@@ -1,7 +1,7 @@
 import hashlib
 import json
 from builtins import ExceptionGroup
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import anyio
 import httpx
@@ -10,14 +10,17 @@ import pytest
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.shared.message import SessionMessage
 from mcp.types import LATEST_PROTOCOL_VERSION
+from sse_starlette.sse import AppStatus
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from pdbe_mcp_server.apps import build_pdbe_apps_server
+from pdbe_mcp_server.server import build_all_server
 from pdbe_mcp_server.skills import (
     EXTENSION,
     PROTOCOL,
     SkillCatalog,
+    add_skill_result_metadata,
     run_with_skills,
     skill_http_request,
 )
@@ -160,99 +163,147 @@ async def test_modern_http_standard_method_reaches_sdk_with_replayed_body():
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("json_response", [True, False])
-async def test_modern_http_tools_list_works_through_mcp_sdk(json_response):
-    server = build_pdbe_apps_server(Mock())
+@pytest.mark.parametrize("aggregate", [True, False], ids=["all", "apps"])
+async def test_modern_discovery_and_lists_through_mcp_sdk(
+    json_response, aggregate, monkeypatch
+):
+    monkeypatch.setattr(AppStatus, "should_exit_event", None)
+    child = build_pdbe_apps_server(Mock())
+    server = build_all_server([child]) if aggregate else child
     manager = StreamableHTTPSessionManager(
         app=server, json_response=json_response, stateless=True
     )
 
     async def app(scope, receive, send):
-        assert await skill_http_request(
+        if not await skill_http_request(
             server.skill_catalog,
             server.name,
             scope,
             receive,
             send,
             manager.handle_request,
-        )
-
-    def response_payload(response):
-        if json_response:
-            return response.json()
-        return json.loads(
-            next(
-                line.removeprefix("data: ")
-                for line in response.text.splitlines()
-                if line.startswith("data: ")
-            )
-        )
+            capabilities=server.create_initialization_options().capabilities,
+        ):
+            await manager.handle_request(scope, receive, send)
 
     async with manager.run():
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://localhost"
         ) as client:
-            tools_response = await client.post(
-                "/",
-                json=request("tools/list").model_dump(by_alias=True),
-                headers={
-                    "Accept": "application/json, text/event-stream",
-                    "MCP-Protocol-Version": PROTOCOL,
-                },
-            )
-            tools = response_payload(tools_response)["result"]["tools"]
+
+            async def query(method, *, modern=True, **params):
+                payload = request(method, **params).model_dump(by_alias=True)
+                if modern:
+                    payload["params"]["_meta"].update(
+                        {
+                            "io.modelcontextprotocol/clientInfo": {
+                                "name": "claude-ai",
+                                "version": "0.1.0",
+                            },
+                            "io.modelcontextprotocol/clientCapabilities": {
+                                "extensions": {
+                                    "io.modelcontextprotocol/ui": {
+                                        "mimeTypes": ["text/html;profile=mcp-app"],
+                                    },
+                                },
+                            },
+                        }
+                    )
+                else:
+                    payload["params"].pop("_meta")
+                response = await client.post(
+                    "/",
+                    json=payload,
+                    headers={
+                        "Accept": "application/json, text/event-stream",
+                        "MCP-Protocol-Version": PROTOCOL
+                        if modern
+                        else LATEST_PROTOCOL_VERSION,
+                    },
+                )
+                assert response.status_code == 200, response.text
+                if response.headers["content-type"].startswith("application/json"):
+                    message = response.json()
+                else:
+                    message = json.loads(
+                        next(
+                            line.removeprefix("data: ")
+                            for line in response.text.splitlines()
+                            if line.startswith("data: ")
+                        )
+                    )
+                return message["result"]
+
+            discovery = await query("server/discover")
+            assert discovery["supportedVersions"] == [PROTOCOL]
+            assert discovery["capabilities"]["tools"] == {}
+            assert discovery["capabilities"]["resources"] == {}
+            assert discovery["capabilities"]["extensions"][EXTENSION] == {
+                "directoryRead": True
+            }
+            assert "prompts" not in discovery["capabilities"]
+
+            tool_result = await query("tools/list")
+            assert tool_result["tools"]
             app_uri = next(
                 tool["_meta"]["ui"]["resourceUri"]
-                for tool in tools
+                for tool in tool_result["tools"]
                 if tool.get("_meta", {}).get("ui", {}).get("resourceUri")
             )
-            resources_response = await client.post(
-                "/",
-                json=request("resources/list").model_dump(by_alias=True),
-                headers={
-                    "Accept": "application/json, text/event-stream",
-                    "MCP-Protocol-Version": PROTOCOL,
-                },
-            )
-            read_response = await client.post(
-                "/",
-                json=request("resources/read", uri=app_uri).model_dump(by_alias=True),
-                headers={
-                    "Accept": "application/json, text/event-stream",
-                    "MCP-Protocol-Version": PROTOCOL,
-                },
-            )
+            resource_result = await query("resources/list")
+            assert app_uri in {r["uri"] for r in resource_result["resources"]}
+            for result in (tool_result, resource_result):
+                assert result["resultType"] == "complete"
+                assert result["ttlMs"] == 0
+                assert result["cacheScope"] == "private"
 
-            legacy_payload = request("resources/read", uri=app_uri).model_dump(
-                by_alias=True
-            )
-            legacy_payload["params"].pop("_meta")
-            legacy_response = await client.post(
-                "/",
-                json=legacy_payload,
-                headers={
-                    "Accept": "application/json, text/event-stream",
-                    "MCP-Protocol-Version": PROTOCOL,
-                },
-            )
+            read_result = await query("resources/read", uri=app_uri)
+            assert len(read_result["contents"][0]["text"]) > 1000
+            assert read_result["resultType"] == "complete"
+            assert read_result["ttlMs"] == 300000
+            assert read_result["cacheScope"] == "public"
 
-    assert tools_response.status_code == 200
-    assert tools
-    assert resources_response.status_code == 200
-    assert app_uri in {
-        resource["uri"]
-        for resource in response_payload(resources_response)["result"]["resources"]
+            # Legacy protocol clients still receive ordinary SDK result shapes.
+            for method, key, modern_result, params in (
+                ("tools/list", "tools", tool_result, {}),
+                ("resources/list", "resources", resource_result, {}),
+                ("resources/read", "contents", read_result, {"uri": app_uri}),
+            ):
+                legacy = await query(method, modern=False, **params)
+                assert legacy[key] == modern_result[key]
+                assert not {"resultType", "ttlMs", "cacheScope"} & legacy.keys()
+
+
+@pytest.mark.anyio
+async def test_list_result_adapter_preserves_pagination_cache_policy_and_errors():
+    resource = types.Resource(uri="skill://pdbe/example", name="example")
+    original = types.ListResourcesResult(
+        resources=[resource],
+        nextCursor="page-2",
+        ttlMs=123,
+        cacheScope="private",
+        _meta={"custom": "preserved"},
+    )
+    handler = AsyncMock(return_value=types.ServerResult(original))
+    server = Mock(request_handlers={types.ListResourcesRequest: handler})
+    add_skill_result_metadata(server)
+    adapted = server.request_handlers[types.ListResourcesRequest]
+    query = types.ListResourcesRequest.model_validate(
+        request("resources/list").model_dump(by_alias=True)
+    )
+    response = (await adapted(query)).root
+    assert response.resources is original.resources
+    assert response.nextCursor == "page-2"
+    assert response.meta == {"custom": "preserved"}
+    assert response.model_extra == {
+        "resultType": "complete",
+        "ttlMs": 123,
+        "cacheScope": "private",
     }
-    assert read_response.status_code == 200
-    read_result = response_payload(read_response)["result"]
-    assert len(read_result["contents"][0]["text"]) > 1000
-    assert read_result["resultType"] == "complete"
-    assert read_result["ttlMs"] == 300000
-    assert read_result["cacheScope"] == "public"
-
-    assert legacy_response.status_code == 200
-    legacy_result = response_payload(legacy_response)["result"]
-    assert legacy_result["contents"] == read_result["contents"]
-    assert not {"resultType", "ttlMs", "cacheScope"} & legacy_result.keys()
+    assert "resultType" not in original.model_extra
+    handler.side_effect = ValueError("handler failure")
+    with pytest.raises(ValueError, match="handler failure"):
+        await adapted(query)
 
 
 @pytest.mark.anyio
@@ -279,6 +330,8 @@ async def test_stdio_extension_probe_and_file_read_without_initialize():
                     response = (await from_server.receive()).message.root
                     assert isinstance(response, types.JSONRPCResponse)
                     assert response.result["resultType"] == "complete"
+                    if query.method == "server/discover":
+                        assert response.result["capabilities"]["tools"] == {}
         finally:
             group.cancel_scope.cancel()
 

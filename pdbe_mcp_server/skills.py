@@ -117,7 +117,10 @@ class SkillCatalog:
         )
 
     def dispatch(
-        self, request: types.JSONRPCRequest, server_name: str
+        self,
+        request: types.JSONRPCRequest,
+        server_name: str,
+        capabilities: types.ServerCapabilities | None = None,
     ) -> types.JSONRPCResponse | types.JSONRPCError:
         try:
             params = request.params or {}
@@ -139,10 +142,16 @@ class SkillCatalog:
                 data = {
                     "supportedVersions": [PROTOCOL],
                     "capabilities": {
+                        **{
+                            name: {}
+                            for name in ("tools", "prompts", "resources")
+                            if capabilities is not None
+                            and getattr(capabilities, name, None) is not None
+                        },
                         "resources": {},
                         "extensions": {EXTENSION: {"directoryRead": True}},
                     },
-                    "instructions": "This stateless surface serves PDBe skills and their resource files. Tool and App calls use the existing initialized MCP transport.",
+                    "instructions": "Explore PDBe scientific tools with tools/list and interactive molecular views and MolViewSpec skill files with resources/list.",
                 }
             elif method == "skills/list":
                 data = {"skills": [self.entry()]}
@@ -258,7 +267,9 @@ async def run_with_skills(
                     if isinstance(request, types.JSONRPCRequest) and catalog.handles(
                         request
                     ):
-                        reply = catalog.dispatch(request, server_name)
+                        reply = catalog.dispatch(
+                            request, server_name, initialization_options.capabilities
+                        )
                         await write_stream.send(
                             SessionMessage(types.JSONRPCMessage(reply))
                         )
@@ -278,7 +289,7 @@ async def run_with_skills(
 
 
 async def skill_http_request(
-    catalog, server_name, scope, receive, send, fallback
+    catalog, server_name, scope, receive, send, fallback, *, capabilities=None
 ) -> bool:
     """Handle modern skill requests before the SDK's legacy HTTP-version check."""
     headers = dict(scope.get("headers", []))
@@ -320,7 +331,7 @@ async def skill_http_request(
 
             await fallback(forwarded_scope, replay_receive, send)
             return True
-        reply = catalog.dispatch(request, server_name)
+        reply = catalog.dispatch(request, server_name, capabilities)
         status = 400 if isinstance(reply, types.JSONRPCError) else 200
         response = reply.model_dump(mode="json", by_alias=True, exclude_none=True)
     except ValueError:
@@ -334,31 +345,48 @@ async def skill_http_request(
     return True
 
 
-def add_skill_read_metadata(server):
-    """Adapt public App resource results before the SDK serializes them."""
-    handler = server.request_handlers[types.ReadResourceRequest]
+def add_skill_result_metadata(server):
+    """Adapt resource and list results before SDK serialization, without buffering."""
 
-    async def read_resource(request):
-        response = await handler(request)
-        meta = request.params.meta
-        if (
-            meta is not None
-            and getattr(meta, "io.modelcontextprotocol/protocolVersion", None)
-            == PROTOCOL
-            and isinstance(response.root, types.ReadResourceResult)
-        ):
-            defaults = {
-                "resultType": "complete",
-                "ttlMs": 300000,
-                "cacheScope": "public",
-            }
-            # A shallow model copy preserves the existing contents and metadata.
-            updates = {
-                key: value
-                for key, value in defaults.items()
-                if key not in (response.root.model_extra or {})
-            }
-            return types.ServerResult(response.root.model_copy(update=updates))
-        return response
+    def wrap_handler(handler, result_type):
+        async def with_metadata(request):
+            response = await handler(request)
+            meta = (
+                request.params.meta
+                if request is not None and request.params is not None
+                else None
+            )
+            if (
+                meta is not None
+                and getattr(meta, "io.modelcontextprotocol/protocolVersion", None)
+                == PROTOCOL
+                and isinstance(response.root, result_type)
+            ):
+                # Only resource contents are guaranteed identical for all callers.
+                # Lists may vary with request context; do not cache them by default.
+                public_read = result_type is types.ReadResourceResult
+                defaults = {
+                    "resultType": "complete",
+                    "ttlMs": 300000 if public_read else 0,
+                    "cacheScope": "public" if public_read else "private",
+                }
+                updates = {
+                    key: value
+                    for key, value in defaults.items()
+                    if key not in (response.root.model_extra or {})
+                }
+                if updates:
+                    # Shallow copies preserve contents, pagination, and metadata.
+                    return types.ServerResult(response.root.model_copy(update=updates))
+            return response
 
-    server.request_handlers[types.ReadResourceRequest] = read_resource
+        return with_metadata
+
+    for request_type, result_type in (
+        (types.ListToolsRequest, types.ListToolsResult),
+        (types.ListResourcesRequest, types.ListResourcesResult),
+        (types.ReadResourceRequest, types.ReadResourceResult),
+    ):
+        handler = server.request_handlers.get(request_type)
+        if handler is not None:
+            server.request_handlers[request_type] = wrap_handler(handler, result_type)

@@ -30,7 +30,7 @@ from pdbe_mcp_server.mvs import (
     build_mvs,
     build_mvs_story,
 )
-from pdbe_mcp_server.skills import SkillCatalog, add_skill_read_metadata
+from pdbe_mcp_server.skills import SkillCatalog, add_skill_result_metadata
 from pdbe_mcp_server.tool_names import PDBeServer
 
 RESOURCE_URI = "ui://pdbe/structure-explorer"
@@ -794,5 +794,5 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
             )
         ]
 
-    add_skill_read_metadata(server)
+    add_skill_result_metadata(server)
     return server
