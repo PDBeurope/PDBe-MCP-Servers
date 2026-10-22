@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><title>Workspace App test host</title></head>
+<body style="margin:0;font:14px system-ui">
+<p id="host-status">Connecting…</p><pre id="context" hidden></pre><pre id="download" hidden></pre>
+<iframe id="app" title="Molecular Workspace" sandbox="allow-scripts allow-downloads" style="width:100%;height:1400px;border:0"></iframe>
+<script type="module">
+import { AppBridge, PostMessageTransport } from '@modelcontextprotocol/ext-apps/app-bridge';
+const frame = document.querySelector('#app');
+const result = await (await fetch('/workspace-result.json')).json();
+const bridge = new AppBridge(null, { name: 'Workspace test host', version: '1' }, {
+  updateModelContext: { text: {} }, downloadFile: {}, serverTools: {},
+}, { hostContext: { theme: 'light', platform: 'web', displayMode: 'inline', availableDisplayModes: ['inline'], containerDimensions: { width: 1440, maxHeight: 1800 } } });
+bridge.onupdatemodelcontext = async ({ structuredContent }) => {
+  document.querySelector('#context').textContent = JSON.stringify(structuredContent);
+  return {};
+};
+bridge.oncalltool = async params => (await fetch('/workspace-tool', { method: 'POST', headers: {'Content-Type':'application/json'}, body:JSON.stringify(params) })).json();
+bridge.ondownloadfile = async ({ contents }) => {
+  document.querySelector('#download').textContent = contents[0].resource.text;
+  return {};
+};
+bridge.oninitialized = async () => {
+  document.querySelector('#host-status').textContent = 'App connected';
+  await bridge.sendToolResult(result);
+};
+bridge.onerror = error => { document.querySelector('#host-status').textContent = String(error); };
+await bridge.connect(new PostMessageTransport(frame.contentWindow, frame.contentWindow));
+frame.srcdoc = await (await fetch('/workspace.html')).text();
+</script></body></html>

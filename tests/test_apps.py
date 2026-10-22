@@ -14,7 +14,6 @@ from starlette.routing import Mount
 
 from pdbe_mcp_server import apps
 from pdbe_mcp_server.apps import (
-    APP_RESOURCES,
     build_pdbe_apps_server,
     get_structure_data,
     normalize_annotations,
@@ -288,13 +287,16 @@ async def test_display_preferences_over_http(
         if "resourceUri" in tool["_meta"]["ui"]
     }
     listed = (await rpc(app_client, path, "resources/list"))["result"]["resources"]
-    assert uris == {
+    resources = {
         item["uri"] for item in listed if item["mimeType"] == apps.APP_MIME_TYPE
     }
-    assert len(uris) == 3
-    assert (uris == set(APP_RESOURCES)) == (header and search)
+    assert uris == {
+        apps.AppDisplayOptions(header, search).resource_uri(apps.WORKSPACE_RESOURCE_URI)
+    }
+    assert uris <= resources
+    assert len(resources) == 4
 
-    for uri in uris:
+    for uri in resources:
         # Read through an unconfigured connection: the URI determines the HTML.
         result = await rpc(
             app_client, f"/mcp/{endpoint}/", "resources/read", {"uri": uri}
@@ -323,8 +325,6 @@ async def test_display_preferences_over_http(
                     "https://wwpdb.org",
                     "https://*.wwpdb.org",
                 ]
-                if "mvs-viewer" in uri
-                else ["https://www.ebi.ac.uk"]
             ),
             "resourceDomains": ["data:", "blob:"],
         }
@@ -347,7 +347,9 @@ async def test_display_preferences_are_isolated_between_clients(app_client):
             "",
             "?show_header=true&show_search=false",
         ][index % len(paths)]
-        assert tool["_meta"]["ui"]["resourceUri"] == apps.RESOURCE_URI + suffix
+        assert (
+            tool["_meta"]["ui"]["resourceUri"] == apps.WORKSPACE_RESOURCE_URI + suffix
+        )
 
     # A base URI must keep its original full UI even on an internal connection.
     result = await rpc(
@@ -368,7 +370,7 @@ async def test_stdio_tools_keep_original_resource_uris():
         tool.meta["ui"]["resourceUri"]
         for tool in result.root.tools
         if "resourceUri" in tool.meta["ui"]
-    } == set(APP_RESOURCES)
+    } == {apps.WORKSPACE_RESOURCE_URI}
 
 
 @pytest.mark.anyio
@@ -413,6 +415,7 @@ async def test_removed_apps_are_unavailable(app_client, endpoint):
         "ebi-pdbe-compare_structures",
         "ebi-pdbe-build_mvs",
         "ebi-pdbe-build_mvs_story",
+        "ebi-pdbe-update_workspace",
     }
     for name in (
         "pdbe_explore_ligand",
@@ -500,6 +503,163 @@ async def test_invalid_display_options_are_reported(app_client, endpoint):
             app_client,
             f"/mcp/{endpoint}/",
             "resources/read",
-            {"uri": apps.RESOURCE_URI + suffix},
+            {"uri": apps.WORKSPACE_RESOURCE_URI + suffix},
         )
         assert "error" in response
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("endpoint", ["apps", "all"])
+async def test_workspace_update_restore_and_revision_conflict_over_http(
+    app_client, endpoint
+):
+    from pdbe_mcp_server.mvs import build_mvs
+    from pdbe_mcp_server.workspace import workspace_from_mvs
+
+    path = f"/mcp/{endpoint}/"
+    await rpc(app_client, path, "tools/list")
+    saved = workspace_from_mvs(build_mvs({"builder": {"pdb_id": "1cbs"}})).model_dump(
+        mode="json", exclude_none=True
+    )
+    layer_id = saved["scenes"][0]["layers"][0]["id"]
+    arguments = {
+        "workspace": saved,
+        "expected_revision": 0,
+        "operations": [
+            {
+                "op": "set_visibility",
+                "scene_id": "scene-1",
+                "target_id": layer_id,
+                "visible": False,
+            }
+        ],
+    }
+    result = (
+        await rpc(
+            app_client,
+            path,
+            "tools/call",
+            {"name": "ebi-pdbe-update_workspace", "arguments": arguments},
+        )
+    )["result"]
+    assert not result["isError"]
+    updated = result["_meta"]["workspace"]
+    assert updated["id"] == saved["id"] and updated["revision"] == 1
+    assert not updated["scenes"][0]["layers"][0]["visible"]
+    assert result["structuredContent"]["render_status"] == "pending"
+    restored = (
+        await rpc(
+            app_client,
+            path,
+            "tools/call",
+            {
+                "name": "pdbe_update_workspace",
+                "arguments": {
+                    "workspace": updated,
+                    "expected_revision": 1,
+                    "operations": [],
+                },
+            },
+        )
+    )["result"]
+    assert restored["_meta"]["workspace"] == updated
+    conflict = (
+        await rpc(
+            app_client,
+            path,
+            "tools/call",
+            {
+                "name": "ebi-pdbe-update_workspace",
+                "arguments": {
+                    "workspace": updated,
+                    "expected_revision": 0,
+                    "operations": [],
+                },
+            },
+        )
+    )["result"]
+    assert conflict["isError"] and "revision conflict" in conflict["content"][0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_minimal_structure_data_skips_optional_requests():
+    executor = Mock()
+    records = {
+        "summary": [{"title": "Comparison", "assemblies": []}],
+        "molecules": [],
+        "residue_listing": {"molecules": []},
+    }
+
+    def execute(method, path, parameters):
+        endpoint = path.split("/")[3]
+        assert endpoint in records, f"Unexpected optional lookup: {endpoint}"
+        return {
+            "data": {"2dn2": records[endpoint]},
+            "source": f"https://example.test/{endpoint}",
+        }
+
+    executor.execute_operation.side_effect = execute
+    result = await get_structure_data(
+        {"pdb_id": "2dn2"}, executor, include_annotations=False, include_ligands=False
+    )
+    assert result["annotations"] == [] and result["ligands"] == []
+    assert result["data_status"] == {
+        "annotations": "not_requested",
+        "ligands": "not_requested",
+    }
+    assert executor.execute_operation.call_count == 3
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("include", [False, True])
+async def test_comparison_fetches_optional_data_only_when_requested(
+    app_client, monkeypatch, include
+):
+    data = {
+        "pdb_id": "2dn2",
+        "title": "Protein",
+        "chains": [{"label_asym_id": "A", "name": "Protein"}],
+        "ligands": [],
+        "annotations": [],
+        "sources": [],
+        "warnings": [],
+    }
+    fetch = AsyncMock(return_value=data)
+    side = {
+        "pdb_id": "2dn2",
+        "chain": {"label_asym_id": "A"},
+        "matrix": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+    }
+    comparison = {
+        "reference": side,
+        "mobile": side,
+        "pairs": [],
+        "sources": [],
+        "warnings": [],
+    }
+    monkeypatch.setattr(apps, "get_structure_data", fetch)
+    monkeypatch.setattr(apps, "comparison_data", lambda *args: comparison)
+    monkeypatch.setattr(apps, "comparison_text", lambda data: "Comparison prepared")
+    arguments = {
+        "reference_pdb_id": "2dn2",
+        "reference_chain_id": "A",
+        "mobile_pdb_id": "2dn2",
+        "mobile_chain_id": "A",
+    }
+    if include:
+        arguments.update(include_annotations=True, include_ligands=True)
+    response = await rpc(
+        app_client,
+        "/mcp/apps/",
+        "tools/call",
+        {"name": "ebi-pdbe-compare_structures", "arguments": arguments},
+    )
+    assert not response["result"].get("isError")
+    assert fetch.await_count == 2
+    for call in fetch.await_args_list:
+        assert call.kwargs["include_annotations"] is include
+        assert call.kwargs["include_ligands"] is include
+    assert (
+        len(response["result"]["structuredContent"]["workspace"]["scenes"][0]["layers"])
+        == 2
+    )

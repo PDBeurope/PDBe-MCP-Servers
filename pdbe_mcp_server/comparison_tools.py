@@ -31,6 +31,12 @@ def comparison_input_schema() -> dict[str, Any]:
         "minimum": 1,
         "description": "1-based PDBe segment index; required if several cover both chains.",
     }
+    for option in ("include_annotations", "include_ligands"):
+        properties[option] = {
+            "type": "boolean",
+            "default": False,
+            "description": "Optional supplied data; omitted from the initial protein comparison unless requested.",
+        }
     return {
         "type": "object",
         "properties": properties,
@@ -264,7 +270,7 @@ def comparison_data(
         "segment": segment,
         "pairs": pairs,
         "mapped_pair_count": len(pairs),
-        "method": "PDBe precomputed superposition matrices; SIFTS correspondence; first deposited coordinate model. Mol* applies the matrices and selects residue trace atoms. Occupied Cα trace atoms are measured using Mol* Vec3.distance on displayed coordinates and Mol* arrayRms, without additional fitting. Coverage is shown as observed and mapped pair counts, with no derived percentages.",
+        "method": "PDBe precomputed superposition matrices; residue correspondence from unambiguous equal-length SIFTS mapping segments; first deposited coordinate model. The viewer applies the supplied transforms. No app-calculated RMSD, per-residue displacement, or binding-site neighbourhoods.",
         "sources": sorted(sources),
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "warnings": sorted(set(warnings)),
@@ -278,7 +284,7 @@ def comparison_text(data: dict[str, Any]) -> str:
         f"UniProt {data['uniprot_accession']}; segment {data['segment']['index']} "
         f"({data['segment']['start']}–{data['segment']['end']}); {data['mapped_pair_count']} mapped pairs.\n"
         + data["method"]
-        + "\nCoordinate-derived scores become available when the app loads.\nSources: "
+        + "\nResidue correspondence is supplied from PDBe/SIFTS mappings; the app does not calculate geometric scores.\nSources: "
         + ", ".join(data["sources"])
         + "\n"
         + "\n".join(data["warnings"])

@@ -1,0 +1,17 @@
+
+.workspace-search{padding:12px 16px;border-bottom:1px solid #c8ded8}.workspace-search form{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.workspace-search details{margin-top:10px}
+html[data-pdbe-show-search="false"] .workspace-search{display:none}
+.workspace-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,28%)}#story-layout{min-width:0}
+#workspace-panel{padding:16px;border-left:1px solid #c8ded8;max-height:580px;overflow:auto;background:#f6faf9;color:#173448}
+#workspace-panel[hidden]{display:none}.workspace-layout:has(#workspace-panel[hidden]){grid-template-columns:1fr}
+h2{font-size:16px;margin:0 0 10px}#workspace-panel label{display:block;margin:8px 0;overflow-wrap:anywhere}#workspace-panel details{margin:16px 0;border-top:1px solid #c8ded8;padding-top:12px}
+input,select{font:inherit;padding:5px;max-width:100%;border:1px solid #9bb8c4;border-radius:4px}#layers{max-height:260px;overflow:auto}#layers label{font-size:12px;display:flex;align-items:start;gap:8px}
+.hint{font-size:12px;color:#536875;overflow-wrap:anywhere}.table-scroll{max-height:320px;overflow:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:6px;border-bottom:1px solid #c8ded8}tr:focus,tr:hover{background:#e6f2ee}#comparison-panel details{margin-top:12px}
+html[data-theme="dark"] #workspace-panel{background:#172e37;color:#dbe7ed;border-color:#36525c}html[data-theme="dark"] .hint{color:#adc1cb}
+@media(max-width:720px){.workspace-layout{grid-template-columns:1fr}#workspace-panel{border-left:0;border-top:1px solid #c8ded8;max-height:none}#layers{max-height:180px}}
+
+#layers button{flex:0 0 auto;white-space:nowrap;margin-left:auto;font-size:11px;padding:2px 6px}#residue-list{display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto}
+
+#annotation-coverage{font-size:12px}#annotation-coverage summary{overflow-wrap:anywhere;cursor:pointer}#annotation-coverage pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;max-height:180px;overflow:auto}#annotation-coverage details details{margin:8px 0;padding:8px}#comparison-options{border-bottom:1px solid #c8ded8;padding-bottom:8px}
+
+#ligands-panel{border-top:1px solid #c8ded8;margin-top:12px;padding-top:12px}#ligands-panel h3{font-size:14px;margin:0 0 8px}#ligand-layers label{font-size:12px;display:flex;align-items:start;gap:8px}#ligand-layers button{flex:0 0 auto;white-space:nowrap;margin-left:auto;font-size:11px;padding:2px 6px}

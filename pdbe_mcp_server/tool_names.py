@@ -14,6 +14,7 @@ _ListToolsCallback = (
     | Callable[[types.ListToolsRequest], Awaitable[types.ListToolsResult]]
 )
 _CURATED_NAMES = {
+    "pdbe_update_workspace": "update_workspace",
     "pdbe_open_structure": "open_structure",
     "pdbe_compare_structures": "compare_structures",
     "pdbe_build_mvs": "build_mvs",

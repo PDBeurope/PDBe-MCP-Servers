@@ -32,7 +32,16 @@ from pdbe_mcp_server.mvs import (
 )
 from pdbe_mcp_server.skills import SkillCatalog, add_skill_result_metadata
 from pdbe_mcp_server.tool_names import PDBeServer
+from pdbe_mcp_server.workspace import (
+    UpdateWorkspaceInput,
+    compile_workspace,
+    update_workspace,
+    workspace_from_comparison,
+    workspace_from_mvs,
+    workspace_from_structure,
+)
 
+WORKSPACE_RESOURCE_URI = "ui://pdbe/molecular-workspace"
 RESOURCE_URI = "ui://pdbe/structure-explorer"
 COMPARISON_RESOURCE_URI = "ui://pdbe/structure-comparison"
 MVS_RESOURCE_URI = "ui://pdbe/mvs-viewer"
@@ -41,6 +50,7 @@ UI_FILE = Path(__file__).parent / "ui" / "structure-explorer.html"
 COMPARISON_UI_FILE = UI_FILE.with_name("structure-comparison.html")
 MVS_UI_FILE = UI_FILE.with_name("mvs-viewer.html")
 APP_RESOURCES = {
+    WORKSPACE_RESOURCE_URI: "PDBe Molecular Workspace",
     RESOURCE_URI: "PDBe Structure Explorer",
     COMPARISON_RESOURCE_URI: "PDBe Structure Comparison Workbench",
     MVS_RESOURCE_URI: "PDBe Custom Molecular View",
@@ -204,7 +214,7 @@ def normalize_annotations(
                 accession = str(detail.get("domainId", track.get("accession", "")))
                 instance = str(detail.get("domain", detail.get("groupLabel", "")))
                 name = str(detail.get("domainName", track.get("name", accession)))
-                key = (kind, entity_id, provider, accession, instance)
+                key = (kind, entity_id, provider, accession, instance, name, source_url)
                 if key not in features:
                     features[key] = {
                         "id": f"feature-{len(features)}",
@@ -240,6 +250,7 @@ async def get_structure_data(
     arguments: dict[str, Any],
     generator: OpenAPIToMCPGenerator | None = None,
     include_annotations: bool = True,
+    include_ligands: bool = True,
 ) -> dict[str, Any]:
     """Normalize entry metadata while preserving author and label identifiers."""
     pdb_id = str(arguments["pdb_id"]).lower()
@@ -288,7 +299,10 @@ async def get_structure_data(
 
     summary, molecules = await asyncio.gather(fetch("summary"), fetch("molecules"))
     listing, ligand_records = await asyncio.gather(
-        fetch("residue_listing", optional=True), fetch("ligand_monomers", optional=True)
+        fetch("residue_listing", optional=True),
+        fetch("ligand_monomers", optional=True)
+        if (include_ligands or include_annotations)
+        else asyncio.sleep(0, result=[]),
     )
 
     assemblies = summary[0].get("assemblies", [])
@@ -390,8 +404,23 @@ async def get_structure_data(
         "initial_chain_id": chain_id,
         "model_index": 0,
         "chains": chains,
-        "ligands": ligands,
+        "ligands": ligands if include_ligands else [],
         "annotations": annotations,
+        "data_status": {
+            "annotations": "not_requested"
+            if not include_annotations
+            else "unavailable"
+            if any(
+                "data is unavailable" in w and any(track in w for track in tracks)
+                for w in warnings
+            )
+            else "loaded",
+            "ligands": "not_requested"
+            if not include_ligands
+            else "unavailable"
+            if any("ligand_monomers data is unavailable" in w for w in warnings)
+            else "loaded",
+        },
         "entry_url": f"https://www.ebi.ac.uk/pdbe/entry/pdb/{pdb_id}",
         "coordinate_url": f"https://www.ebi.ac.uk/pdbe/entry-files/download/{pdb_id}.bcif",
         "sources": sorted(sources),
@@ -479,6 +508,25 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
         display = request_display_options(server)
         return [
             types.Tool(
+                name="pdbe_update_workspace",
+                description=(
+                    "Compose or restore a molecular workspace in the shared viewer. Supply the latest complete "
+                    "workspace from tool results or App context, expected_revision, and atomic operations. "
+                    "Supports adding/removing scenes and structures, component or annotation layers, "
+                    "and changing layer visibility. IDs must match exactly. No operations validates and restores "
+                    "a saved workspace. No global server state is stored. The host must route matching workspace "
+                    "IDs to an existing App for cross-call updates; otherwise a new viewer opens. "
+                    "The App displays supplied coordinates, transforms, residue mappings and annotations; it does not calculate scientific measurements."
+                ),
+                inputSchema=UpdateWorkspaceInput.model_json_schema(),
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=True
+                ),
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                },
+            ),
+            types.Tool(
                 name="pdbe_build_mvs_story",
                 description=(
                     "Build a guided molecular story with 2–20 ordered scenes and open it in Mol* 5.13.1. "
@@ -493,7 +541,9 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 annotations=types.ToolAnnotations(
                     readOnlyHint=True, destructiveHint=False, openWorldHint=False
                 ),
-                _meta={"ui": {"resourceUri": display.resource_uri(MVS_RESOURCE_URI)}},
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                },
             ),
             types.Tool(
                 name="pdbe_build_mvs",
@@ -515,7 +565,9 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 annotations=types.ToolAnnotations(
                     readOnlyHint=True, destructiveHint=False, openWorldHint=False
                 ),
-                _meta={"ui": {"resourceUri": display.resource_uri(MVS_RESOURCE_URI)}},
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                },
             ),
             types.Tool(
                 name="pdbe_compare_structures",
@@ -523,17 +575,17 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     "Compare two protein label chains using PDBe's precomputed "
                     "superposition matrices and SIFTS residue correspondence. "
                     "Requires a shared UniProt accession and PDBe segment containing "
-                    "both chains. Opens a two-chain overlay with Mol*-calculated Cα RMSD "
-                    "and per-residue displacement, observed/mapped pair counts and CSV export. "
-                    "PDBe supplies the alignment; Mol* supplies all geometric calculations. "
-                    "No additional fitting is performed."
+                    "both chains. Opens aligned proteins first; ligands and residue annotations are opt-in "
+                    "through include_ligands/include_annotations or the workspace controls. Includes PDBe/SIFTS correspondence and CSV export. "
+                    "The viewer applies PDBe's transforms; no additional fitting, RMSD, "
+                    "per-residue displacement or inferred binding sites are calculated."
                 ),
                 inputSchema=comparison_input_schema(),
                 annotations=types.ToolAnnotations(
                     readOnlyHint=True, destructiveHint=False, openWorldHint=True
                 ),
                 _meta={
-                    "ui": {"resourceUri": display.resource_uri(COMPARISON_RESOURCE_URI)}
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
                 },
             ),
             types.Tool(
@@ -550,6 +602,16 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                             "type": "string",
                             "pattern": "^[1-9][A-Za-z0-9]{3}$",
                             "description": "Four-character PDB accession, e.g. 4hhb",
+                        },
+                        "include_annotations": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Fetch supplied residue annotation records; disable for a lightweight view.",
+                        },
+                        "include_ligands": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Fetch deposited ligand instances.",
                         },
                         "assembly_id": {
                             "type": "string",
@@ -568,13 +630,39 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 annotations=types.ToolAnnotations(
                     readOnlyHint=True, destructiveHint=False, openWorldHint=True
                 ),
-                _meta={"ui": {"resourceUri": display.resource_uri(RESOURCE_URI)}},
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                },
             ),
         ]
 
     @server.call_tool()
     @tool_deadline
     async def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        if name == "pdbe_update_workspace":
+            try:
+                data = await run_blocking_tool(
+                    lambda: compile_workspace(update_workspace(arguments))
+                )
+            except ValueError as error:
+                return types.CallToolResult(
+                    isError=True,
+                    content=[types.TextContent(type="text", text=str(error))],
+                )
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text="Molecular workspace compiled. Coordinate loading is pending in the App; only supplied scientific data is displayed.",
+                    )
+                ],
+                structuredContent={
+                    "workspace": data["workspace"],
+                    "status": "compiled",
+                    "render_status": "pending",
+                },
+                _meta={"workspace": data["workspace"], "mvs": data},
+            )
         if name in {"pdbe_build_mvs", "pdbe_build_mvs_story"}:
             is_story = name == "pdbe_build_mvs_story"
             try:
@@ -585,6 +673,8 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 )
             except ValueError as error:
                 return mvs_validation_failure(error)
+            workspace = workspace_from_mvs(data)
+            data = await run_blocking_tool(lambda: compile_workspace(workspace))
             compact = {
                 key: value
                 for key, value in data.items()
@@ -613,7 +703,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     )
                 ],
                 structuredContent=compact,
-                _meta={"mvs": data},
+                _meta={"mvs": data, "workspace": data["workspace"]},
             )
         if name == "pdbe_compare_structures":
             if not COMPARISON_UI_FILE.is_file():
@@ -635,7 +725,10 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                         get_structure_data(
                             {"pdb_id": arguments[f"{side}_pdb_id"]},
                             executor,
-                            include_annotations=False,
+                            include_annotations=arguments.get(
+                                "include_annotations", False
+                            ),
+                            include_ligands=arguments.get("include_ligands", False),
                         )
                         for side in ("reference", "mobile")
                     ]
@@ -652,10 +745,20 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                         )
                     ],
                 )
+            workspace = workspace_from_comparison(data, list(structures))
+            rendered = await run_blocking_tool(lambda: compile_workspace(workspace))
             return types.CallToolResult(
                 content=[types.TextContent(type="text", text=comparison_text(data))],
-                structuredContent={k: v for k, v in data.items() if k != "pairs"},
-                _meta={"comparison": data},
+                structuredContent={
+                    **{k: v for k, v in data.items() if k != "pairs"},
+                    "workspace": rendered["workspace"],
+                    "render_status": "pending",
+                },
+                _meta={
+                    "comparison": data,
+                    "workspace": rendered["workspace"],
+                    "mvs": rendered,
+                },
             )
         if name != "pdbe_open_structure":
             raise ValueError(f"Unknown tool name: {name}")
@@ -673,7 +776,12 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 ],
             )
         try:
-            data = await get_structure_data(arguments, generator)
+            data = await get_structure_data(
+                arguments,
+                generator,
+                include_annotations=arguments.get("include_annotations", True),
+                include_ligands=arguments.get("include_ligands", True),
+            )
         except ValueError as error:
             return types.CallToolResult(
                 isError=True,
@@ -710,11 +818,18 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
         )
         if data["warnings"]:
             text += "\n" + "\n".join(data["warnings"])
+        workspace = workspace_from_structure(data)
+        rendered = await run_blocking_tool(lambda: compile_workspace(workspace))
+        compact["workspace"] = rendered["workspace"]
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=text)],
             structuredContent=compact,
             # Full residue lists go to the app without consuming model context.
-            _meta={"structure": data},
+            _meta={
+                "structure": data,
+                "workspace": rendered["workspace"],
+                "mvs": rendered,
+            },
         )
 
     @server.list_resources()
@@ -784,8 +899,6 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                                     "https://wwpdb.org",
                                     "https://*.wwpdb.org",
                                 ]
-                                if base_uri == MVS_RESOURCE_URI
-                                else ["https://www.ebi.ac.uk"]
                             ),
                             "resourceDomains": ["data:", "blob:"],
                         },

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>PDBe Molecular Workspace</title></head>
+<body>
+  <main>
+    <header class="brand-header">
+      <img class="pdbe-logo" src="./src/assets/pdbe-letterhead-white.webp" alt="PDBe — Protein Data Bank in Europe" width="145" height="50" />
+      <div class="header-title"><span class="eyebrow">Structural evidence</span><h1>Molecular Workspace</h1></div>
+    </header>
+    <section class="toolbar"><div><h1 id="title">Molecular view</h1><p id="pdb-ids" class="hint" hidden></p><p id="description"></p></div>
+      <button id="reset" type="button" disabled>Reset view</button>
+      <button id="download" type="button" disabled>Save MVSJ</button>
+    </section>
+    <section class="workspace-search" aria-label="Structure workflows">
+      <form id="open-form"><label>PDB entry <input id="open-pdb" pattern="[1-9][A-Za-z0-9]{3}" maxlength="4" required placeholder="1cbs" /></label><button>Open structure</button></form>
+      <details><summary>Compare structures</summary><form id="compare-form">
+        <label>Reference PDB <input id="reference_pdb_id" value="4hhb" required /></label><label>Label chain <input id="reference_chain_id" value="A" required /></label>
+        <label>Mobile PDB <input id="mobile_pdb_id" value="1hho" required /></label><label>Label chain <input id="mobile_chain_id" value="A" required /></label><button>Compare</button>
+      </form></details>
+    </section>
+    <p id="status" role="status" aria-live="polite">Waiting for a scene…</p>
+    <div class="workspace-layout"><div id="story-layout">
+      <div id="viewer" aria-label="Interactive molecular structure"></div>
+      <aside id="story-panel" aria-label="Story" hidden>
+        <nav class="story-navigation" aria-label="Story scenes">
+          <button id="story-prev" type="button" disabled>Previous</button>
+          <button id="story-next" type="button" disabled>Next</button>
+        </nav>
+        <h2 id="story-title">Story</h2>
+        <div id="story-text"></div>
+      </aside>
+    </div>
+    <aside id="workspace-panel" hidden>
+      <h2>Layers</h2><p id="workspace-id" class="hint"></p>
+      <div id="comparison-options" hidden>
+        <label><input id="show-annotations" type="checkbox" /> Residue annotations</label>
+        <p id="optional-data-status" class="hint"></p>
+      </div>
+      <div id="layers"></div>
+      <section id="ligands-panel" aria-label="Ligand molecules">
+        <h3>Ligands</h3><label><input id="show-ligands" type="checkbox" /> Show ligands</label>
+        <p id="ligand-status" class="hint"></p><div id="ligand-layers"></div>
+      </section>
+      <div id="annotation-coverage" aria-label="Annotation group coverage"></div>
+      <details><summary>Browse residues</summary>
+        <label>Structure and chain <select id="residue-chain"></select></label><label>Find residue <input id="residue-filter" placeholder="Name or residue number" /></label>
+        <div id="residue-list"></div><p class="hint">Up to 100 matching residues. Selections retain label and author numbering and annotation evidence.</p>
+      </details>
+      <button id="save-workspace" disabled>Save workspace</button>
+      <label>Restore workspace <input id="restore-workspace" type="file" accept="application/json,.json" /></label>
+    </aside></div>
+    <section id="comparison-panel" class="scene-details" hidden><h2>Residue correspondence</h2><p id="comparison-summary"></p>
+      <p class="hint">Residue mappings come from PDBe/SIFTS. The viewer applies supplied PDBe transforms and displays source annotations. No RMSD, displacement or distance-based binding sites are calculated.</p>
+      <button id="export-comparison" disabled>Export residue correspondence CSV</button>
+      <details><summary>Mapped residue pairs</summary><div class="table-scroll"><table><thead><tr><th>UniProt</th><th>Reference residue</th><th>Mobile residue</th></tr></thead><tbody id="comparison-rows"></tbody></table></div></details>
+    </section>
+    <section class="scene-details"><ul id="legend" aria-label="Scene components"></ul><p id="selection">Select a residue or atom to inspect it.</p>
+      <button id="ask-selection">Ask about selection</button>
+      <p id="warnings"></p><p id="source"></p><small>Mol* 5.13.1 · One viewer for structures, alignments, annotations, ligand sites, density and stories. Cross-call updates require host routing by workspace ID.</small></section>
+  </main>
+  <script type="module" src="/src/workspace-main.ts"></script>
+</body>
+</html>

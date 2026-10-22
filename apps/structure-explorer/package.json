@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "test": "node --experimental-strip-types --test tests/annotations.test.mjs tests/comparison.test.mjs tests/mvs.test.mjs",
-    "build": "tsc --noEmit && vite build && vite build --mode comparison && vite build --mode mvs"
+    "test": "node --experimental-strip-types --test tests/annotations.test.mjs tests/comparison.test.mjs tests/mvs.test.mjs tests/workspace.test.mjs",
+    "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^2.0.3",

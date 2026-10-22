@@ -250,7 +250,17 @@ async def test_expanded_inputs_cross_mcp_schema_validation_and_app_delivery(
     assert result.structuredContent["status"] == "compiled"
     mvsj = result.meta["mvs"]["mvsj"]
     root = mvsj["snapshots"][0]["root"] if story else mvsj["root"]
-    assert root == fixture["mvsj"]["root"]
+    expected = json.loads(json.dumps(fixture["mvsj"]["root"]))
+    structure_ids = iter(result.meta["workspace"]["scenes"][0]["structures"])
+
+    def add_workspace_refs(node):
+        if node["kind"] == "structure":
+            node["ref"] = next(structure_ids)["id"]
+        for child in node.get("children", []):
+            add_workspace_refs(child)
+
+    add_workspace_refs(expected)
+    assert root == expected
     spec = (
         result.structuredContent["story"]
         if story
