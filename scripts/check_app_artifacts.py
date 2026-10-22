@@ -9,6 +9,7 @@ EXPECTED = {
     "structure-explorer.html",
     "structure-comparison.html",
     "mvs-viewer.html",
+    "workspace.html",
 }
 
 
