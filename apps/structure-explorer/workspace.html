@@ -54,6 +54,24 @@
       <button id="export-comparison" disabled>Export residue correspondence CSV</button>
       <details><summary>Mapped residue pairs</summary><div class="table-scroll"><table><thead><tr><th>UniProt</th><th>Reference residue</th><th>Mobile residue</th></tr></thead><tbody id="comparison-rows"></tbody></table></div></details>
     </section>
+    <section id="ligand-interaction-panel" class="scene-details" hidden aria-label="Ligand and binding site explorer">
+      <h2>Ligand &amp; Binding Site Explorer</h2>
+      <form id="ligand-explorer-form"><label>PDB entry <input id="ligand-pdb-id" pattern="[1-9][A-Za-z0-9]{3}" maxlength="4" required placeholder="1cbs" /></label><button type="submit">Load ligand instances</button><button id="restore-ligand-workflow" type="button">Restore saved workflow</button></form>
+      <label>Exact ligand instance <select id="ligand-instance" disabled><option value="">Load a PDB entry first</option></select></label>
+      <p id="ligand-evidence-status" class="hint" aria-live="polite"></p>
+      <div id="ligand-filter-controls" hidden>
+        <label>Classification <select id="contact-classification"><option value="">All classifications</option></select></label>
+        <label>Interaction record type <select id="contact-interaction-type"><option value="">All interaction types</option></select></label>
+        <label>Partner chain <select id="contact-chain"><option value="">All chains</option></select></label>
+        <label>Partner type <select id="contact-type"><option value="">All types</option><option value="protein">Protein</option><option value="water">Water</option><option value="metal">Metal</option><option value="other">Other</option></select></label>
+        <label>Maximum distance (Å) <input id="contact-max-distance" type="number" min="0" step="0.1" placeholder="No limit" /></label>
+        <span id="contact-distance-status" class="hint"></span>
+        <button id="export-contacts" type="button" disabled>Export filtered contacts CSV</button>
+      </div>
+      <p class="hint">Distances filter PDBe-returned records only; this control does not discover neighbours or define a binding site. Contact lines are unavailable unless source atom and assembly/model mappings resolve unambiguously.</p>
+      <div class="table-scroll"><table><thead><tr><th>Partner</th><th>Ligand atoms</th><th>Partner atoms</th><th>Interaction</th><th>Classifications</th><th>Distance (Å)</th></tr></thead><tbody id="contact-rows"></tbody></table></div>
+      <details><summary>Evidence and annotations</summary><div id="ligand-evidence"></div></details>
+    </section>
     <section class="scene-details"><ul id="legend" aria-label="Scene components"></ul><p id="selection">Select a residue or atom to inspect it.</p>
       <button id="ask-selection">Ask about selection</button>
       <p id="warnings"></p><p id="source"></p><small>Mol* 5.13.1 · One viewer for structures, alignments, annotations, ligand sites, density and stories. Cross-call updates require host routing by workspace ID.</small></section>

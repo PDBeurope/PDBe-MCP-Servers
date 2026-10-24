@@ -8,6 +8,7 @@ import { annotationGroups, isLigandAnnotationLayer, ligandLayerLabel, layerCateg
 import { comparisonCsv } from "./comparison";
 import { StructureElement, StructureProperties } from "molstar-mvs/lib/mol-model/structure.js";
 import { OrderedSet } from "molstar-mvs/lib/mol-data/int.js";
+import type { UnitIndex } from "molstar-mvs/lib/mol-model/structure/structure/element/util.js";
 import "./mvs.css";
 import "./workspace.css";
 
@@ -33,6 +34,8 @@ interface ToolResult {
   content?: { type: string; text?: string }[];
   _meta?: Record<string, unknown>;
 }
+interface ContactRecord { ligand_atoms?: string[]; interaction_type?: string; interaction_details?: string[] | string; distance?: number | string; end?: { chain_id?: string; label_asym_id?: string; author_residue_number?: string | number; author_insertion_code?: string; chem_comp_id?: string; atom_names?: string[] }; [key: string]: unknown }
+interface LigandData { pdb_id: string; ligands: Record<string, unknown>[]; selected?: Record<string, unknown> | null; contacts: ContactRecord[]; interaction_source?: string | null; retrieved_at: string; validation?: unknown; validation_source?: string; entry_sources?: string[]; warnings?: string[]; assemblies?: unknown[]; assembly_context?: unknown; assembly_source?: string; chains?: Record<string, unknown>[]; molecules?: Record<string, unknown>[]; annotations?: Record<string, unknown>[]; contact_lines_enabled?: boolean; contact_lines_unavailable_reason?: string }
 
 function el<T extends HTMLElement = HTMLElement>(id: string): T {
   return document.getElementById(id) as T;
@@ -61,6 +64,9 @@ let updating = false;
 let selectionContext: Record<string, unknown> | undefined;
 let loadState = "pending";
 let inventories = new Map<string, ReturnType<typeof coordinateInventory>>();
+let ligandData: LigandData | undefined;
+let contactObjectUrl: string | undefined;
+let ligandWorkspaceSnapshot: Workspace | undefined;
 
 function activeWorkspaceScene() {
   const key = viewer?.plugin.managers.snapshot.current?.key;
@@ -434,6 +440,11 @@ async function load(result: SceneResult, token: number): Promise<void> {
     const snapshotIndex = Math.max(0, workspace?.scenes.findIndex(s => s.id === (preserve ? previousScene : workspace?.view?.active_scene_id)) ?? 0);
     await created.loadMvsData(JSON.stringify(renderedMvs), "mvsj", { sanityChecks: true, keepCamera: preserve, defaultSnapshotIndex: snapshotIndex });
     await refreshDataView(token);
+    if (ligandData?.selected) highlightContact({ end: {
+      chain_id: String(ligandData.selected.auth_asym_id), label_asym_id: String(ligandData.selected.label_asym_id),
+      author_residue_number: ligandData.selected.auth_seq_id as string | number,
+      author_insertion_code: String(ligandData.selected.insertion_code ?? ""), chem_comp_id: String(ligandData.selected.comp_id),
+    } });
     if (disposed || token !== revision) return;
     const structures = created.plugin.managers.structure.hierarchy.current.structures;
     const atomCount = structures.reduce((count, s) => count + (s.cell.obj?.data.elementCount ?? 0), 0);
@@ -495,8 +506,190 @@ async function load(result: SceneResult, token: number): Promise<void> {
   }
 }
 
+function contactClassifications(record: ContactRecord): string[] {
+  const values = Array.isArray(record.interaction_details) ? record.interaction_details : [record.interaction_details];
+  return [...new Set(values.filter((value): value is string => typeof value === "string" && value.length > 0))];
+}
+function contactPartnerType(record: ContactRecord): string {
+  const comp = String(record.end?.chem_comp_id ?? "").toUpperCase();
+  if (["HOH", "WAT", "DOD"].includes(comp)) return "water";
+  if (/^(MG|MN|FE|ZN|CU|CO|NI|CA|NA|K|CD|HG|CL|IOD|BR)$/.test(comp)) return "metal";
+  const chain = ligandData?.chains?.find(item => item.auth_asym_id === record.end?.chain_id);
+  const kind = String(chain?.molecule_type ?? "").toLowerCase();
+  if (kind.includes("polypeptide") || kind === "protein") return "protein";
+  if (kind === "water") return "water";
+  return "other";
+}
+function contactPartnerName(record: ContactRecord): string {
+  const chain = ligandData?.chains?.find(item => item.auth_asym_id === record.end?.chain_id);
+  return typeof chain?.name === "string" ? chain.name : "name unavailable";
+}
+function ligandRoleText(value: unknown): string[] {
+  const labels = new Set<string>();
+  const semanticKeys = new Set(["role", "type", "category", "annotation", "label", "name", "function", "classification"]);
+  const add = (raw: string) => {
+    const label = raw.replaceAll("_", " ").replace(/\s+/g, " ").trim();
+    if (label) labels.add(label[0].toUpperCase() + label.slice(1));
+  };
+  const visit = (current: unknown) => {
+    if (typeof current === "string") { add(current); return; }
+    if (Array.isArray(current)) { current.forEach(item => visit(item)); return; }
+    if (!current || typeof current !== "object") return;
+    const entries = Object.entries(current as Record<string, unknown>);
+    const semantic = entries.filter(([key]) => semanticKeys.has(key.toLowerCase()));
+    for (const [key, item] of semantic.length ? semantic : entries) {
+      if (item === true) add(key);
+      else if (typeof item === "string" && !semantic.length) add(`${key}: ${item}`);
+      else visit(item);
+    }
+  };
+  visit(value);
+  return [...labels];
+}
+function filteredContacts(): ContactRecord[] {
+  if (!ligandData) return [];
+  const classification = el<HTMLSelectElement>("contact-classification").value;
+  const interactionType = el<HTMLSelectElement>("contact-interaction-type").value;
+  const chain = el<HTMLSelectElement>("contact-chain").value;
+  const type = el<HTMLSelectElement>("contact-type").value;
+  const maximum = Number(el<HTMLInputElement>("contact-max-distance").value);
+  const matching = ligandData.contacts.filter(record => {
+    if (classification && !contactClassifications(record).includes(classification)) return false;
+    if (interactionType && record.interaction_type !== interactionType) return false;
+    if (chain && record.end?.chain_id !== chain) return false;
+    if (type && contactPartnerType(record) !== type) return false;
+    return true;
+  });
+  const geometryTypes = new Set(matching.map(record => record.interaction_type ?? "unknown"));
+  const distanceInput = el<HTMLInputElement>("contact-max-distance");
+  const distanceStatus = el("contact-distance-status");
+  distanceInput.disabled = geometryTypes.size > 1;
+  distanceStatus.textContent = geometryTypes.size > 1
+    ? "Unavailable for mixed interaction geometries; source distance values remain visible. Filter to records with one source interaction type first."
+    : "Applies to source-reported numeric distances for the currently matching interaction type.";
+  if (!distanceInput.value || geometryTypes.size > 1) return matching;
+  return matching.filter(record => !Number.isFinite(Number(record.distance)) || Number(record.distance) <= maximum);
+}
+function csvCell(value: unknown): string { return `"${String(value ?? "").replaceAll('"', '""')}"`; }
+function contactCsv(records: ContactRecord[]): string {
+  const columns = ["pdb_id", "ccd_id", "ligand_label_chain", "ligand_auth_chain", "ligand_auth_residue", "ligand_insertion_code", "ligand_atoms", "partner_auth_chain", "partner_auth_residue", "partner_insertion_code", "partner_comp_id", "partner_atoms", "interaction_type", "classifications", "pdbe_distance_angstrom", "source_endpoint", "retrieved_at"];
+  const rows = records.map(record => [ligandData?.pdb_id, ligandData?.selected?.comp_id, ligandData?.selected?.label_asym_id, ligandData?.selected?.auth_asym_id,
+    ligandData?.selected?.auth_seq_id, ligandData?.selected?.insertion_code, record.ligand_atoms, record.end?.chain_id,
+    record.end?.author_residue_number, record.end?.author_insertion_code, record.end?.chem_comp_id, record.end?.atom_names,
+    record.interaction_type, record.interaction_details, record.distance, ligandData?.interaction_source, ligandData?.retrieved_at]);
+  return [columns, ...rows].map(row => row.map(value => csvCell(Array.isArray(value) ? JSON.stringify(value) : value)).join(",")).join("\r\n");
+}
+function highlightContact(record: ContactRecord): void {
+  if (!viewer || !record.end) return;
+  const matches: { structure: import("molstar-mvs/lib/mol-model/structure/structure.js").Structure; unit: any; indices: number[] }[] = [];
+  for (const current of viewer.plugin.managers.structure.hierarchy.current.structures) {
+    const structure = current.cell.obj?.data;
+    if (!structure) continue;
+    for (const unit of structure.units) {
+      const model = unit.model, h = model.atomicHierarchy, indices: number[] = [];
+      for (let offset = 0; offset < unit.elements.length; offset++) {
+        const atom = unit.elements[offset], ri = h.residueAtomSegments.index[atom], ci = h.chainAtomSegments.index[atom];
+        if (h.chains.auth_asym_id.value(ci) !== record.end.chain_id
+          || String(h.residues.auth_seq_id.value(ri)) !== String(record.end.author_residue_number)
+          || (h.residues.pdbx_PDB_ins_code.value(ri) || "").trim() !== (record.end.author_insertion_code || "").trim()) continue;
+        if (record.end.label_asym_id && h.chains.label_asym_id.value(ci) !== record.end.label_asym_id) continue;
+        if (record.end.chem_comp_id && h.atoms.label_comp_id.value(atom) !== record.end.chem_comp_id) continue;
+        const name = h.atoms.label_atom_id.value(atom);
+        const atomNames = (record.end.atom_names ?? []).flatMap(value => value.split(",").map(part => part.trim()));
+        if (!atomNames.length || atomNames.includes(name)) indices.push(offset);
+      }
+      if (indices.length) matches.push({ structure, unit, indices });
+    }
+  }
+  // The endpoint lacks assembly/model identifiers; never choose among duplicate coordinate copies.
+  if (matches.length !== 1) { status("This contact cannot be mapped to one coordinate copy from the source identifiers."); return; }
+  const match = matches[0];
+  const loci = StructureElement.Loci(match.structure, [{ unit: match.unit, indices: OrderedSet.ofSortedArray(matches[0].indices as UnitIndex[]) }]);
+  viewer.plugin.managers.interactivity.lociHighlights.highlightOnly({ loci });
+}
+function renderLigandData(data: LigandData): void {
+  ligandData = data;
+  const panel = el("ligand-interaction-panel"); panel.hidden = false;
+  const input = el<HTMLInputElement>("ligand-pdb-id"); input.value = data.pdb_id;
+  const select = el<HTMLSelectElement>("ligand-instance"), previous = data.selected
+    ? JSON.stringify([data.selected.comp_id, data.selected.auth_asym_id, data.selected.auth_seq_id, data.selected.insertion_code, data.selected.label_asym_id]) : "";
+  select.replaceChildren(new Option("Choose a ligand instance…", ""));
+  data.ligands.forEach((item, index) => {
+    const identity = [item.comp_id, item.auth_asym_id, item.auth_seq_id, item.insertion_code ?? "", item.label_asym_id];
+    const roles = ligandRoleText(item.role_annotations);
+    const roleLabel = roles.length ? ` · roles ${roles.join(", ")}` : "";
+    const bound = item.bound_molecule_id ? ` · bound molecule ${item.bound_molecule_id}` : "";
+    select.add(new Option(`${item.comp_id} · author chain ${item.auth_asym_id} · residue ${item.auth_seq_id}${item.insertion_code ?? ""} · label chain ${item.label_asym_id}${item.label_seq_id == null ? "" : ` · label residue ${item.label_seq_id}`} · alternate conformers ${item.alternate_conformers ?? "unavailable"}${bound}${roleLabel}`, JSON.stringify(identity)));
+    if (JSON.stringify(identity) === previous) select.selectedIndex = index + 1;
+  });
+  select.disabled = false;
+  const controls = el("ligand-filter-controls"); controls.hidden = !data.selected;
+  const classes = [...new Set(data.contacts.flatMap(contactClassifications))].sort();
+  const classSelect = el<HTMLSelectElement>("contact-classification"), oldClass = classSelect.value;
+  classSelect.replaceChildren(new Option("All classifications", ""), ...classes.map(value => new Option(value, value)));
+  if (classes.includes(oldClass)) classSelect.value = oldClass;
+  const interactionTypes = [...new Set(data.contacts.map(record => record.interaction_type).filter((value): value is string => !!value))].sort();
+  const recordTypeSelect = el<HTMLSelectElement>("contact-interaction-type"), oldRecordType = recordTypeSelect.value;
+  recordTypeSelect.replaceChildren(new Option("All interaction types", ""), ...interactionTypes.map(value => new Option(value, value)));
+  if (interactionTypes.includes(oldRecordType)) recordTypeSelect.value = oldRecordType;
+  const chains = [...new Set(data.contacts.map(record => record.end?.chain_id).filter((value): value is string => !!value))].sort();
+  const chainSelect = el<HTMLSelectElement>("contact-chain"), oldChain = chainSelect.value;
+  chainSelect.replaceChildren(new Option("All chains", ""), ...chains.map(value => new Option(value, value)));
+  if (chains.includes(oldChain)) chainSelect.value = oldChain;
+  const statusText = data.selected ? `${data.contacts.length} source interaction records for ${data.selected.comp_id}; source distance convention may vary by interaction category.` : `${data.ligands.length} ligand instances. Select by CCD, author chain, residue and insertion code.`;
+  el("ligand-evidence-status").textContent = statusText;
+  const evidence = el("ligand-evidence"); evidence.replaceChildren();
+  const sources = [...(data.entry_sources ?? []), data.interaction_source, data.validation_source, data.assembly_source].filter((value): value is string => !!value);
+  for (const source of sources) { const p = document.createElement("p"); p.textContent = `Source: ${source}`; evidence.append(p); }
+  const when = document.createElement("p"); when.textContent = `Retrieved: ${data.retrieved_at}`; evidence.append(when);
+  const validation = document.createElement("pre"); validation.textContent = data.validation == null ? "Ligand validation: unavailable" : JSON.stringify(data.validation, null, 2); evidence.append(validation);
+  const assembly = document.createElement("pre"); assembly.textContent = data.assembly_context == null ? "Assembly composition: unavailable" : `Assembly context\n${JSON.stringify(data.assembly_context, null, 2)}`; evidence.append(assembly);
+  const lineStatus = document.createElement("p"); lineStatus.textContent = data.contact_lines_enabled ? "Contact lines are available for unambiguous source mappings." : `Contact lines unavailable: ${data.contact_lines_unavailable_reason ?? "source mapping is ambiguous"}`; evidence.append(lineStatus);
+  const ligandRoles = ligandRoleText(data.selected?.role_annotations);
+  const roleText = document.createElement("p"); roleText.textContent = `Ligand roles: ${ligandRoles.length ? ligandRoles.join(", ") : data.selected?.role_annotations === undefined ? "unavailable" : "none reported"}`; evidence.append(roleText);
+  const classificationNote = document.createElement("p"); classificationNote.textContent = "Interaction classifications below are PDBe-distributed computational records. Curated functional annotations are separate supporting context."; evidence.append(classificationNote);
+  const annotations = data.annotations ?? [];
+  if (annotations.length) {
+    const heading = document.createElement("p"); heading.textContent = `Available residue and binding-site annotations (${annotations.length})`; evidence.append(heading);
+    for (const annotation of annotations.slice(0, 80)) {
+      const record = annotation as Record<string, unknown>, item = document.createElement("details"), summary = document.createElement("summary");
+      summary.textContent = `${String(record.source ?? "PDBe annotation")} · ${String(record.name ?? record.accession ?? "supporting context")}`;
+      const value = document.createElement("pre"); value.textContent = JSON.stringify(record, null, 2); item.append(summary, value); evidence.append(item);
+    }
+  }
+  const notes = document.createElement("p"); notes.textContent = data.warnings?.length ? data.warnings.join(" ") : "Conservation and functional annotations are supporting context only. Missing annotation data is unavailable, never inferred."; evidence.append(notes);
+  try { localStorage.setItem(`pdbe-ligand-workflow:${data.pdb_id}`, JSON.stringify({ data, workspace: ligandWorkspaceSnapshot, filters: {
+    classification: classSelect.value, interactionType: el<HTMLSelectElement>("contact-interaction-type").value, chain: chainSelect.value, type: el<HTMLSelectElement>("contact-type").value,
+    maxDistance: el<HTMLInputElement>("contact-max-distance").value,
+  } })); } catch { /* Storage can be disabled by the host. */ }
+  renderContactRows();
+}
+function renderContactRows(): void {
+  const body = el("contact-rows"), records = filteredContacts(); body.replaceChildren();
+  for (const record of records) {
+    const row = document.createElement("tr"); row.tabIndex = 0; row.setAttribute("role", "button");
+    const partner = record.end ?? {};
+    [ `${partner.chem_comp_id ?? "?"} · ${partner.chain_id ?? "?"}:${partner.author_residue_number ?? "?"}${partner.author_insertion_code?.trim() ?? ""} (${contactPartnerType(record)} · ${contactPartnerName(record)})`,
+      JSON.stringify(record.ligand_atoms ?? []), JSON.stringify(partner.atom_names ?? []), record.interaction_type,
+      contactClassifications(record).join("; "), record.distance ].forEach(value => { const cell = document.createElement("td"); cell.textContent = String(value ?? "unavailable"); row.append(cell); });
+    row.addEventListener("click", () => highlightContact(record));
+    row.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); highlightContact(record); } });
+    body.append(row);
+  }
+  el<HTMLButtonElement>("export-contacts").disabled = !records.length;
+  if (ligandData) {
+    try { localStorage.setItem(`pdbe-ligand-workflow:${ligandData.pdb_id}`, JSON.stringify({ data: ligandData, workspace: ligandWorkspaceSnapshot,
+      filters: { classification: el<HTMLSelectElement>("contact-classification").value, interactionType: el<HTMLSelectElement>("contact-interaction-type").value, chain: el<HTMLSelectElement>("contact-chain").value,
+        type: el<HTMLSelectElement>("contact-type").value, maxDistance: el<HTMLInputElement>("contact-max-distance").value } })); }
+    catch { /* Storage can be disabled by the host. */ }
+  }
+}
+
 function receive(result: ToolResult): void {
   const suppliedWorkspace = result._meta?.workspace ?? (result._meta?.mvs as SceneResult | undefined)?.workspace;
+  if (suppliedWorkspace) ligandWorkspaceSnapshot = suppliedWorkspace as Workspace;
+  const ligandResult = result._meta?.ligand_data as LigandData | undefined;
+  if (ligandResult) renderLigandData(ligandResult);
   if (suppliedWorkspace) {
     try {
       const next = validateEnvelope(suppliedWorkspace); checkRevision(workspace, next);
@@ -576,6 +769,49 @@ el("export-comparison").addEventListener("click", () => {
   if (downloadUrl) URL.revokeObjectURL(downloadUrl);
   downloadUrl = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   const link = document.createElement("a"); link.href = downloadUrl; link.download = "comparison.csv"; link.click();
+});
+el<HTMLFormElement>("ligand-explorer-form").addEventListener("submit", event => {
+  event.preventDefault();
+  void app.callServerTool({ name: "ebi-pdbe-ligand-interactions", arguments: { pdb_id: el<HTMLInputElement>("ligand-pdb-id").value.trim() } }).then(receive).catch(error => status(String(error), true));
+});
+el<HTMLButtonElement>("restore-ligand-workflow").addEventListener("click", () => {
+  const pdbId = el<HTMLInputElement>("ligand-pdb-id").value.trim().toLowerCase();
+  try {
+    const saved = JSON.parse(localStorage.getItem(`pdbe-ligand-workflow:${pdbId}`) ?? "null") as { data?: LigandData; workspace?: Workspace; filters?: { classification?: string; interactionType?: string; chain?: string; type?: string; maxDistance?: string } } | null;
+    if (!saved?.data || !saved.workspace) { status("No complete saved ligand workflow is available for this entry."); return; }
+    void app.callServerTool({ name: "ebi-pdbe-update_workspace", arguments: { workspace: saved.workspace, expected_revision: saved.workspace.revision, operations: [] } }).then(result => {
+      receive(result);
+      renderLigandData(saved.data!);
+      const filters = saved.filters;
+      if (filters) {
+        el<HTMLSelectElement>("contact-classification").value = filters.classification ?? "";
+        el<HTMLSelectElement>("contact-interaction-type").value = filters.interactionType ?? "";
+        el<HTMLSelectElement>("contact-chain").value = filters.chain ?? "";
+        el<HTMLSelectElement>("contact-type").value = filters.type ?? "";
+        el<HTMLInputElement>("contact-max-distance").value = filters.maxDistance ?? "";
+        renderContactRows();
+      }
+    }).catch(error => status(String(error), true));
+  } catch (error) { status(`Saved ligand workflow could not be restored: ${String(error)}`, true); }
+});
+el<HTMLSelectElement>("ligand-instance").addEventListener("change", event => {
+  const value = (event.currentTarget as HTMLSelectElement).value;
+  if (!value) return;
+  const [comp_id, auth_asym_id, auth_seq_id, insertion_code, label_asym_id] = JSON.parse(value) as [string, string, string | number, string, string];
+  void app.callServerTool({ name: "ebi-pdbe-ligand-interactions", arguments: {
+    pdb_id: el<HTMLInputElement>("ligand-pdb-id").value.trim(), comp_id, auth_asym_id, auth_seq_id, insertion_code, label_asym_id,
+  } }).then(receive).catch(error => status(String(error), true));
+});
+for (const id of ["contact-classification", "contact-interaction-type", "contact-chain", "contact-type", "contact-max-distance"]) {
+  el(id).addEventListener("input", renderContactRows);
+  el(id).addEventListener("change", renderContactRows);
+}
+el<HTMLButtonElement>("export-contacts").addEventListener("click", () => {
+  const records = filteredContacts(); if (!records.length) return;
+  if (contactObjectUrl) URL.revokeObjectURL(contactObjectUrl);
+  contactObjectUrl = URL.createObjectURL(new Blob([contactCsv(records)], { type: "text/csv" }));
+  const link = document.createElement("a"); link.href = contactObjectUrl;
+  link.download = `${ligandData?.pdb_id ?? "pdbe"}-${ligandData?.selected?.comp_id ?? "ligand"}-contacts.csv`; link.click();
 });
 el<HTMLFormElement>("open-form").addEventListener("submit", event => {
   event.preventDefault();

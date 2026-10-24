@@ -372,6 +372,9 @@ async def get_structure_data(
             "comp_id": ligand["chem_comp_id"],
             "name": ligand.get("chem_comp_name", ""),
             "bound_molecule_id": ligand.get("bm_id"),
+            "weight": ligand.get("weight"),
+            "alternate_conformers": ligand.get("alternate_conformers"),
+            "role_annotations": ligand.get("annotations", []),
         }
         for ligand in ligand_records
     ]
@@ -399,6 +402,7 @@ async def get_structure_data(
         "pdb_id": pdb_id,
         "title": summary[0].get("title", pdb_id.upper()),
         "experimental_methods": summary[0].get("experimental_method", []),
+        "molecules": molecules,
         "assembly_id": assembly_id,
         "assemblies": assemblies,
         "initial_chain_id": chain_id,
@@ -634,6 +638,38 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
                 },
             ),
+            types.Tool(
+                name="pdbe_ligand_interactions",
+                description=(
+                    "Explore PDBe-reported interactions for an exact ligand instance in the shared Molecular Workspace. "
+                    "First call with a PDB ID to list instances; then provide author chain and author residue number "
+                    "(plus CCD and insertion code when available) to retrieve that instance's supplied interaction records. "
+                    "The App displays source classifications and distances without calculating or reclassifying contacts. "
+                    "Contact lines are shown only when atom and assembly/model mapping is unambiguous; otherwise use the table."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "pdb_id": {
+                            "type": "string",
+                            "pattern": "^[1-9][A-Za-z0-9]{3}$",
+                        },
+                        "auth_asym_id": {"type": "string", "minLength": 1},
+                        "auth_seq_id": {"type": ["string", "integer"]},
+                        "insertion_code": {"type": "string"},
+                        "comp_id": {"type": "string", "minLength": 1},
+                        "label_asym_id": {"type": "string", "minLength": 1},
+                    },
+                    "required": ["pdb_id"],
+                    "additionalProperties": False,
+                },
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=True
+                ),
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                },
+            ),
         ]
 
     @server.call_tool()
@@ -663,6 +699,205 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 },
                 _meta={"workspace": data["workspace"], "mvs": data},
             )
+        if name == "pdbe_ligand_interactions":
+            if not UI_FILE.is_file():
+                return types.CallToolResult(
+                    isError=True,
+                    content=[
+                        types.TextContent(
+                            type="text",
+                            text="Molecular Workspace UI is not built. Run npm run build in apps/structure-explorer.",
+                        )
+                    ],
+                )
+            try:
+                pdb_id = str(arguments.get("pdb_id", "")).lower()
+                if not re.fullmatch(r"[1-9][a-z0-9]{3}", pdb_id):
+                    raise ValueError(
+                        "pdb_id must be a four-character PDB accession, e.g. 4hhb"
+                    )
+                executor = generator or await run_blocking_tool(
+                    get_shared_api_generator
+                )
+                structure = await get_structure_data(
+                    {"pdb_id": pdb_id},
+                    executor,
+                    include_annotations=True,
+                    include_ligands=True,
+                )
+                selected = None
+                contacts: list[dict[str, Any]] = []
+                interaction_source = None
+                assembly_context = None
+                assembly_source = None
+                try:
+                    assembly_result = await run_blocking_tool(
+                        lambda: executor.execute_operation(
+                            "GET", "/pdb/entry/assembly/{pdb_id}", {"pdb_id": pdb_id}
+                        )
+                    )
+                    assembly_context = assembly_result["data"].get(
+                        pdb_id, assembly_result["data"]
+                    )
+                    assembly_source = assembly_result["source"]
+                except (requests.RequestException, ValueError, AttributeError):
+                    assembly_context = None
+                if "auth_asym_id" in arguments or "auth_seq_id" in arguments:
+                    if (
+                        "auth_asym_id" not in arguments
+                        or "auth_seq_id" not in arguments
+                    ):
+                        raise ValueError(
+                            "Select a ligand using both author chain and author residue number"
+                        )
+                    candidates = [
+                        item
+                        for item in structure["ligands"]
+                        if item["auth_asym_id"] == arguments["auth_asym_id"]
+                        and str(item["auth_seq_id"]) == str(arguments["auth_seq_id"])
+                        and (
+                            "comp_id" not in arguments
+                            or item["comp_id"] == arguments["comp_id"]
+                        )
+                        and (
+                            "label_asym_id" not in arguments
+                            or item["label_asym_id"] == arguments["label_asym_id"]
+                        )
+                        and (
+                            "insertion_code" not in arguments
+                            or item["insertion_code"].strip()
+                            == arguments["insertion_code"].strip()
+                        )
+                    ]
+                    if len(candidates) != 1:
+                        raise ValueError(
+                            "The author identifiers must resolve to exactly one listed ligand instance"
+                        )
+                    selected = candidates[0]
+                    path = "/pdb/bound_ligand_interactions/{pdb_id}/{chain_id}/{seq_id}"
+                    try:
+                        result = await run_blocking_tool(
+                            lambda: executor.execute_operation(
+                                "GET",
+                                path,
+                                {
+                                    "pdb_id": pdb_id,
+                                    "chain_id": selected["auth_asym_id"],
+                                    "seq_id": selected["auth_seq_id"],
+                                },
+                            )
+                        )
+                        interaction_source = result["source"]
+                        payload = result["data"]
+                        if isinstance(payload, dict):
+                            payload = payload.get(
+                                pdb_id, payload.get(pdb_id.upper(), payload)
+                            )
+                        if isinstance(payload, list):
+                            matched_records = [
+                                row
+                                for row in payload
+                                if isinstance(row, dict)
+                                and row.get("ligand", {}).get("chain_id")
+                                == selected["auth_asym_id"]
+                                and str(
+                                    row.get("ligand", {}).get("author_residue_number")
+                                )
+                                == str(selected["auth_seq_id"])
+                                and row.get("ligand", {}).get("chem_comp_id")
+                                == selected["comp_id"]
+                                and str(
+                                    row.get("ligand", {}).get(
+                                        "author_insertion_code", " "
+                                    )
+                                ).strip()
+                                == selected["insertion_code"].strip()
+                            ]
+                            if len(matched_records) == 1:
+                                contacts = list(
+                                    matched_records[0].get("interactions", [])
+                                )
+                            elif len(matched_records) > 1:
+                                structure["warnings"].append(
+                                    "Multiple PDBe interaction records match the author identifiers; contacts were left unavailable because the instance is ambiguous."
+                                )
+                        elif isinstance(payload, dict):
+                            contacts = list(payload.get("interactions", []))
+                    except (requests.RequestException, ValueError):
+                        structure["warnings"].append(
+                            "PDBe interaction records are unavailable for this ligand instance."
+                        )
+                rendered = await run_blocking_tool(
+                    lambda: compile_workspace(workspace_from_structure(structure))
+                )
+                ligand_data = {
+                    "pdb_id": pdb_id,
+                    "ligands": structure["ligands"],
+                    "selected": selected,
+                    "contacts": contacts,
+                    "interaction_source": interaction_source,
+                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                    "entry_sources": structure["sources"],
+                    "warnings": structure["warnings"],
+                    "assembly_id": structure["assembly_id"],
+                    "assemblies": structure["assemblies"],
+                    "assembly_context": assembly_context,
+                    "assembly_source": assembly_source,
+                    "chains": structure["chains"],
+                    "molecules": structure.get("molecules", []),
+                    "annotations": structure.get("annotations", []),
+                    "contact_lines_enabled": False,
+                    "contact_lines_unavailable_reason": "The interaction records do not resolve coordinate model and assembly copy context unambiguously.",
+                    "validation": None,
+                }
+                if selected:
+                    try:
+                        validation = await run_blocking_tool(
+                            lambda: executor.execute_operation(
+                                "GET",
+                                "/validation/ligand_monomer/entry/{pdb_id}/chain/{chain_id}/residue_number/{residue_number}",
+                                {
+                                    "pdb_id": pdb_id,
+                                    "chain_id": selected["auth_asym_id"],
+                                    "residue_number": selected["auth_seq_id"],
+                                },
+                            )
+                        )
+                        ligand_data["validation"] = validation["data"]
+                        ligand_data["validation_source"] = validation["source"]
+                    except (requests.RequestException, ValueError):
+                        ligand_data["validation"] = None
+                text = (
+                    f"{pdb_id.upper()}: {len(structure['ligands'])} modeled ligand instance(s). "
+                    + (
+                        f"Selected {selected['comp_id']} at author chain {selected['auth_asym_id']} residue {selected['auth_seq_id']}{selected['insertion_code']}; {len(contacts)} PDBe interaction record(s)."
+                        if selected
+                        else "Choose an exact ligand instance in the workspace to load its interaction records."
+                    )
+                )
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=text)],
+                    structuredContent={
+                        "status": "prepared",
+                        "ligand_data": ligand_data,
+                        "workspace": rendered["workspace"],
+                    },
+                    _meta={
+                        "workspace": rendered["workspace"],
+                        "mvs": rendered,
+                        "ligand_data": ligand_data,
+                    },
+                )
+            except (ValueError, requests.RequestException) as error:
+                return types.CallToolResult(
+                    isError=True,
+                    content=[
+                        types.TextContent(
+                            type="text",
+                            text=f"PDBe ligand interactions unavailable: {error}",
+                        )
+                    ],
+                )
         if name in {"pdbe_build_mvs", "pdbe_build_mvs_story"}:
             is_story = name == "pdbe_build_mvs_story"
             try:

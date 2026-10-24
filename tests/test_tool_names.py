@@ -83,6 +83,7 @@ async def test_all_builders_advertise_only_unique_namespaced_tools(servers):
     assert {tool.name for tool in await tools(endpoints["apps"])} == {
         "ebi-pdbe-open_structure",
         "ebi-pdbe-compare_structures",
+        "ebi-pdbe-ligand-interactions",
         "ebi-pdbe-build_mvs",
         "ebi-pdbe-build_mvs_story",
         "ebi-pdbe-update_workspace",

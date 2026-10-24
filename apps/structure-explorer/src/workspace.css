@@ -14,4 +14,6 @@ html[data-theme="dark"] #workspace-panel{background:#172e37;color:#dbe7ed;border
 
 #annotation-coverage{font-size:12px}#annotation-coverage summary{overflow-wrap:anywhere;cursor:pointer}#annotation-coverage pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;max-height:180px;overflow:auto}#annotation-coverage details details{margin:8px 0;padding:8px}#comparison-options{border-bottom:1px solid #c8ded8;padding-bottom:8px}
 
+#ligand-interaction-panel{overflow:auto}#ligand-interaction-panel form,#ligand-filter-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:10px 0}#ligand-interaction-panel label{display:flex;flex-direction:column;gap:4px}#contact-rows tr{cursor:pointer}#contact-rows tr:focus,#contact-rows tr:hover{outline:2px solid #477d8f;outline-offset:-2px}
+
 #ligands-panel{border-top:1px solid #c8ded8;margin-top:12px;padding-top:12px}#ligands-panel h3{font-size:14px;margin:0 0 8px}#ligand-layers label{font-size:12px;display:flex;align-items:start;gap:8px}#ligand-layers button{flex:0 0 auto;white-space:nowrap;margin-left:auto;font-size:11px;padding:2px 6px}

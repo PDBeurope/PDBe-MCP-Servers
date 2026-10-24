@@ -17,6 +17,7 @@ _CURATED_NAMES = {
     "pdbe_update_workspace": "update_workspace",
     "pdbe_open_structure": "open_structure",
     "pdbe_compare_structures": "compare_structures",
+    "pdbe_ligand_interactions": "ligand-interactions",
     "pdbe_build_mvs": "build_mvs",
     "pdbe_build_mvs_story": "build_mvs_story",
     "pdbe_get_ai_summary": "get_ai_summary",

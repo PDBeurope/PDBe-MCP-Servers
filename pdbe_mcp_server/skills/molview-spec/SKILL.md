@@ -1,8 +1,8 @@
 ---
 name: molview-spec
-description: Build or replace custom molecular views and guided molecular stories with PDBe evidence and MolViewSpec. Use for explicit visualization, representation, coloring, highlighting, or story requests.
+description: Build or replace custom molecular views and guided molecular stories with PDBe evidence and MolViewSpec, or explore PDBe-reported ligand interactions in the Molecular Workspace. Use for explicit visualization, representation, coloring, highlighting, ligand-contact, or story requests.
 metadata:
-  version: "5"
+  version: "6"
 ---
 
 # Molecular views and stories
@@ -46,6 +46,35 @@ On older servers without workspace updates, recover the complete builder and
 use the established full-replacement builder workflow. Do not pass host routing
 fields such as `pdbe_visualization_request.mode` to PDBe tools. If the requested
 viewer state is unavailable, recover it before constructing the edit.
+
+## Ligand interaction workflow
+
+Use `ebi-pdbe-ligand-interactions` for the Ligand & Binding Site Explorer workflow
+inside the Molecular Workspace. Start with a PDB ID to list modeled ligand instances;
+select an exact instance by CCD, author chain, author residue number, and insertion
+code. Retain its label-chain and label-residue mapping for the viewer. Interaction
+requests use the endpoint's demonstrated author chain and author residue identifiers;
+never substitute label identifiers for these request fields.
+
+Display one table row for each returned PDBe interaction record. Preserve atom lists,
+multi-atom groups, every supplied classification (including clashes and overlaps),
+source labels, and supplied distances. Filters only hide returned rows; a maximum
+distance filter does not detect contacts or define a binding site. Keep each source
+interaction record type visible. Apply a maximum-distance filter only when the current
+records share one interaction geometry type; when types are mixed, leave all rows
+visible until the user narrows the type. Do not recalculate distances, infer contacts,
+reclassify records, or score interaction importance.
+Distinguish distributed computational interaction classifications from curated
+functional annotations. Treat conservation, validation, binding-site and functional
+annotations as supporting evidence, with source and retrieval provenance; report
+missing values as unavailable.
+
+Contact lines require unambiguous atom identifiers plus coordinate model and assembly
+context. If source records do not resolve those identifiers to exactly one coordinate
+copy, leave the table available and do not draw a line. Preserve the selected ligand,
+filters, and source records as restorable workflow state. CSV export must retain
+original identifiers, atom groups, interaction type, all classifications, source
+distance and provenance.
 
 Only report that a replacement or story was created after a successful tool
 result in the current turn. A prose description or a skill-reference read does

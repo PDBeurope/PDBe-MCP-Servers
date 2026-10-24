@@ -182,7 +182,20 @@ async def test_app_reuses_raw_executor_and_handles_missing_annotations():
                 }
             ]
         },
-        "ligand_monomers": [],
+        "ligand_monomers": [
+            {
+                "entity_id": 2,
+                "struct_asym_id": "B",
+                "chain_id": "A",
+                "author_residue_number": 200,
+                "author_insertion_code": "A",
+                "chem_comp_id": "REA",
+                "chem_comp_name": "RETINOIC ACID",
+                "alternate_conformers": 2,
+                "bm_id": "bm1",
+                "annotations": [{"role": "cofactor-like"}],
+            }
+        ],
         "domains": track([{"startIndex": 1, "endIndex": 1, "indexType": "PDB"}]),
         "binding_sites": {"data": []},
         "uniprot_mapping": {"data": []},
@@ -204,6 +217,11 @@ async def test_app_reuses_raw_executor_and_handles_missing_annotations():
     assert data["annotations"][0]["segments"][0]["label_asym_id"] == "X"
     assert data["chains"][0]["residues"][0]["auth_seq_id"] == -2
     assert data["chains"][0]["residues"][0]["insertion_code"] == "B"
+    assert data["ligands"][0]["label_asym_id"] == "B"
+    assert data["ligands"][0]["auth_seq_id"] == 200
+    assert data["ligands"][0]["insertion_code"] == "A"
+    assert data["ligands"][0]["alternate_conformers"] == 2
+    assert data["ligands"][0]["role_annotations"] == [{"role": "cofactor-like"}]
     assert any("annotations" in warning for warning in data["warnings"])
 
 
@@ -231,7 +249,8 @@ async def app_client(tmp_path, monkeypatch):
             encoding="utf-8",
         )
         monkeypatch.setattr(apps, name, path)
-    app_server = build_pdbe_apps_server(Mock())
+    api_generator = Mock()
+    app_server = build_pdbe_apps_server(api_generator)
     servers = {"apps": app_server, "all": build_all_server([app_server])}
     async with AsyncExitStack() as stack:
         routes = []
@@ -249,6 +268,7 @@ async def app_client(tmp_path, monkeypatch):
                 "MCP-Protocol-Version": "2025-11-25",
             },
         ) as client:
+            client.pdbe_generator = api_generator
             yield client
 
 
@@ -413,6 +433,7 @@ async def test_removed_apps_are_unavailable(app_client, endpoint):
     assert {tool["name"] for tool in tools} == {
         "ebi-pdbe-open_structure",
         "ebi-pdbe-compare_structures",
+        "ebi-pdbe-ligand-interactions",
         "ebi-pdbe-build_mvs",
         "ebi-pdbe-build_mvs_story",
         "ebi-pdbe-update_workspace",
@@ -608,6 +629,101 @@ async def test_minimal_structure_data_skips_optional_requests():
         "ligands": "not_requested",
     }
     assert executor.execute_operation.call_count == 3
+
+
+@pytest.mark.anyio
+async def test_ligand_interaction_tool_uses_author_ids_and_preserves_records(
+    app_client, monkeypatch
+):
+    ligand = {
+        "entity_id": "2",
+        "label_asym_id": "B",
+        "label_seq_id": None,
+        "auth_asym_id": "A",
+        "auth_seq_id": 200,
+        "insertion_code": "",
+        "comp_id": "REA",
+        "name": "RETINOIC ACID",
+    }
+    structure = {
+        "pdb_id": "1cbs",
+        "title": "Test",
+        "experimental_methods": [],
+        "assembly_id": None,
+        "assemblies": [],
+        "chains": [],
+        "ligands": [ligand, {**ligand, "label_asym_id": "C", "insertion_code": "A"}],
+        "annotations": [],
+        "sources": [],
+        "warnings": [],
+        "molecules": [],
+    }
+    monkeypatch.setattr(apps, "get_structure_data", AsyncMock(return_value=structure))
+    monkeypatch.setattr(apps, "workspace_from_structure", lambda value: {"version": 1})
+    monkeypatch.setattr(
+        apps,
+        "compile_workspace",
+        lambda value: {"workspace": {"id": "w"}, "mvsj": {}, "version": 1},
+    )
+    generator = app_client.pdbe_generator
+    records = [
+        {
+            "ligand": {
+                "chain_id": "A",
+                "author_residue_number": 200,
+                "chem_comp_id": "REA",
+                "author_insertion_code": " ",
+            },
+            "interactions": [
+                {
+                    "ligand_atoms": ["C1", "C2"],
+                    "interaction_type": "atom-atom",
+                    "interaction_details": ["hydrophobic", "clash"],
+                    "distance": 3.4,
+                    "end": {
+                        "chain_id": "A",
+                        "author_residue_number": 15,
+                        "atom_names": ["CZ"],
+                    },
+                }
+            ],
+        }
+    ]
+    generator.execute_operation.side_effect = [
+        {"data": {"1cbs": []}, "source": "https://example.test/assembly"},
+        {"data": {"1cbs": records}, "source": "https://example.test/interactions"},
+        {"data": {"1cbs": []}, "source": "https://example.test/validation"},
+    ]
+    response = await rpc(
+        app_client,
+        "/mcp/apps/",
+        "tools/call",
+        {
+            "name": "ebi-pdbe-ligand-interactions",
+            "arguments": {
+                "pdb_id": "1cbs",
+                "comp_id": "REA",
+                "auth_asym_id": "A",
+                "auth_seq_id": 200,
+                "insertion_code": "",
+                "label_asym_id": "B",
+            },
+        },
+    )
+    result = response["result"]
+    assert not result.get("isError")
+    assert generator.execute_operation.call_args_list[1].args == (
+        "GET",
+        "/pdb/bound_ligand_interactions/{pdb_id}/{chain_id}/{seq_id}",
+        {"pdb_id": "1cbs", "chain_id": "A", "seq_id": 200},
+    )
+    data = result["_meta"]["ligand_data"]
+    assert data["contacts"] == records[0]["interactions"]
+    assert data["selected"]["label_asym_id"] == "B"
+    assert data["annotations"] == []
+    assert data["contact_lines_enabled"] is False
+    assert data["contacts"][0]["ligand_atoms"] == ["C1", "C2"]
+    assert len(data["contacts"][0]["interaction_details"]) == 2
 
 
 @pytest.mark.anyio
