@@ -1,4 +1,5 @@
 import { copyFileSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
@@ -16,11 +17,17 @@ export default defineConfig(({ mode }) => ({
       "h264-mp4-encoder": fileURLToPath(new URL("./src/h264-mp4-encoder-stub.ts", import.meta.url)),
     },
   },
-  plugins: [viteSingleFile(), { name: "workspace-resource-aliases", closeBundle() {
-    if (mode === "smoke") return;
-    const directory = fileURLToPath(new URL("../../pdbe_mcp_server/ui/", import.meta.url));
-    for (const name of ["structure-explorer.html", "structure-comparison.html", "mvs-viewer.html"]) copyFileSync(`${directory}/workspace.html`, `${directory}/${name}`);
-  } }],
+  plugins: [viteSingleFile(), {
+    name: "workspace-resource-aliases",
+    writeBundle(options) {
+      if (mode === "smoke") return;
+      const directory = options.dir ?? fileURLToPath(new URL("../../pdbe_mcp_server/ui/", import.meta.url));
+      const source = resolve(directory, "workspace.html");
+      for (const name of ["structure-explorer.html", "structure-comparison.html", "mvs-viewer.html"]) {
+        copyFileSync(source, resolve(directory, name));
+      }
+    },
+  }],
   build: {
     rollupOptions: {
       input: mode === "smoke" ? "tests/mvs-host.html" : "workspace.html",
