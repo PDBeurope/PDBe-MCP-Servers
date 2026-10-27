@@ -10,6 +10,10 @@
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^2.0.3",
+    "@nightingale-elements/nightingale-manager": "5.11.0",
+    "@nightingale-elements/nightingale-navigation": "5.11.0",
+    "@nightingale-elements/nightingale-sequence": "5.11.0",
+    "@nightingale-elements/nightingale-track": "5.11.0",
     "molstar": "5.8.0",
     "molstar-mvs": "npm:molstar@5.13.1",
     "pdbe-molstar": "^3.12.0"

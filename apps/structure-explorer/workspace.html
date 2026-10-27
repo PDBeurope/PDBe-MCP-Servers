@@ -8,6 +8,7 @@
       <div class="header-title"><span class="eyebrow">Structural evidence</span><h1>Molecular Workspace</h1></div>
     </header>
     <section class="toolbar"><div><h1 id="title">Molecular view</h1><p id="pdb-ids" class="hint" hidden></p><p id="description"></p></div>
+      <button id="sequence-toggle" type="button" aria-pressed="true">Hide sequence</button>
       <button id="reset" type="button" disabled>Reset view</button>
       <button id="download" type="button" disabled>Save MVSJ</button>
     </section>
@@ -20,7 +21,22 @@
     </section>
     <p id="status" role="status" aria-live="polite">Waiting for a scene…</p>
     <div class="workspace-layout"><div id="story-layout">
+      <div class="viewer-sequence">
       <div id="viewer" aria-label="Interactive molecular structure"></div>
+      <section id="sequence-panel" aria-label="Linked protein sequence and annotation tracks" hidden>
+        <header class="sequence-header"><div><h2>Sequence &amp; annotations</h2><p class="hint">Sequence positions use the entity sequence; structural mapping uses label_seq_id. Missing coordinates remain selectable here.</p></div>
+          <label>Structure and chain <select id="sequence-chain"></select></label>
+        </header>
+        <div id="sequence-status" class="hint" role="status"></div>
+        <nightingale-manager id="sequence-manager" length="1" display-start="1" display-end="1" reflected-attributes="length,display-start,display-end,highlight">
+          <nightingale-navigation id="sequence-navigation" length="1" display-start="1" display-end="1" height="32" show-highlight></nightingale-navigation>
+          <nightingale-sequence id="nightingale-sequence" length="1" display-start="1" display-end="1" height="48"></nightingale-sequence>
+          <div id="sequence-tracks" aria-label="Sequence annotation tracks"></div>
+        </nightingale-manager>
+        <div class="sequence-actions"><button id="sequence-zoom-in" type="button" aria-label="Zoom in on sequence">Zoom in</button><button id="sequence-zoom-out" type="button" aria-label="Zoom out on sequence">Zoom out</button><button id="sequence-zoom-reset" type="button">Show full sequence</button><button id="sequence-focus" type="button" disabled>Focus in 3D</button><button id="sequence-clear" type="button" disabled>Clear selection</button><button id="sequence-show-all" type="button" disabled>Show all tracks</button><span id="sequence-detail" class="hint">Select a sequence position or annotation to inspect it.</span></div>
+        <div id="sequence-tooltip" class="sequence-tooltip" role="region" aria-label="Sequence selection details" hidden><div id="sequence-tooltip-content"></div><button id="sequence-tooltip-close" class="sequence-tooltip-close" type="button" aria-label="Close sequence details">×</button></div>
+      </section>
+      </div>
       <aside id="story-panel" aria-label="Story" hidden>
         <nav class="story-navigation" aria-label="Story scenes">
           <button id="story-prev" type="button" disabled>Previous</button>
@@ -33,7 +49,6 @@
     <aside id="workspace-panel" hidden>
       <h2>Layers</h2><p id="workspace-id" class="hint"></p>
       <div id="comparison-options" hidden>
-        <label><input id="show-annotations" type="checkbox" /> Residue annotations</label>
         <p id="optional-data-status" class="hint"></p>
       </div>
       <div id="layers"></div>
@@ -41,11 +56,6 @@
         <h3>Ligands</h3><label><input id="show-ligands" type="checkbox" /> Show ligands</label>
         <p id="ligand-status" class="hint"></p><div id="ligand-layers"></div>
       </section>
-      <div id="annotation-coverage" aria-label="Annotation group coverage"></div>
-      <details><summary>Browse residues</summary>
-        <label>Structure and chain <select id="residue-chain"></select></label><label>Find residue <input id="residue-filter" placeholder="Name or residue number" /></label>
-        <div id="residue-list"></div><p class="hint">Up to 100 matching residues. Selections retain label and author numbering and annotation evidence.</p>
-      </details>
       <button id="save-workspace" disabled>Save workspace</button>
       <label>Restore workspace <input id="restore-workspace" type="file" accept="application/json,.json" /></label>
     </aside></div>

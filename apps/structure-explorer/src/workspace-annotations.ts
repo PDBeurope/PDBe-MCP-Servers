@@ -82,6 +82,50 @@ export function annotationGroups(scene: WorkspaceScene): AnnotationGroup[] {
   return groups.sort((a, b) => priority(a) - priority(b));
 }
 export interface FetchedStructure { structureId: string; scene: WorkspaceScene }
+export interface FetchedAnnotations {
+  structureId: string; pdb_id: string; annotations: Annotation[]; layers: WorkspaceLayer[];
+  data_status?: "loaded" | "unavailable"; data_sources?: string[];
+}
+/** Merge annotation-only results without returning or replacing a compiled scene. */
+export function mergeOptionalAnnotations(base: WorkspaceScene, fetched: FetchedAnnotations[], visible: boolean): WorkspaceScene {
+  const scene = structuredClone(base);
+  for (const result of fetched) {
+    const target = scene.structures.find(structure => structure.id === result.structureId);
+    if (!target || target.pdb_id.toLowerCase() !== result.pdb_id.toLowerCase()) {
+      throw new Error("Optional annotations do not match the intended structure");
+    }
+    const allowedChains = new Set(target.chains?.map(chain => chain.label_asym_id));
+    target.annotations = uniqueAnnotations(result.annotations.map(feature => ({ ...feature,
+      segments: feature.segments.filter(segment => !scene.comparison || allowedChains.has(segment.label_asym_id)),
+    })).filter(feature => feature.segments.length));
+    target.data_status = { ...target.data_status, annotations: result.data_status ?? "loaded" };
+    target.data_sources = [...new Set([...(target.data_sources ?? []), ...(result.data_sources ?? [])])];
+    const annotationIds = new Set(target.annotations.map(feature => feature.id));
+    for (const incoming of result.layers.filter(layer => layerCategory(layer) === "annotations")) {
+      if (incoming.source_annotation_ids?.length && !incoming.source_annotation_ids.some(id => annotationIds.has(id))) continue;
+      if (incoming.source_annotation_id && !annotationIds.has(incoming.source_annotation_id)) continue;
+      const layer = structuredClone(incoming);
+      if (scene.comparison && layer.component) {
+        const selectors = layer.component["selector"];
+        if (Array.isArray(selectors)) {
+          const selected = selectors.filter(selector => allowedChains.has(String(selector.label_asym_id)));
+          if (!selected.length) continue;
+          layer.component["selector"] = selected;
+        }
+      }
+      let id = `${target.id}-${incoming.id}`;
+      const existing = scene.layers.find(item => item.id === id);
+      if (existing && layerCategory(existing) === "annotations") continue;
+      let suffix = 1;
+      while (scene.layers.some(item => item.id === id)) id = `${target.id}-${incoming.id}-${suffix++}`;
+      scene.layers.push({ ...layer, id, structure_id: target.id, name: `${target.pdb_id.toUpperCase()} · ${layer.name}`, visible });
+    }
+  }
+  for (const layer of scene.layers) if (layerCategory(layer) === "annotations") {
+    layer.visible = visible && !isLigandAnnotationLayer(scene, layer);
+  }
+  return scene;
+}
 /** Enrich metadata via a complete scene upsert: keep coordinates, transforms and correspondence intact. */
 export function mergeOptionalScene(base: WorkspaceScene, fetched: FetchedStructure[], kind: OptionalData, visible: boolean): WorkspaceScene {
   const scene = structuredClone(base);

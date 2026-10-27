@@ -639,6 +639,32 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 },
             ),
             types.Tool(
+                name="pdbe_load_structure_annotations",
+                description=(
+                    "Load PDBe-supplied residue annotations for an already open PDB entry. "
+                    "Returns normalized annotation records and their visual track layers only; "
+                    "it does not return coordinates or rebuild the molecular scene."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "pdb_id": {
+                            "type": "string",
+                            "pattern": "^[1-9][A-Za-z0-9]{3}$",
+                            "description": "Four-character PDB accession, e.g. 4hhb",
+                        }
+                    },
+                    "required": ["pdb_id"],
+                    "additionalProperties": False,
+                },
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=True
+                ),
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                },
+            ),
+            types.Tool(
                 name="pdbe_ligand_interactions",
                 description=(
                     "Explore PDBe-reported interactions for an exact ligand instance in the shared Molecular Workspace. "
@@ -685,6 +711,64 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     isError=True,
                     content=[types.TextContent(type="text", text=str(error))],
                 )
+            operations = arguments.get("operations", [])
+            if operations and all(
+                operation.get("op") == "set_visibility" for operation in operations
+            ):
+                return types.CallToolResult(
+                    content=[
+                        types.TextContent(
+                            type="text",
+                            text="Workspace layer visibility updated.",
+                        )
+                    ],
+                    structuredContent={"status": "visibility_updated"},
+                    _meta={
+                        "visibility_update": {
+                            "workspace_id": data["workspace"]["id"],
+                            "revision": data["workspace"]["revision"],
+                        },
+                        # The App already holds the complete workspace and scene
+                        # metadata. Only the rebuilt MVSJ is needed to render the
+                        # changed visibility, avoiding a large workspace echo.
+                        "mvsj": data["mvsj"],
+                    },
+                )
+            if (
+                arguments.get("compact_response")
+                and operations
+                and all(
+                    operation.get("op") == "upsert_scene" for operation in operations
+                )
+            ):
+                return types.CallToolResult(
+                    content=[
+                        types.TextContent(
+                            type="text",
+                            text="Molecular workspace updated and compiled.",
+                        )
+                    ],
+                    structuredContent={"status": "workspace_updated"},
+                    _meta={
+                        "workspace_update": {
+                            "workspace_id": data["workspace"]["id"],
+                            "revision": data["workspace"]["revision"],
+                        },
+                        # The App already applied the scene operation locally.
+                        # Return only the compiled view. The normalized builder,
+                        # source list, and workspace duplicate large metadata.
+                        "mvs": {
+                            "version": data["version"],
+                            "mvsj": data["mvsj"],
+                            "warnings": data["warnings"],
+                            **(
+                                {"coordinate_url": data["coordinate_url"]}
+                                if data.get("coordinate_url")
+                                else {}
+                            ),
+                        },
+                    },
+                )
             return types.CallToolResult(
                 content=[
                     types.TextContent(
@@ -693,11 +777,13 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     )
                 ],
                 structuredContent={
-                    "workspace": data["workspace"],
                     "status": "compiled",
                     "render_status": "pending",
                 },
-                _meta={"workspace": data["workspace"], "mvs": data},
+                # Keep the workspace in one place. `data` already carries it;
+                # returning parallel copies in structuredContent and _meta
+                # needlessly multiplies large annotation-rich responses.
+                _meta={"mvs": data},
             )
         if name == "pdbe_ligand_interactions":
             if not UI_FILE.is_file():
@@ -995,6 +1081,47 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     "mvs": rendered,
                 },
             )
+        if name == "pdbe_load_structure_annotations":
+            try:
+                data = await get_structure_data(
+                    {"pdb_id": arguments.get("pdb_id", "")},
+                    generator,
+                    include_annotations=True,
+                    include_ligands=False,
+                )
+                workspace_data = workspace_from_structure(data).model_dump(
+                    mode="json", by_alias=True, exclude_none=True
+                )
+                scene = workspace_data["scenes"][0]
+                layers = [
+                    layer
+                    for layer in scene["layers"]
+                    if layer.get("category") == "source_annotation"
+                ]
+            except ValueError as error:
+                return types.CallToolResult(
+                    isError=True,
+                    content=[types.TextContent(type="text", text=str(error))],
+                )
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text=(
+                            f"Loaded {len(data['annotations'])} annotation features for "
+                            f"{data['pdb_id'].upper()}."
+                        ),
+                    )
+                ],
+                structuredContent={
+                    "pdb_id": data["pdb_id"],
+                    "annotations": data["annotations"],
+                    "layers": layers,
+                    "data_status": data["data_status"]["annotations"],
+                    "data_sources": data["sources"],
+                    "warnings": data["warnings"],
+                },
+            )
         if name != "pdbe_open_structure":
             raise ValueError(f"Unknown tool name: {name}")
         if not UI_FILE.is_file():
@@ -1055,15 +1182,17 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
             text += "\n" + "\n".join(data["warnings"])
         workspace = workspace_from_structure(data)
         rendered = await run_blocking_tool(lambda: compile_workspace(workspace))
-        compact["workspace"] = rendered["workspace"]
+        mvs_payload = {
+            key: value for key, value in rendered.items() if key != "workspace"
+        }
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=text)],
             structuredContent=compact,
-            # Full residue lists go to the app without consuming model context.
+            # The App needs the workspace and compiled scene, but not a third copy
+            # of the same annotation and residue metadata.
             _meta={
-                "structure": data,
                 "workspace": rendered["workspace"],
-                "mvs": rendered,
+                "mvs": mvs_payload,
             },
         )
 

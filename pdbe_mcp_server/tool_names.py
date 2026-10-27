@@ -15,7 +15,9 @@ _ListToolsCallback = (
 )
 _CURATED_NAMES = {
     "pdbe_update_workspace": "update_workspace",
+    "pdbe_set_sequence_tracks": "set_sequence_tracks",
     "pdbe_open_structure": "open_structure",
+    "pdbe_load_structure_annotations": "load_structure_annotations",
     "pdbe_compare_structures": "compare_structures",
     "pdbe_ligand_interactions": "ligand-interactions",
     "pdbe_build_mvs": "build_mvs",

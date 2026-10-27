@@ -3,14 +3,32 @@ import type { Viewer } from "molstar-mvs/lib/apps/viewer/app.js";
 import { createWorkspaceViewer, displayedStructure } from "./workspace-renderer";
 import { residuePositions, attachLayerRefs, coordinateInventory, type SceneNode } from "./workspace-capabilities";
 import { validateEnvelope, checkRevision, type Workspace, type WorkspaceOperation } from "./workspace";
-import { annotationsAt, detailText } from "./annotations";
-import { annotationGroups, isLigandAnnotationLayer, ligandLayerLabel, layerCategory, mergeOptionalScene, type OptionalData } from "./workspace-annotations";
+import { annotationsAt } from "./annotations";
+import { isLigandAnnotationLayer, ligandLayerLabel, layerCategory, mergeOptionalAnnotations, mergeOptionalScene, type FetchedAnnotations, type FetchedStructure, type OptionalData } from "./workspace-annotations";
 import { comparisonCsv } from "./comparison";
+import { linkedSequence, observedTrack, annotationTrackGroups, type LinkedSequence, type SequenceResidue, type NightingaleFeature } from "./sequence-link";
+import NightingaleManager from "@nightingale-elements/nightingale-manager";
+import NightingaleSequence from "@nightingale-elements/nightingale-sequence";
+import NightingaleTrack from "@nightingale-elements/nightingale-track";
+import NightingaleNavigation from "@nightingale-elements/nightingale-navigation";
 import { StructureElement, StructureProperties } from "molstar-mvs/lib/mol-model/structure.js";
 import { OrderedSet } from "molstar-mvs/lib/mol-data/int.js";
 import type { UnitIndex } from "molstar-mvs/lib/mol-model/structure/structure/element/util.js";
+import type { Structure } from "molstar-mvs/lib/mol-model/structure/structure.js";
 import "./mvs.css";
 import "./workspace.css";
+
+// Keep these constructors live through bundling: Nightingale packages declare
+// sideEffects:false, but their custom-element registration happens at import time.
+const nightingaleElements: [string, CustomElementConstructor][] = [
+  ["nightingale-manager", NightingaleManager],
+  ["nightingale-sequence", NightingaleSequence],
+  ["nightingale-track", NightingaleTrack],
+  ["nightingale-navigation", NightingaleNavigation],
+];
+for (const [name, element] of nightingaleElements) {
+  if (!customElements.get(name)) customElements.define(name, element);
+}
 
 interface LegendItem {
   label: string;
@@ -67,6 +85,20 @@ let inventories = new Map<string, ReturnType<typeof coordinateInventory>>();
 let ligandData: LigandData | undefined;
 let contactObjectUrl: string | undefined;
 let ligandWorkspaceSnapshot: Workspace | undefined;
+let sequenceMap: LinkedSequence | undefined;
+let sequenceStructureId: string | undefined;
+let sequenceCoordinates: Structure | undefined;
+let sequencePdbId: string | undefined;
+let sequenceAnnotations: import("./annotations").Annotation[] = [];
+let sequenceCommittedPositions: number[] = [];
+let sequenceTrackFeaturePositions = new Map<string, number[]>();
+let sequenceTrackFeatureAnnotations = new Map<string, import("./annotations").Annotation>();
+let sequenceTooltipTarget: HTMLElement | undefined;
+let sequenceTooltipPinned = false;
+let sequenceVisible = true;
+let sequenceTargetsByValue = new Map<string, { structureId: string; pdbId: string; structure: Structure; chainId: string; authChainId: string; sequence: LinkedSequence }>();
+let sequenceTrackCatalog: { id: string; label: string; feature_count: number }[] = [];
+let sequenceTrackSelection: Set<string> | undefined;
 
 function activeWorkspaceScene() {
   const key = viewer?.plugin.managers.snapshot.current?.key;
@@ -88,7 +120,7 @@ function renderWorkspaceControls() {
   el("ligand-layers").replaceChildren();
   if (!active) { workspaceControls(); return; }
   const options = el("comparison-options"); options.hidden = !active.comparison;
-  for (const [kind, id] of [["ligands", "show-ligands"], ["annotations", "show-annotations"]] as const) {
+  for (const [kind, id] of [["ligands", "show-ligands"]] as const) {
     const input = el<HTMLInputElement>(id), layers = active.layers.filter(layer => layerCategory(layer) === kind && !isLigandAnnotationLayer(active, layer));
     input.checked = layers.some(layer => layer.visible);
     input.indeterminate = input.checked && layers.some(layer => !layer.visible);
@@ -103,7 +135,6 @@ function renderWorkspaceControls() {
     ? "Deposited molecules. Label and author chain identifiers may differ."
     : ligandDataLoaded ? "No deposited ligand molecules are available in this workspace."
     : "Enable Show ligands to load deposited molecules into this workspace.";
-  renderAnnotationCoverage();
   for (const layer of active.layers) {
     // Source tracks have one annotation summary rather than hundreds of repeated layer rows.
     if (layerCategory(layer) === "annotations") continue;
@@ -122,7 +153,7 @@ function renderWorkspaceControls() {
     label.append(checkbox, document.createTextNode(ligand ? ligandLayerLabel(active, layer) : `${layer.name} · ${layer.kind.replaceAll("_", " ")}`), focus);
     el(ligand ? "ligand-layers" : "layers").append(label);
   }
-  renderResidueBrowser(); workspaceControls();
+  workspaceControls();
 }
 
 function availableLigands(structure?: import("./workspace").WorkspaceStructure) {
@@ -131,37 +162,326 @@ function availableLigands(structure?: import("./workspace").WorkspaceStructure) 
 function availableChains(structure?: import("./workspace").WorkspaceStructure) {
   return structure?.chains?.some(chain => chain.residues?.length) ? structure.chains : inventories.get(`${activeWorkspaceScene()?.id}/${structure?.id}`)?.chains ?? [];
 }
-function renderResidueBrowser() {
-  const active = activeWorkspaceScene(), select = el<HTMLSelectElement>("residue-chain");
-  const previous = select.value; select.replaceChildren();
-  active?.structures.forEach(structure => availableChains(structure).forEach(chain => {
-    if (chain.residues?.length) select.add(new Option(`${structure.pdb_id.toUpperCase()} · label ${chain.label_asym_id} / author ${chain.auth_asym_id}`, `${structure.id}/${chain.label_asym_id}`));
-  }));
-  if ([...select.options].some(option => option.value === previous)) select.value = previous;
-  renderResidues();
+
+function sequenceTargets() {
+  const targets: { value: string; structureId: string; pdbId: string; structure: Structure; chainId: string; authChainId: string; sequence: LinkedSequence }[] = [];
+  const active = activeWorkspaceScene();
+  if (active && viewer) {
+    for (const definition of active.structures) {
+      const structure = displayedStructure(viewer, definition.id);
+      if (!structure) continue;
+      for (const chain of availableChains(definition)) {
+        const sequence = linkedSequence(structure, chain.label_asym_id);
+        if (sequence) targets.push({ value: JSON.stringify([definition.id, chain.label_asym_id]), structureId: definition.id,
+          pdbId: definition.pdb_id, structure, chainId: chain.label_asym_id, authChainId: chain.auth_asym_id, sequence });
+      }
+    }
+  } else if (viewer) {
+    for (const ref of viewer.plugin.managers.structure.hierarchy.current.structures) {
+      const structure = ref.cell.obj?.data;
+      if (!structure) continue;
+      const inventory = coordinateInventory(structure);
+      for (const chain of inventory.chains) {
+        const sequence = linkedSequence(structure, chain.label_asym_id);
+        if (sequence) targets.push({ value: JSON.stringify([ref.cell.transform.ref, chain.label_asym_id]),
+          structureId: ref.cell.transform.ref, pdbId: currentScene()?.builder.pdb_id ?? scene?.builder?.pdb_id ?? "", structure,
+          chainId: chain.label_asym_id, authChainId: chain.auth_asym_id, sequence });
+      }
+    }
+  }
+  return targets;
 }
-function renderResidues() {
-  const [id, chainId] = el<HTMLSelectElement>("residue-chain").value.split("/");
-  const structure = activeWorkspaceScene()?.structures.find(s => s.id === id);
-  const chain = availableChains(structure).find(c => c.label_asym_id === chainId);
-  const query = el<HTMLInputElement>("residue-filter").value.trim().toLowerCase();
-  const list = el("residue-list"); list.replaceChildren();
-  (chain?.residues ?? []).filter(r => `${r.comp_id} ${r.label_seq_id} ${r.auth_seq_id}${r.insertion_code}`.toLowerCase().includes(query)).slice(0, 100).forEach(residue => {
-    const button = document.createElement("button"); button.type = "button";
-    button.textContent = `${residue.comp_id} · label ${residue.label_seq_id} / author ${residue.auth_seq_id}${residue.insertion_code}`;
-    button.addEventListener("click", () => {
-      if (!viewer || !structure || !chain) return;
-      const coordinates = displayedStructure(viewer, structure.id);
-      const points = coordinates ? residuePositions(coordinates, chain.label_asym_id, residue.label_seq_id) : [];
-      if (points.length) viewer.plugin.managers.camera.focusSpheres(points, center => ({ center, radius: 2 }), { minRadius: 8 });
-      const evidence = annotationsAt(structure.annotations ?? [], chain.label_asym_id, residue.label_seq_id);
-      selectionContext = { structure_id: structure.id, pdb_id: structure.pdb_id, ...residue,
-        label_asym_id: chain.label_asym_id, auth_asym_id: chain.auth_asym_id, annotations: evidence };
-      el("selection").textContent = `${button.textContent}${points.length ? "" : " · coordinates unavailable"}${evidence.length ? " · " + evidence.map(e => `${e.feature.source}: ${e.feature.name}`).join("; ") : ""}`;
-      void publish({ status: "selection", selection: selectionContext });
-    });
-    list.append(button);
-  });
+
+function setSequenceHighlight(positions: number[]) {
+  const ranges: string[] = [];
+  for (const position of [...new Set(positions)].sort((a, b) => a - b)) {
+    const previous = ranges.at(-1)?.split(":").map(Number);
+    if (previous && previous[1] + 1 === position) ranges[ranges.length - 1] = `${previous[0]}:${position}`;
+    else ranges.push(`${position}:${position}`);
+  }
+  const manager = el<HTMLElement>("sequence-manager");
+  if (ranges.length) manager.setAttribute("highlight", ranges.join(","));
+  else manager.removeAttribute("highlight");
+}
+
+function sequenceLoci(positions: number[]) {
+  if (!sequenceCoordinates || !sequenceMap || !positions.length) return undefined;
+  const selected = new Set(positions);
+  const elements: { unit: (typeof sequenceCoordinates.units)[number]; indices: UnitIndex[] }[] = [];
+  for (const unit of sequenceCoordinates.units) {
+    if (unit.kind !== 0) continue;
+    const h = unit.model.atomicHierarchy, indices: UnitIndex[] = [];
+    for (let offset = 0; offset < unit.elements.length; offset++) {
+      const atom = unit.elements[offset], residue = h.residueAtomSegments.index[atom], chain = h.chainAtomSegments.index[atom];
+      if (h.chains.label_asym_id.value(chain) === sequenceMap.label_asym_id
+        && selected.has(h.residues.label_seq_id.value(residue))) indices.push(offset as UnitIndex);
+    }
+    if (indices.length) elements.push({ unit, indices });
+  }
+  return elements.length ? StructureElement.Loci(sequenceCoordinates, elements.map(item => ({
+    unit: item.unit, indices: OrderedSet.ofSortedArray(item.indices),
+  }))) : undefined;
+}
+
+function showSequenceTooltip(positions: number[], annotation?: import("./annotations").Annotation, target?: HTMLElement, pinned = false) {
+  const tooltip = el("sequence-tooltip");
+  if (positions.length && sequenceTooltipPinned && !pinned) return;
+  sequenceTooltipTarget?.removeAttribute("aria-describedby");
+  sequenceTooltipTarget = target;
+  sequenceTooltipPinned = pinned && positions.length > 0;
+  if (sequenceTooltipTarget) sequenceTooltipTarget.setAttribute("aria-describedby", "sequence-tooltip");
+  const tooltipContent = el("sequence-tooltip-content");
+  if (!sequenceMap || !positions.length) { tooltip.hidden = true; tooltipContent.textContent = ""; return; }
+  const matched = positions.map(position => sequenceMap!.residues.find(residue => residue.position === position)).filter((residue): residue is SequenceResidue => !!residue);
+  const range = positions.length === 1 ? `Residue ${positions[0]}` : `Residues ${Math.min(...positions)}–${Math.max(...positions)} (${positions.length} mapped positions)`;
+  const labels = matched.slice(0, 8).map(residue => `${residue.letter} ${residue.comp_id} · author ${residue.auth_seq_id}${residue.insertion_code} · ${residue.has_coordinates ? "coordinates present" : "no coordinates"}`);
+  const annotations = annotation ? [annotation] : [...new Set(sequenceAnnotations.filter(item => item.segments.some(segment => segment.label_asym_id === sequenceMap!.label_asym_id
+    && positions.some(position => segment.start <= position && position <= segment.end))))];
+  const annotationText = annotations.map(item => `${item.source} · ${item.name}${item.accession ? ` (${item.accession})` : ""}${item.description ? `: ${item.description}` : ""}`).join("; ");
+  tooltipContent.textContent = [annotationText || "Sequence selection", range, labels.join("; "), matched.length > 8 ? `…and ${matched.length - 8} more` : ""]
+    .filter(Boolean).join(" — ");
+  tooltip.hidden = false;
+  if (target) {
+    const bounds = target.getBoundingClientRect();
+    const width = Math.min(440, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(bounds.left, window.innerWidth - width - 12));
+    const height = tooltip.getBoundingClientRect().height;
+    const top = bounds.bottom + 8 + height < window.innerHeight ? bounds.bottom + 8 : Math.max(12, bounds.top - height - 8);
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  } else {
+    tooltip.style.left = "12px";
+    tooltip.style.top = "auto";
+  }
+}
+
+function selectSequencePositions(positions: number[], source: string, annotation?: import("./annotations").Annotation, tooltipTarget?: HTMLElement, contextExtras?: Record<string, unknown>) {
+  if (!sequenceMap || !sequenceStructureId || !sequenceCoordinates) return;
+  const valid = [...new Set(positions)].filter(position => position >= 1 && position <= sequenceMap!.sequence.length);
+  if (!valid.length) return;
+  sequenceCommittedPositions = valid;
+  setSequenceHighlight(valid);
+  const matched = valid.map(position => sequenceMap!.residues.find(residue => residue.position === position)).filter((residue): residue is SequenceResidue => !!residue);
+  const evidence = sequenceAnnotations.filter(feature => feature.segments.some(segment => segment.label_asym_id === sequenceMap!.label_asym_id
+    && valid.some(position => segment.start <= position && position <= segment.end)));
+  selectionContext = matched.length === 1
+    ? { structure_id: sequenceStructureId, pdb_id: sequencePdbId, ...matched[0], label_asym_id: sequenceMap.label_asym_id,
+      auth_asym_id: sequenceMap.auth_asym_id, annotations: annotationsAt(sequenceAnnotations, sequenceMap.label_asym_id, matched[0].label_seq_id) }
+    : { structure_id: sequenceStructureId, pdb_id: sequencePdbId, label_asym_id: sequenceMap.label_asym_id,
+      auth_asym_id: sequenceMap.auth_asym_id, selected_positions: valid,
+      residues_with_coordinates: matched.filter(residue => residue.has_coordinates).length,
+      annotations: evidence, selected_residues: matched };
+  if (contextExtras) selectionContext = { ...selectionContext, ...contextExtras };
+  const coordinates = valid.flatMap(position => residuePositions(sequenceCoordinates!, sequenceMap!.label_asym_id, position));
+  const loci = sequenceLoci(valid);
+  if (viewer) {
+    if (loci) viewer.plugin.managers.interactivity.lociSelects.selectOnly({ loci });
+    else viewer.plugin.managers.interactivity.lociSelects.deselectAll();
+  }
+  if (source === "focus" && coordinates.length && viewer) viewer.plugin.managers.camera.focusSpheres(coordinates, center => ({ center, radius: 2 }), { minRadius: 8 });
+  const missing = matched.filter(residue => !residue.has_coordinates).length;
+  const evidenceLabels = [...new Set(evidence.map(feature => `${feature.source}: ${feature.name}`))];
+  el("sequence-detail").textContent = `${valid.length === 1 ? `${matched[0]?.letter ?? "?"} · label position ${valid[0]}` : `${valid.length} selected residues`}${missing ? ` · ${missing} without coordinates` : ""}${evidenceLabels.length ? ` · ${evidenceLabels.join("; ")}` : ""}`;
+  showSequenceTooltip(valid, annotation, tooltipTarget, true);
+  el<HTMLButtonElement>("sequence-focus").disabled = !coordinates.length;
+  el<HTMLButtonElement>("sequence-clear").disabled = false;
+  el("selection").textContent = typeof selectionContext.auth_seq_id === "number"
+    ? `${matched[0].comp_id} · author chain ${sequenceMap.auth_asym_id} residue ${matched[0].auth_seq_id}${matched[0].insertion_code} · label chain ${sequenceMap.label_asym_id} residue ${matched[0].label_seq_id}${missing ? " · coordinates unavailable" : ""}`
+    : `${valid.length} residues selected · label chain ${sequenceMap.label_asym_id}${missing ? ` · ${missing} without coordinates` : ""}`;
+  workspaceControls();
+  void publish({ status: "selection", selection: selectionContext });
+}
+
+function renderDynamicSequenceTracks(sequence: LinkedSequence) {
+  const container = el("sequence-tracks"); container.replaceChildren();
+  sequenceTrackFeaturePositions = new Map();
+  sequenceTrackFeatureAnnotations = new Map();
+  const palette = ["#16856a", "#d47532", "#6a76b8", "#c76b78", "#527fc1", "#9473bc", "#609c5d"];
+  const dataGroups: { id: string; label: string; features: NightingaleFeature[] }[] = [];
+  const observed = observedTrack(sequence);
+  const annotationGroups = annotationTrackGroups(sequenceAnnotations, sequence.label_asym_id, sequence.residues.length);
+  const category = (group: typeof annotationGroups[number]) => {
+    const matching = group.features.map(feature => sequenceAnnotations.find(annotation => annotation.id === feature.accession)).filter((annotation): annotation is import("./annotations").Annotation => !!annotation);
+    const text = matching.map(annotation => `${annotation.source} ${annotation.kind} ${annotation.accession} ${annotation.name} ${annotation.description}`).join(" ").toLowerCase();
+    if (/uniprot/.test(text) && !/domain/.test(text)) return 0;
+    if (/domain/.test(text)) return 2;
+    if (/\bkb\b|knowledge.?base/.test(text) || matching.some(annotation => /^annotations?$/i.test(annotation.kind.trim()))) return 3;
+    return -1;
+  };
+  const selectedGroups = annotationGroups.filter(group => category(group) >= 0)
+    .sort((a, b) => category(a) - category(b) || a.label.localeCompare(b.label));
+  dataGroups.push(...selectedGroups.filter(group => category(group) === 0));
+  if (observed.length) dataGroups.push({ id: "observed_residues", label: "Observed residues", features: observed });
+  dataGroups.push(...selectedGroups.filter(group => category(group) === 2 || category(group) === 3));
+  sequenceTrackCatalog = dataGroups.map(group => ({ id: group.id, label: group.label, feature_count: group.features.length }));
+  const shownGroups = sequenceTrackSelection ? dataGroups.filter(group => sequenceTrackSelection!.has(group.id)) : dataGroups;
+  el<HTMLButtonElement>("sequence-show-all").disabled = !sequenceTrackSelection;
+  for (const [index, group] of shownGroups.entries()) {
+    const heading = document.createElement("div"); heading.className = "sequence-track-header";
+    const title = document.createElement("h3"); title.textContent = group.label;
+    title.className = "sequence-track-title"; heading.append(title);
+    if (group.id !== "observed_residues") {
+      const annotationIds = new Set(group.features.map(feature => feature.accession));
+      const active = activeWorkspaceScene();
+      const matchingLayers = active?.layers.filter(layer => layerCategory(layer) === "annotations"
+        && layer.structure_id === sequenceStructureId
+        && (layer.source_annotation_ids?.some(id => annotationIds.has(id))
+          || (!!layer.source_annotation_id && annotationIds.has(layer.source_annotation_id)))) ?? [];
+      const enabled = matchingLayers.length > 0 && matchingLayers.every(layer => layer.visible);
+      const toggle = document.createElement("button");
+      toggle.type = "button"; toggle.className = "sequence-track-3d-toggle";
+      toggle.textContent = enabled ? "Hide in 3D" : "Show in 3D";
+      toggle.disabled = matchingLayers.length === 0 || updating;
+      toggle.setAttribute("aria-pressed", String(enabled));
+      toggle.title = matchingLayers.length ? `Toggle ${group.label} annotation overlay in Mol*` : "No matching 3D annotation layer is available";
+      toggle.addEventListener("click", () => {
+        if (!active) return;
+        const visible = !matchingLayers.every(layer => layer.visible);
+        void mutate(matchingLayers.map(layer => ({ op: "set_visibility" as const, scene_id: active.id, target_id: layer.id, visible })));
+      });
+      heading.append(toggle);
+    }
+    const track = document.createElement("nightingale-track") as HTMLElement & { data: NightingaleFeature[] };
+    track.setAttribute("length", String(sequence.residues.length)); track.setAttribute("height", "42");
+    track.setAttribute("display-start", "1"); track.setAttribute("display-end", String(sequence.residues.length));
+    track.setAttribute("layout", "non-overlapping"); track.setAttribute("aria-label", group.label);
+    track.setAttribute("color", palette[index % palette.length]);
+    const paintedFeatures: NightingaleFeature[] = [];
+    for (const feature of group.features) {
+      const annotation = sequenceAnnotations.find(item => item.id === feature.accession);
+      const fragments = feature.locations.flatMap(location => location.fragments);
+      fragments.forEach((fragment, fragmentIndex) => {
+        const accession = fragments.length > 1 ? `${feature.accession}::segment-${fragmentIndex + 1}` : feature.accession;
+        paintedFeatures.push({ ...feature, accession, locations: [{ fragments: [fragment] }] });
+        sequenceTrackFeaturePositions.set(accession, Array.from({ length: fragment.end - fragment.start + 1 }, (_, index) => fragment.start + index));
+        if (annotation) sequenceTrackFeatureAnnotations.set(accession, annotation);
+      });
+    }
+    track.data = paintedFeatures;
+    container.append(heading, track);
+  }
+  const structure = activeWorkspaceScene()?.structures.find(item => item.id === sequenceStructureId);
+  if (!sequenceAnnotations.length && structure?.data_status?.annotations !== "loaded" && structure?.data_status?.annotations !== "unavailable") {
+    const load = document.createElement("button");
+    load.type = "button"; load.className = "sequence-load-annotations";
+    load.textContent = "Load annotations";
+    load.disabled = updating;
+    load.addEventListener("click", () => { void toggleOptional("annotations", false, true); });
+    container.append(load);
+  }
+  el("sequence-status").textContent = dataGroups.length
+    ? `${sequence.residues.length} entity sequence positions · ${sequence.residues.filter(residue => residue.has_coordinates).length} with coordinates · ${sequenceTrackSelection ? `showing ${shownGroups.length} of ${dataGroups.length} available tracks` : `showing ${dataGroups.length} available tracks`}. Ask the assistant to select tracks for a question.`
+    : structure?.data_status?.annotations === "unavailable" ? "No sequence tracks or annotation data are available for this chain."
+    : "No sequence tracks are available for this chain.";
+}
+
+function renderSequencePanel() {
+  if (!viewer || disposed || scene?.story) {
+    el("sequence-panel").hidden = true; sequenceMap = undefined; sequenceCoordinates = undefined; sequenceTrackCatalog = [];
+    sequenceTargetsByValue = new Map(); return;
+  }
+  const targets = sequenceTargets();
+  sequenceTargetsByValue = new Map(targets.map(target => [target.value, target]));
+  const select = el<HTMLSelectElement>("sequence-chain"), previous = select.value;
+  select.replaceChildren(...targets.map(target => new Option(
+    `${target.pdbId.toUpperCase()} · label ${target.chainId} / author ${target.authChainId} · ${target.sequence.residues.length} residues`, target.value)));
+  if (!targets.length) {
+    el("sequence-panel").hidden = true; sequenceMap = undefined; sequenceCoordinates = undefined; sequenceTrackCatalog = [];
+    sequenceTargetsByValue = new Map(); return;
+  }
+  el("sequence-panel").hidden = !sequenceVisible;
+  el<HTMLButtonElement>("sequence-toggle").textContent = sequenceVisible ? "Hide sequence" : "Show sequence";
+  el<HTMLButtonElement>("sequence-toggle").setAttribute("aria-pressed", String(sequenceVisible));
+  select.value = targets.some(target => target.value === previous) ? previous : targets[0].value;
+  const target = sequenceTargetsByValue.get(select.value)!;
+  sequenceStructureId = target.structureId; sequenceCoordinates = target.structure; sequencePdbId = target.pdbId;
+  sequenceMap = target.sequence;
+  const definition = activeWorkspaceScene()?.structures.find(structure => structure.id === target.structureId);
+  sequenceAnnotations = definition?.annotations ?? [];
+  const manager = el<HTMLElement>("sequence-manager");
+  for (const element of [el<HTMLElement>("sequence-navigation"), el<HTMLElement>("nightingale-sequence")]) {
+    element.setAttribute("length", String(target.sequence.residues.length));
+    element.setAttribute("display-start", "1"); element.setAttribute("display-end", String(target.sequence.residues.length));
+  }
+  manager.setAttribute("length", String(target.sequence.residues.length));
+  manager.setAttribute("display-start", "1"); manager.setAttribute("display-end", String(target.sequence.residues.length));
+  const sequenceElement = el<HTMLElement>("nightingale-sequence") as HTMLElement & { sequence: string };
+  sequenceElement.sequence = target.sequence.sequence;
+  renderDynamicSequenceTracks(target.sequence);
+  setSequenceHighlight(sequenceCommittedPositions);
+}
+
+function clearSequenceHover() {
+  setSequenceHighlight(sequenceCommittedPositions);
+  viewer?.plugin.managers.interactivity.lociHighlights.clearHighlights();
+  if (!sequenceTooltipPinned) showSequenceTooltip([]);
+}
+
+function hoverSequencePositions(positions: number[]) {
+  if (!sequenceMap) return;
+  setSequenceHighlight(positions);
+  const loci = sequenceLoci(positions);
+  if (loci && viewer) viewer.plugin.managers.interactivity.lociHighlights.highlightOnly({ loci });
+  else viewer?.plugin.managers.interactivity.lociHighlights.clearHighlights();
+}
+
+function handleNightingaleChange(event: Event) {
+  const detail = (event as CustomEvent<{ eventType?: string; feature?: { position?: number; accession?: string; start?: number; end?: number } | null; target?: HTMLElement; "display-start"?: number; "display-end"?: number }>).detail;
+  if (!detail) return;
+  if (!detail.eventType) {
+    if (typeof detail["display-start"] === "number" && typeof detail["display-end"] === "number" && sequenceMap) {
+      const start = Math.max(1, Math.ceil(detail["display-start"]));
+      const end = Math.min(sequenceMap.residues.length, Math.floor(detail["display-end"]));
+      if (end >= start) showSequenceTooltip(Array.from({ length: end - start + 1 }, (_, index) => start + index), undefined, el("sequence-navigation"), true);
+    }
+    return;
+  }
+  if (detail.eventType === "mouseout") { clearSequenceHover(); return; }
+  const feature = detail.feature;
+  // Nightingale v5 reports the feature and clicked SVG target separately. For
+  // disjoint annotations the SVG datum is the exact painted fragment.
+  const painted = (detail.target as (HTMLElement & { __data__?: { start?: number; end?: number } }) | undefined)?.__data__;
+  const start = painted?.start ?? feature?.start;
+  const end = painted?.end ?? feature?.end ?? start;
+  const positions = typeof feature?.position === "number" ? [feature.position]
+    : typeof start === "number" ? Array.from({ length: Math.max(1, (end ?? start) - start + 1) }, (_, index) => start + index)
+    : feature?.accession ? sequenceTrackFeaturePositions.get(feature.accession) ?? [] : [];
+  if (detail.eventType === "mouseover") {
+    if (positions.length) {
+      hoverSequencePositions(positions);
+      const annotation = feature?.accession ? sequenceTrackFeatureAnnotations.get(feature.accession) : undefined;
+      showSequenceTooltip(positions, annotation, detail.target);
+    }
+    return;
+  }
+  if (detail.eventType === "click" && positions.length) {
+    const annotation = feature?.accession ? sequenceTrackFeatureAnnotations.get(feature.accession) : undefined;
+    selectSequencePositions(positions, "focus", annotation, detail.target);
+  }
+}
+
+function setSequenceDisplayRange(start: number, end: number) {
+  if (!sequenceMap) return;
+  const length = sequenceMap.residues.length;
+  const safeStart = Math.max(1, Math.min(length, start));
+  const safeEnd = Math.max(safeStart, Math.min(length, end));
+  for (const element of [el<HTMLElement>("sequence-manager"), el<HTMLElement>("sequence-navigation"), el<HTMLElement>("nightingale-sequence"), ...Array.from(el("sequence-tracks").querySelectorAll<HTMLElement>("nightingale-track"))]) {
+    element.setAttribute("display-start", String(safeStart));
+    element.setAttribute("display-end", String(safeEnd));
+  }
+}
+
+function zoomSequence(factor: number) {
+  if (!sequenceMap) return;
+  const manager = el<HTMLElement>("sequence-manager");
+  const length = sequenceMap.residues.length;
+  const start = Number(manager.getAttribute("display-start") ?? 1);
+  const end = Number(manager.getAttribute("display-end") ?? length);
+  const width = end - start + 1;
+  const nextWidth = Math.max(Math.min(length, 3), Math.min(length, width * factor));
+  const center = (start + end) / 2;
+  const nextStart = Math.floor(center - nextWidth / 2);
+  setSequenceDisplayRange(nextStart, nextStart + Math.ceil(nextWidth) - 1);
 }
 async function mutate(operations: WorkspaceOperation[], prepare?: () => Promise<WorkspaceOperation[]>) {
   if (!workspace || updating) return;
@@ -169,7 +489,85 @@ async function mutate(operations: WorkspaceOperation[], prepare?: () => Promise<
   try {
     if (prepare) operations = await prepare();
     captureView();
-    const result = await app.callServerTool({ name: "ebi-pdbe-update_workspace", arguments: { workspace, expected_revision: workspace.revision, operations } });
+    const compactSceneUpdate = operations.length > 0 && operations.every(operation => operation.op === "upsert_scene");
+    const result = await app.callServerTool({ name: "ebi-pdbe-update_workspace", arguments: {
+      workspace, expected_revision: workspace.revision, operations, compact_response: compactSceneUpdate,
+    } });
+    const visibilityOnly = operations.length > 0 && operations.every(operation => operation.op === "set_visibility");
+    if (visibilityOnly) {
+      if (result.isError) {
+        status(result.content?.filter(item => item.type === "text").map(item => item.text).join("\n") || "Layer visibility update failed.", true);
+        renderWorkspaceControls();
+        return;
+      }
+      const update = result._meta?.visibility_update as { workspace_id?: string; revision?: number } | undefined;
+      const mvsj = result._meta?.mvsj as Record<string, unknown> | undefined;
+      if (!workspace || !scene || update?.workspace_id !== workspace.id
+        || update.revision !== workspace.revision + 1 || !mvsj) {
+        throw new Error("The server returned an invalid layer visibility update.");
+      }
+      const next = structuredClone(workspace);
+      for (const operation of operations) {
+        const targetScene = next.scenes.find(item => item.id === operation.scene_id);
+        const layer = targetScene?.layers.find(item => item.id === operation.target_id);
+        if (!layer || operation.visible === undefined) throw new Error("The layer visibility update did not match the current workspace.");
+        layer.visible = operation.visible;
+      }
+      next.revision = update.revision;
+      checkRevision(workspace, next);
+      workspace = validateEnvelope(next);
+      ligandWorkspaceSnapshot = workspace;
+      scene.workspace = workspace;
+      scene.mvsj = mvsj;
+      const token = ++revision;
+      buttons(false);
+      work = work.then(() => load(scene!, token)).catch(error => status(String(error), true));
+      await work;
+      return;
+    }
+    if (compactSceneUpdate) {
+      if (result.isError) {
+        status(result.content?.filter(item => item.type === "text").map(item => item.text).join("\n") || "Workspace update failed.", true);
+        renderWorkspaceControls();
+        return;
+      }
+      const update = result._meta?.workspace_update as { workspace_id?: string; revision?: number } | undefined;
+      const data = result._meta?.mvs as SceneResult | undefined;
+      if (!workspace || !scene || update?.workspace_id !== workspace.id
+        || update.revision !== workspace.revision + 1 || !data?.mvsj || data.version !== 1) {
+        throw new Error("The server returned an invalid compact workspace update.");
+      }
+      const next = structuredClone(workspace);
+      for (const operation of operations) {
+        if (operation.op !== "upsert_scene" || !operation.scene || operation.scene.id !== operation.scene_id
+          || operation.scene_id !== operation.target_id) {
+          throw new Error("The compact workspace update did not match its scene operation.");
+        }
+        const index = next.scenes.findIndex(item => item.id === operation.scene_id);
+        if (index < 0) next.scenes.push(operation.scene);
+        else next.scenes[index] = operation.scene;
+      }
+      next.revision = update.revision;
+      checkRevision(workspace, next);
+      workspace = validateEnvelope(next);
+      const updatedScene = workspace.scenes.find(item => item.id === operations[0].scene_id);
+      const firstStructure = updatedScene?.structures[0];
+      if (!updatedScene || !firstStructure) throw new Error("The compact update has no renderable structure.");
+      const rendered: SceneResult = {
+        version: 1,
+        workspace,
+        builder: { pdb_id: firstStructure.pdb_id, title: updatedScene.title },
+        mvsj: data.mvsj,
+        legend: [],
+        warnings: data.warnings ?? workspace.warnings ?? [],
+        coordinate_url: data.coordinate_url ?? scene.coordinate_url,
+      };
+      const token = ++revision;
+      buttons(false);
+      work = work.then(() => load(rendered, token)).catch(error => status(String(error), true));
+      await work;
+      return;
+    }
     receive(result);
     if (result.isError) { renderWorkspaceControls(); return; }
     await work;
@@ -177,84 +575,38 @@ async function mutate(operations: WorkspaceOperation[], prepare?: () => Promise<
   finally { updating = false; workspaceControls(); }
 }
 
-function renderAnnotationCoverage() {
-  const container = el("annotation-coverage"), active = activeWorkspaceScene(); container.replaceChildren();
-  if (!active) return;
-  const groups = annotationGroups(active);
-  if (groups.length) {
-    const heading = document.createElement("h3"); heading.textContent = "Residue annotations"; container.append(heading);
-    const hint = document.createElement("p"); hint.className = "hint";
-    hint.textContent = "Coverage is the unique annotated residues / listed residues in this chain. It is not a confidence score. Expand an annotation group to inspect supplied values and provenance."; container.append(hint);
-  }
-  for (const group of groups) {
-    const details = document.createElement("details"), summary = document.createElement("summary");
-    const coverage = group.percent === null ? "coverage unavailable" : `${Number(group.percent.toFixed(1))}% (${group.covered}/${group.total} residues)`;
-    summary.textContent = `${group.pdbId.toUpperCase()} · ${group.provider} · chain ${group.chainId} · ${coverage}`;
-    details.append(summary);
-    const layers = active.layers.filter(layer => group.layerIds.includes(layer.id));
-    if (layers.length) {
-      const label = document.createElement("label"), toggle = document.createElement("input"); toggle.type = "checkbox";
-      toggle.checked = layers.some(layer => layer.visible); toggle.indeterminate = toggle.checked && layers.some(layer => !layer.visible);
-      toggle.addEventListener("change", () => {
-        const scene = structuredClone(activeWorkspaceScene()!);
-        for (const layer of scene.layers) if (group.layerIds.includes(layer.id)) layer.visible = toggle.checked;
-        void mutate([{ op: "upsert_scene", scene_id: scene.id, target_id: scene.id, scene }]);
-      });
-      label.append(toggle, document.createTextNode("Show annotation highlights")); details.append(label);
-    }
-    // Build detailed evidence only on expansion. Raw values remain in workspace/context.
-    details.addEventListener("toggle", () => {
-      if (!details.open || details.dataset.rendered) return;
-      details.dataset.rendered = "true";
-      if (group.percent === 100) {
-        const hint = document.createElement("p"); hint.className = "hint";
-        hint.textContent = "This annotation group covers every listed residue. Inspect its raw values to distinguish residues."; details.append(hint);
-      }
-      const limit = 200;
-      for (const feature of group.features.slice(0, limit)) {
-        const record = document.createElement("details"), name = document.createElement("summary");
-        name.textContent = [...new Set([feature.name, feature.accession, feature.description].filter(value => value && value !== group.provider))].join(" · ") || "Source annotation";
-        record.append(name);
-        const values = document.createElement("pre");
-        values.textContent = feature.segments.filter(segment => segment.label_asym_id === group.chainId)
-          .map(segment => `Residues ${segment.start}–${segment.end}${Object.keys(segment.details ?? {}).length ? " · " + detailText(segment.details) : ""}`).join("\n"); record.append(values);
-        if (/^https?:\/\//i.test(feature.source_url)) {
-          const link = document.createElement("a"); link.href = feature.source_url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Source evidence"; record.append(link);
-        }
-        details.append(record);
-      }
-      if (group.features.length > limit) {
-        const hint = document.createElement("p"); hint.className = "hint";
-        hint.textContent = `Showing ${limit} of ${group.features.length} records. All records and values are retained in saved workspace JSON and residue inspection.`; details.append(hint);
-      }
-    });
-    container.append(details);
-  }
-}
-async function toggleOptional(kind: OptionalData, visible: boolean) {
+async function toggleOptional(kind: OptionalData, visible: boolean, fetchIfMissing = false) {
   if (!workspace || !activeWorkspaceScene()) return;
   const originalId = workspace.id, originalRevision = workspace.revision;
   const base = structuredClone(activeWorkspaceScene()!);
   await mutate([], async () => {
-    status(visible ? `Loading optional ${kind}…` : `Hiding ${kind}…`);
-    const pending = visible ? base.structures.filter(structure => structure.data_status?.[kind] !== "loaded") : [];
+    status(visible || fetchIfMissing ? `Loading optional ${kind}…` : `Hiding ${kind}…`);
+    const pending = visible || fetchIfMissing ? base.structures.filter(structure => structure.data_status?.[kind] !== "loaded") : [];
     const fetched = await Promise.all(pending.map(async structure => {
+      if (kind === "annotations") {
+        const result = await app.callServerTool({ name: "ebi-pdbe-load_structure_annotations", arguments: { pdb_id: structure.pdb_id } });
+        if (result.isError) throw new Error(result.content?.filter(item => item.type === "text").map(item => item.text).join("\n") || "Could not load annotations");
+        const data = result.structuredContent as Omit<FetchedAnnotations, "structureId"> | undefined;
+        if (!data || !Array.isArray(data.annotations) || !Array.isArray(data.layers)) throw new Error("The server did not return optional annotation data");
+        return { structureId: structure.id, ...data } as FetchedAnnotations;
+      }
       const result = await app.callServerTool({ name: "ebi-pdbe-open_structure", arguments: {
-        pdb_id: structure.pdb_id, include_annotations: kind === "annotations", include_ligands: kind === "ligands",
+        pdb_id: structure.pdb_id, include_annotations: false, include_ligands: true,
       } });
       if (result.isError) throw new Error(result.content?.filter(item => item.type === "text").map(item => item.text).join("\n") || `Could not load ${kind}`);
       const supplied = result._meta?.workspace as Workspace | undefined;
       if (!supplied?.scenes?.[0]) throw new Error(`The server did not return optional ${kind} workspace data`);
-      return { structureId: structure.id, scene: supplied.scenes[0] };
+      return { structureId: structure.id, scene: supplied.scenes[0] } as FetchedStructure;
     }));
     if (!workspace || workspace.id !== originalId || workspace.revision !== originalRevision
       || JSON.stringify(activeWorkspaceScene()) !== JSON.stringify(base)) throw new Error("Workspace changed while fetching data. Please retry with the current view.");
-    const updated = mergeOptionalScene(base, fetched, kind, visible);
+    const updated = kind === "annotations"
+      ? mergeOptionalAnnotations(base, fetched as FetchedAnnotations[], visible)
+      : mergeOptionalScene(base, fetched as FetchedStructure[], kind, visible);
     return [{ op: "upsert_scene", scene_id: updated.id, target_id: updated.id, scene: updated }];
   });
 }
 el<HTMLInputElement>("show-ligands").addEventListener("change", event => { void toggleOptional("ligands", (event.target as HTMLInputElement).checked); });
-el<HTMLInputElement>("show-annotations").addEventListener("change", event => { void toggleOptional("annotations", (event.target as HTMLInputElement).checked); });
 
 async function refreshDataView(token: number) {
   const active = activeWorkspaceScene();
@@ -292,6 +644,7 @@ async function refreshDataView(token: number) {
     tr.addEventListener("click", inspect); tr.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); inspect(); } });
     rows.append(tr);
   });
+  renderSequencePanel();
   workspaceControls();
 }
 
@@ -400,6 +753,17 @@ async function publish(data: Record<string, unknown>): Promise<void> {
           scientific_policy: "supplied_data_only",
           source_annotations: activeWorkspaceScene()?.structures.map(structure => ({ structure_id: structure.id, annotations: structure.annotations ?? [] })),
           comparison: activeWorkspaceScene()?.comparison ?? null,
+        } : null,
+        pdbe_sequence_track_capabilities: sequenceMap ? {
+          workspace_id: workspace?.id ?? null,
+          structure_id: sequenceStructureId,
+          pdb_id: sequencePdbId,
+          label_asym_id: sequenceMap.label_asym_id,
+          auth_asym_id: sequenceMap.auth_asym_id,
+          sequence_length: sequenceMap.sequence.length,
+          tracks: sequenceTrackCatalog,
+          selected_tracks: sequenceTrackSelection ? [...sequenceTrackSelection] : "all",
+          instruction: "Choose the sequence tracks that best answer the user's question. Use ebi-pdbe-set_sequence_tracks with these exact IDs and workspace/structure/chain identifiers; the app can render observed-residue coverage and supplied annotation groups. Do not infer unsupported tracks or scientific facts.",
         } : null } });
     } catch (error) {
       // Host context is optional; its failure must not misreport a rendered scene.
@@ -418,6 +782,7 @@ async function load(result: SceneResult, token: number): Promise<void> {
     else attachLayerRefs(renderedMvs.root as SceneNode, workspace.scenes[0].layers);
   }
   inventories = new Map();
+  if (!preserve) { sequenceTrackSelection = undefined; sequenceCommittedPositions = []; }
   if (!preserve || selectionContext?.structure_id && !workspace?.scenes.some(s => s.structures.some(structure => structure.id === selectionContext!.structure_id))
       || selectionContext?.uniprot_position && !workspace?.scenes.some(s => s.comparison)) selectionContext = undefined;
   loadState = "loading";
@@ -490,9 +855,30 @@ async function load(result: SceneResult, token: number): Promise<void> {
         atom_id: p.atom.label_atom_id(location), instance_id: location.unit.conformation.operator.instanceId,
         model_id: location.unit.model.modelNum,
       };
+      let sequenceSynced = false;
       selectionContext = { ...selection, annotations: selectedStructure ? annotationsAt(selectedStructure.annotations ?? [], selection.label_asym_id, selection.label_seq_id) : [] };
+      if (selection.label_seq_id !== null && selectedStructure) {
+        const target = sequenceTargets().find(item => item.structureId === selectedStructure.id && item.chainId === selection.label_asym_id);
+        if (target) {
+          el<HTMLSelectElement>("sequence-chain").value = target.value;
+          renderSequencePanel();
+          selectSequencePositions([selection.label_seq_id], "focus", undefined, undefined, selection);
+          sequenceSynced = true;
+        }
+      }
       el("selection").textContent = `${selection.comp_id} · author chain ${selection.auth_asym_id} residue ${selection.auth_seq_id}${selection.insertion_code} · label chain ${selection.label_asym_id}${selection.label_seq_id === null ? "" : ` residue ${selection.label_seq_id}`}`;
-      void publish({ status: "selection", selection }).catch(error => status(String(error), true));
+      if (!sequenceSynced) void publish({ status: "selection", selection }).catch(error => status(String(error), true));
+    });
+    if (isNewViewer) created.subscribe(created.plugin.behaviors.interaction.hover, event => {
+      if (!sequenceMap || !sequenceCoordinates || !StructureElement.Loci.is(event.current.loci)
+        || StructureElement.Loci.isEmpty(event.current.loci)) { clearSequenceHover(); return; }
+      const loci = event.current.loci, first = loci.elements[0];
+      if (!sequenceCoordinates.units.includes(first.unit)) { clearSequenceHover(); return; }
+      const location = StructureElement.Location.create(loci.structure, first.unit, first.unit.elements[OrderedSet.getAt(first.indices, 0)]);
+      const chain = StructureProperties.chain.label_asym_id(location);
+      const position = StructureProperties.residue.label_seq_id(location);
+      if (chain === sequenceMap.label_asym_id && position > 0) hoverSequencePositions([position]);
+      else clearSequenceHover();
     });
     buttons(true);
   } catch (error) {
@@ -699,6 +1085,35 @@ function receive(result: ToolResult): void {
     status(result.content?.filter(c => c.type === "text").map(c => c.text).join("\n") || "Scene construction failed.", true);
     return;
   }
+  const trackConfig = result._meta?.sequence_track_config as {
+    workspace_id?: string | null; structure_id: string; pdb_id: string; label_asym_id: string; track_ids: string[]; reason?: string;
+  } | undefined;
+  if (trackConfig) {
+    const currentTarget = sequenceTargetsByValue.get(JSON.stringify([trackConfig.structure_id, trackConfig.label_asym_id]));
+    if (!currentTarget || (trackConfig.workspace_id ?? undefined) !== (workspace?.id ?? undefined)
+      || currentTarget.pdbId.toLowerCase() !== trackConfig.pdb_id.toLowerCase()) {
+      status("Ignored a sequence-track choice for a different or outdated structure/chain.", true);
+      return;
+    }
+    const available = new Set(sequenceTrackCatalog.map(track => track.id));
+    const unknown = trackConfig.track_ids.filter(id => !available.has(id));
+    if (unknown.length) {
+      status(`Ignored unknown sequence track ID(s): ${unknown.join(", ")}`, true);
+      return;
+    }
+    const targetValue = JSON.stringify([trackConfig.structure_id, trackConfig.label_asym_id]);
+    if (el<HTMLSelectElement>("sequence-chain").value !== targetValue) {
+      viewer?.plugin.managers.interactivity.lociSelects.deselectAll();
+      sequenceCommittedPositions = []; selectionContext = undefined;
+    }
+    el<HTMLSelectElement>("sequence-chain").value = targetValue;
+    sequenceTrackSelection = new Set(trackConfig.track_ids);
+    renderSequencePanel();
+    const detail = trackConfig.reason ? ` ${trackConfig.reason}` : "";
+    status(`Assistant selected ${trackConfig.track_ids.length} sequence track(s).${detail}`);
+    void publish({ status: "sequence_tracks_selected", track_ids: trackConfig.track_ids, reason: trackConfig.reason });
+    return;
+  }
   const data = result._meta?.mvs as SceneResult | undefined;
   if (!data?.mvsj || data.version !== 1 || !(data.builder && Array.isArray(data.legend) || data.story && Array.isArray(data.scenes))) {
     status("No supported MVS scene was returned by the tool.", true);
@@ -713,22 +1128,23 @@ function receive(result: ToolResult): void {
 el("reset").addEventListener("click", () => { viewer?.plugin.managers.camera.reset(); });
 el("story-prev").addEventListener("click", () => { void navigateStory(-1); });
 el("story-next").addEventListener("click", () => { void navigateStory(1); });
-el("download").addEventListener("click", () => {
+el("download").addEventListener("click", event => {
+  event.stopPropagation();
   if (!scene) return;
   const current = scene;
   const name = current.story ? "molecular-story.mvsj" : `${current.builder?.pdb_id ?? "molecular-scene"}.mvsj`;
   void (async () => {
     if (connected && app.getHostCapabilities()?.downloadFile) {
       const result = await app.downloadFile({ contents: [{ type: "resource", resource: {
-        uri: `mvs://pdbe/${name}`, mimeType: "application/json", text: JSON.stringify(renderedMvs ?? current.mvsj, null, 2),
+        uri: `file:///${encodeURIComponent(name)}`, mimeType: "application/json", text: JSON.stringify(renderedMvs ?? current.mvsj, null, 2),
       } }] });
-      if (result.isError) throw new Error("The host could not save the MVSJ file");
+      if (result.isError) throw new Error("The host could not download the MVSJ file. Check the host's download prompt or try again.");
     } else {
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
       downloadUrl = URL.createObjectURL(new Blob([JSON.stringify(renderedMvs ?? current.mvsj, null, 2)], { type: "application/json" }));
       const link = document.createElement("a"); link.href = downloadUrl; link.download = name; link.click();
     }
-  })().catch(error => status(String(error), true));
+  })().catch(error => status(`Could not save MVSJ: ${error instanceof Error ? error.message : String(error)}`, true));
 });
 
 async function saveJson(value: unknown, name: string) {
@@ -756,8 +1172,71 @@ el("restore-workspace").addEventListener("change", event => {
     receive(result);
   })().catch(error => status(String(error), true));
 });
-el("residue-chain").addEventListener("change", renderResidues);
-el("residue-filter").addEventListener("input", renderResidues);
+el<HTMLSelectElement>("sequence-chain").addEventListener("change", () => {
+  sequenceTrackSelection = undefined; sequenceCommittedPositions = [];
+  viewer?.plugin.managers.interactivity.lociSelects.deselectAll();
+  selectionContext = undefined;
+  renderSequencePanel();
+  el("sequence-detail").textContent = "Select a sequence position or annotation to inspect it.";
+  showSequenceTooltip([]);
+  el("selection").textContent = "Select a residue or atom to inspect it.";
+  el<HTMLButtonElement>("sequence-focus").disabled = true;
+  el<HTMLButtonElement>("sequence-clear").disabled = true;
+  workspaceControls();
+  void publish({ status: "sequence_chain_changed", chain: sequenceMap?.label_asym_id });
+});
+el("sequence-manager").addEventListener("change", handleNightingaleChange);
+el("sequence-panel").addEventListener("pointerleave", clearSequenceHover);
+el("viewer").addEventListener("pointerleave", () => clearSequenceHover());
+el<HTMLButtonElement>("sequence-tooltip-close").addEventListener("click", () => showSequenceTooltip([]));
+document.addEventListener("click", event => {
+  if (!sequenceTooltipPinned) return;
+  const path = event.composedPath();
+  if (path.includes(el("sequence-tooltip")) || path.includes(el("viewer"))
+    || (sequenceTooltipTarget && path.includes(sequenceTooltipTarget))) return;
+  showSequenceTooltip([]);
+});
+el<HTMLButtonElement>("sequence-toggle").addEventListener("click", () => {
+  sequenceVisible = !sequenceVisible;
+  el<HTMLButtonElement>("sequence-toggle").textContent = sequenceVisible ? "Hide sequence" : "Show sequence";
+  el<HTMLButtonElement>("sequence-toggle").setAttribute("aria-pressed", String(sequenceVisible));
+  renderSequencePanel();
+});
+el("sequence-manager").addEventListener("wheel", event => {
+  const wheel = event as WheelEvent;
+  if (!sequenceMap || wheel.deltaY === 0) return;
+  wheel.preventDefault();
+  wheel.stopPropagation();
+  const unitScale = wheel.deltaMode === WheelEvent.DOM_DELTA_LINE ? 25
+    : wheel.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 500 : 1;
+  zoomSequence(Math.exp(wheel.deltaY * unitScale * 0.002));
+}, { capture: true, passive: false });
+el<HTMLButtonElement>("sequence-zoom-in").addEventListener("click", () => zoomSequence(0.5));
+el<HTMLButtonElement>("sequence-zoom-out").addEventListener("click", () => zoomSequence(2));
+el<HTMLButtonElement>("sequence-zoom-reset").addEventListener("click", () => {
+  if (sequenceMap) setSequenceDisplayRange(1, sequenceMap.residues.length);
+});
+el<HTMLButtonElement>("sequence-show-all").addEventListener("click", () => {
+  sequenceTrackSelection = undefined;
+  if (sequenceMap) renderDynamicSequenceTracks(sequenceMap);
+  void publish({ status: "sequence_tracks_reset", tracks: "all" });
+});
+el<HTMLButtonElement>("sequence-focus").addEventListener("click", () => {
+  if (sequenceCommittedPositions.length) selectSequencePositions(sequenceCommittedPositions, "focus");
+});
+el<HTMLButtonElement>("sequence-clear").addEventListener("click", () => {
+  viewer?.plugin.managers.interactivity.lociSelects.deselectAll();
+  sequenceCommittedPositions = [];
+  setSequenceHighlight([]); clearSequenceHover();
+  selectionContext = undefined;
+  el("sequence-detail").textContent = "Select a sequence position or annotation to inspect it.";
+  showSequenceTooltip([]);
+  el("selection").textContent = "Select a residue or atom to inspect it.";
+  el<HTMLButtonElement>("sequence-focus").disabled = true;
+  el<HTMLButtonElement>("sequence-clear").disabled = true;
+  workspaceControls();
+  void publish({ status: "selection_cleared" });
+});
 el("ask-selection").addEventListener("click", () => {
   if (!selectionContext || !app.getHostCapabilities()?.message) return;
   void app.sendMessage({ role: "user", content: [{ type: "text", text: `Explain this molecular workspace selection using its evidence: ${JSON.stringify(selectionContext)}` }] }).catch(error => status(String(error), true));

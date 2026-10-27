@@ -182,6 +182,10 @@ class UpdateWorkspaceInput(Spec):
     workspace: Workspace
     expected_revision: int = Field(ge=0, strict=True)
     operations: list[WorkspaceOperation] = Field(default_factory=list, max_length=100)
+    compact_response: bool = Field(
+        default=False,
+        description="Return only compiled scene data and workspace revision metadata when the caller already holds the updated workspace.",
+    )
 
 
 def update_workspace(arguments: dict[str, Any]) -> Workspace:
@@ -577,12 +581,15 @@ def workspace_from_structure(data: dict[str, Any]) -> Workspace:
                 annotation["source"],
                 annotation.get("source_url", ""),
                 segment["label_asym_id"],
+                annotation.get("kind") or "features",
             )
             group = groups.setdefault(key, {"ids": [], "ranges": []})
             if annotation["id"] not in group["ids"]:
                 group["ids"].append(annotation["id"])
             group["ranges"].append((segment["start"], segment["end"]))
-    for i, ((provider, source_url, chain_id), group) in enumerate(groups.items()):
+    for i, ((provider, source_url, chain_id, annotation_kind), group) in enumerate(
+        groups.items()
+    ):
         ranges = []
         for start, end in sorted(set(group["ranges"])):
             if ranges and start <= ranges[-1][1] + 1:
@@ -603,13 +610,13 @@ def workspace_from_structure(data: dict[str, Any]) -> Workspace:
                 "category": "source_annotation",
                 "source_annotation_ids": group["ids"],
                 "structure_id": sid,
-                "name": f"{provider} · chain {chain_id}",
+                "name": f"{provider} · {annotation_kind} · chain {chain_id}",
                 "visible": False,
                 "component": {
                     "selector": selectors,
                     "representation": {"type": "ball_and_stick"},
                     "color": {"color": "#9473bc"},
-                    "tooltip": f"{provider}: supplied annotation coverage",
+                    "tooltip": f"{provider} {annotation_kind}: supplied annotation coverage",
                 },
                 "sources": [source_url] if source_url else [],
             }
