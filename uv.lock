@@ -755,10 +755,10 @@ dependencies = [
     { name = "molviewspec" },
     { name = "neo4j" },
     { name = "omegaconf" },
-    { name = "python-toon" },
     { name = "pyyaml" },
     { name = "requests" },
     { name = "starlette" },
+    { name = "toon-format" },
     { name = "typing-extensions" },
     { name = "uvicorn" },
 ]
@@ -790,10 +790,10 @@ requires-dist = [
     { name = "molviewspec", specifier = ">=1.8.1,<2" },
     { name = "neo4j", specifier = ">=5,<6" },
     { name = "omegaconf", specifier = ">=2.3,<3" },
-    { name = "python-toon", specifier = ">=0.1.3,<0.2" },
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "requests", specifier = ">=2.33,<3" },
     { name = "starlette", specifier = ">=1.0.1,<2" },
+    { name = "toon-format", specifier = ">=1,<2" },
     { name = "typing-extensions", specifier = ">=4.1,<5" },
     { name = "uvicorn", specifier = ">=0.30,<1" },
 ]
@@ -1063,15 +1063,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5b/42/55c32bb9b12693c092ad250a0e82edb5b31ddeda6eb772de5f308b3804ad/python_multipart-0.0.32.tar.gz", hash = "sha256:be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e", size = 46881, upload-time = "2026-06-04T16:18:58.647Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/04/e8135ebd1ad02c56ec633277529b2602ff99ff634be76cdba5744cf554fd/python_multipart-0.0.32-py3-none-any.whl", hash = "sha256:ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23", size = 30042, upload-time = "2026-06-04T16:18:57.319Z" },
-]
-
-[[package]]
-name = "python-toon"
-version = "0.1.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4e/92/640c83ca46d5fe9c49895449a8932f55252537dd13dd22186cbac3a1ce59/python_toon-0.1.3.tar.gz", hash = "sha256:ca348b214c4f1cdad3579fd83dd60032d9eb87eb349c2d430ad9eb6371f174bf", size = 31280, upload-time = "2025-11-04T09:12:20.949Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/a4/2f2def0378b44f913d2d6cb3bc5b1a15267b363937ab1cb9afb07ce2313c/python_toon-0.1.3-py3-none-any.whl", hash = "sha256:a27b0ee4a729e730d1037d0a63eb8b344b3e5a26e3dc9a173067b6c31a868ee6", size = 21797, upload-time = "2025-11-04T09:12:19.443Z" },
 ]
 
 [[package]]
@@ -1633,6 +1624,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/5b/b9/1ed31d167be802da0fc95020d04cd27b7d7065cc6fbefdd2f9186f60d7bd/tomli-2.2.1-cp313-cp313-win32.whl", hash = "sha256:d3f5614314d758649ab2ab3a62d4f2004c825922f9e370b29416484086b264ec", size = 98724, upload-time = "2024-11-27T22:38:32.837Z" },
     { url = "https://files.pythonhosted.org/packages/c7/32/b0963458706accd9afcfeb867c0f9175a741bf7b19cd424230714d722198/tomli-2.2.1-cp313-cp313-win_amd64.whl", hash = "sha256:a38aa0308e754b0e3c67e344754dff64999ff9b513e691d0e786265c93583c69", size = 109383, upload-time = "2024-11-27T22:38:34.455Z" },
     { url = "https://files.pythonhosted.org/packages/6e/c2/61d3e0f47e2b74ef40a68b9e6ad5984f6241a942f7cd3bbfbdbd03861ea9/tomli-2.2.1-py3-none-any.whl", hash = "sha256:cb55c73c5f4408779d0cf3eef9f762b9c9f147a77de7b258bef0a5628adc85cc", size = 14257, upload-time = "2024-11-27T22:38:35.385Z" },
+]
+
+[[package]]
+name = "toon-format"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/9e/88b94e00ae3589130bb2bde233c60b55776deb670cc3d077657d6a8b9a2e/toon_format-1.2.0.tar.gz", hash = "sha256:ed09c0cb8ba58f17372f876df1e43400d2d916aef67c641f152d8a28c5898669", size = 20775, upload-time = "2026-10-18T13:23:36.594Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/9e/69331571d5b91b3f34f0dcd7c8135bb3241e41c3c3effb4af8f57772a9ca/toon_format-1.2.0-py3-none-any.whl", hash = "sha256:d94db4b088a281a7bbc85e75d7fbd24e6a0ec7bc110edb129285259eca6522c0", size = 22863, upload-time = "2026-10-18T13:23:35.557Z" },
 ]
 
 [[package]]

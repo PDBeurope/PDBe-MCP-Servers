@@ -423,9 +423,9 @@ class OpenAPIToMCPGenerator:
 
         if _toon_enabled():
             try:
-                import toon
+                import toon_format
 
-                result_text = toon.encode(data)
+                result_text = toon_format.encode(data)
                 if not isinstance(result_text, str):
                     result_text = str(result_text)
             except Exception as e:

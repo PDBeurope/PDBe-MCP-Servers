@@ -805,9 +805,9 @@ class GraphTools:
                 # Format TOON or JSON output
                 if _toon_enabled():
                     try:
-                        import toon
+                        import toon_format
 
-                        result_text = toon.encode(results)
+                        result_text = toon_format.encode(results)
                         if not isinstance(result_text, str):
                             result_text = str(result_text)
                     except Exception as e:

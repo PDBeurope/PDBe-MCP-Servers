@@ -198,7 +198,7 @@ class TestOpenAPIToMCPGenerator:
             params=None,
         )
 
-    @patch("toon.encode")
+    @patch("toon_format.encode")
     @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
     def test_call_tool_toon_success(
         self,
@@ -222,7 +222,7 @@ class TestOpenAPIToMCPGenerator:
         assert result[0].text == "TOON_DATA"
         mock_encode.assert_called_once()
 
-    @patch("toon.encode")
+    @patch("toon_format.encode")
     @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
     def test_call_tool_toon_fallback_to_json(
         self,
