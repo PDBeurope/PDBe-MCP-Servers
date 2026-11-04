@@ -1292,16 +1292,6 @@ el<HTMLButtonElement>("export-contacts").addEventListener("click", () => {
   const link = document.createElement("a"); link.href = contactObjectUrl;
   link.download = `${ligandData?.pdb_id ?? "pdbe"}-${ligandData?.selected?.comp_id ?? "ligand"}-contacts.csv`; link.click();
 });
-el<HTMLFormElement>("open-form").addEventListener("submit", event => {
-  event.preventDefault();
-  void app.callServerTool({ name: "ebi-pdbe-open_structure", arguments: { pdb_id: el<HTMLInputElement>("open-pdb").value.trim() } }).then(receive).catch(error => status(String(error), true));
-});
-el<HTMLFormElement>("compare-form").addEventListener("submit", event => {
-  event.preventDefault();
-  const args = Object.fromEntries(["reference_pdb_id", "reference_chain_id", "mobile_pdb_id", "mobile_chain_id"].map(id => [id, el<HTMLInputElement>(id).value.trim()]));
-  void app.callServerTool({ name: "ebi-pdbe-compare_structures", arguments: args }).then(receive).catch(error => status(String(error), true));
-});
-
 app.ontoolinputpartial = () => status("Preparing the molecular scene…");
 app.ontoolinput = () => status("Building and validating the molecular scene…");
 app.ontoolresult = receive;

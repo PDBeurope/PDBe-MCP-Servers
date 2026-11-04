@@ -63,7 +63,7 @@ Only public PDBe endpoints on `https://www.ebi.ac.uk` are needed for browser
 network access. Their origin is declared in the UI resource CSP. The host needs
 MCP Apps support, WebGL, and network access to that origin. The evidence panel
 lists source endpoints and retrieval time. Missing optional annotations produce
-a warning; coordinate failures offer a retry through **Open structure**.
+a warning; coordinate failures are reported in the viewer status.
 
 Structure inspection, precomputed structure comparisons, and custom MVS scenes are available.
 

@@ -12,13 +12,6 @@
       <button id="reset" type="button" disabled>Reset view</button>
       <button id="download" type="button" disabled>Save MVSJ</button>
     </section>
-    <section class="workspace-search" aria-label="Structure workflows">
-      <form id="open-form"><label>PDB entry <input id="open-pdb" pattern="[1-9][A-Za-z0-9]{3}" maxlength="4" required placeholder="1cbs" /></label><button>Open structure</button></form>
-      <details><summary>Compare structures</summary><form id="compare-form">
-        <label>Reference PDB <input id="reference_pdb_id" value="4hhb" required /></label><label>Label chain <input id="reference_chain_id" value="A" required /></label>
-        <label>Mobile PDB <input id="mobile_pdb_id" value="1hho" required /></label><label>Label chain <input id="mobile_chain_id" value="A" required /></label><button>Compare</button>
-      </form></details>
-    </section>
     <p id="status" role="status" aria-live="polite">Waiting for a scene…</p>
     <div class="workspace-layout"><div id="story-layout">
       <div class="viewer-sequence">

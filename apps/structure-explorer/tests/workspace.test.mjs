@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { parsePDB } from 'molstar-mvs/lib/mol-io/reader/pdb/parser.js';
 import { trajectoryFromPDB } from 'molstar-mvs/lib/mol-model-formats/structure/pdb.js';
@@ -20,6 +21,14 @@ const trajectory = await trajectoryFromPDB(parsed.result).run();
 const model = trajectory.representative, h = model.atomicHierarchy;
 const chain = h.chains.label_asym_id.value(0);
 const structure = Structure.ofModel(model);
+
+test('workspace UI removes manual structure and superposition entry but retains ligand entry', async () => {
+  const html = await readFile(new URL('../workspace.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /id="(?:open-form|open-pdb|compare-form|reference_pdb_id|mobile_pdb_id)"/);
+  assert.doesNotMatch(html, /Open structure|Compare structures|Reference PDB|Mobile PDB/);
+  assert.match(html, /id="ligand-explorer-form"/);
+  assert.match(html, /id="ligand-pdb-id"/);
+});
 
 test('workspace revisions and references are checked before replacing the current view', () => {
   const w = {version:1,id:'workspace-1',revision:2,scenes:[{id:'scene-1',structures:[{id:'protein'}],layers:[{id:'site',structure_id:'protein',kind:'component'}]}]};
