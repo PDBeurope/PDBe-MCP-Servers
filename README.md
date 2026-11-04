@@ -5,14 +5,16 @@ AI client that supports the Model Context Protocol (MCP).
 
 | Server | Purpose |
 | --- | --- |
+| `all` | API, Search, Apps, and Graph tools through one server |
 | `pdbe_api_server` | Entries, assemblies, molecules, ligands, publications, and validation data |
 | `pdbe_search_server` | Solr searches with filtering, facets, grouping, and pagination |
-| `pdbe_apps_server` | Interactive structure inspection, comparison, and MolViewSpec scenes |
+| `pdbe_apps_server` | Interactive structure and ligand exploration, comparison, and MolViewSpec workspaces |
 | `pdbe_graph_server` | PDBe-KB graph schema and queries against your local Neo4j database |
-| `all` | All tools in one server |
 
-Start with the API and Search servers. Graph queries require your own PDBe-KB
-Neo4j database; PDBe does not provide a public running instance.
+The recommended `all` server exposes API, Search, Apps, and Graph together.
+Graph queries require your own PDBe-KB Neo4j database; PDBe does not provide a
+public running instance. Configure individual server types if you only need a
+subset of the tools.
 
 ## Quick start
 
@@ -31,7 +33,25 @@ uvx pdbe-mcp-server --server-type pdbe_search_server
 
 ## Connect your AI client
 
-For clients using a JSON `mcpServers` configuration, add:
+For clients using a JSON `mcpServers` configuration, we recommend starting
+with the aggregate server. It exposes the API, Search, Apps, and Graph tools
+through one stdio connection:
+
+```json
+{
+  "mcpServers": {
+    "PDBe All": {
+      "command": "uvx",
+      "args": ["pdbe-mcp-server", "--server-type", "all"]
+    }
+  }
+}
+```
+
+Graph queries require your own PDBe-KB Neo4j database, and interactive Apps
+views require an Apps-capable client.
+
+If you only need selected servers, configure one or more individually:
 
 ```json
 {
@@ -64,18 +84,34 @@ ligand interactions, glycosylation, cryo-EM structures, and EMDB maps.
 
 In an MCP Apps client, the Apps server provides a shared Mol* workspace for:
 
-- **Structure Explorer:** inspect chains, ligands, residues, and annotations.
+- **Structure Explorer:** inspect chains, residues, ligand instances, and
+  source annotations, with linked sequence and annotation tracks.
+- **Ligand & Binding Site Explorer:** inspect PDBe-reported ligand interaction
+  records, filter evidence, and export contacts.
 - **Structure Comparison:** view PDBe's precomputed superpositions and
-  PDBe/SIFTS residue correspondence.
-- **MolViewSpec Builder:** create custom scenes and multi-scene molecular stories.
+  PDBe/SIFTS residue correspondence, with a correspondence table and CSV export.
+- **MolViewSpec Builder and Stories:** create custom scenes and ordered
+  multi-scene molecular stories.
+- **Workspace management:** save or restore workspace JSON, export MVSJ, and
+  update scenes and layers through MCP tools.
 
 Add another client entry using `--server-type pdbe_apps_server`, or use `all`.
 The host needs MCP Apps support, WebGL, and access to `https://www.ebi.ac.uk`.
 Clients without UI support receive text and structured data fallbacks.
 
 Comparisons use supplied PDBe transforms and mappings; the app does not
-calculate a new fit, RMSD, or proximity-derived binding sites. Chain selectors
-use label chain IDs (`struct_asym_id`).
+calculate a new fit, RMSD, or proximity-derived binding sites. The ligand
+explorer displays PDBe-supplied interaction records rather than calculating new
+contacts. Chain selectors use label chain IDs (`struct_asym_id`).
+
+Example prompts for an MCP Apps-capable client:
+
+- “Open PDB entry 1tqn in the molecular workspace.”
+- “Compare the alpha chains of human deoxy- and oxyhemoglobin (PDB 4hhb and
+  1hho) and show their residue correspondence.”
+- “Explore a ligand in PDB entry 1tqn and show its PDBe-reported interactions.”
+- “Build a two-scene molecular story for PDB entry 1tqn, showing the protein
+  first and then highlighting a ligand.”
 
 See the [molecular workspace guide](docs/molecular-workspace.md) for setup,
 tool examples, annotations, saved workspaces, updates, and host routing.
@@ -95,6 +131,15 @@ The `--all` flag also exposes `/all/`. Use `ROOT_PREFIX` for a path prefix.
 
 See the [server reference](docs/server-reference.md) for Docker, legacy SSE,
 search parameters, graph setup, and experimental TOON output.
+
+## PDBe-hosted beta server
+
+A beta-hosted remote MCP server is available at
+[https://wwwdev.ebi.ac.uk/pdbe/mcp/all/](https://wwwdev.ebi.ac.uk/pdbe/mcp/all/).
+Connect to it from an MCP client using Streamable HTTP. As a beta service, its
+availability and interface may change. For beta-server issues or feedback,
+email [pdbehelp@ebi.ac.uk](mailto:pdbehelp@ebi.ac.uk). For other issues, please
+[open a GitHub issue](https://github.com/PDBeurope/PDBe-MCP-Servers/issues).
 
 ## Local development
 
