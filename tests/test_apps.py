@@ -421,7 +421,10 @@ async def test_structure_aliases_preserve_app_results(
     result = response["result"]
     assert not result["isError"]
     assert result["structuredContent"]["pdb_id"] == "1cbs"
-    assert result["_meta"]["structure"] == data
+    assert (
+        result["_meta"]["workspace"]["scenes"][0]["structures"][0]["pdb_id"] == "1cbs"
+    )
+    assert result["_meta"]["mvs"]["mvsj"]["kind"] == "single"
     fetch.assert_awaited_once()
 
 
@@ -437,6 +440,7 @@ async def test_removed_apps_are_unavailable(app_client, endpoint):
         "ebi-pdbe-build_mvs",
         "ebi-pdbe-build_mvs_story",
         "ebi-pdbe-update_workspace",
+        "ebi-pdbe-load_structure_annotations",
     }
     for name in (
         "pdbe_explore_ligand",
@@ -535,7 +539,7 @@ async def test_workspace_update_restore_and_revision_conflict_over_http(
     app_client, endpoint
 ):
     from pdbe_mcp_server.mvs import build_mvs
-    from pdbe_mcp_server.workspace import workspace_from_mvs
+    from pdbe_mcp_server.workspace import update_workspace, workspace_from_mvs
 
     path = f"/mcp/{endpoint}/"
     await rpc(app_client, path, "tools/list")
@@ -564,10 +568,15 @@ async def test_workspace_update_restore_and_revision_conflict_over_http(
         )
     )["result"]
     assert not result["isError"]
-    updated = result["_meta"]["workspace"]
+    updated = update_workspace(arguments).model_dump(mode="json", exclude_none=True)
+    assert result["_meta"]["visibility_update"] == {
+        "workspace_id": saved["id"],
+        "revision": 1,
+    }
+    assert "mvsj" in result["_meta"]
     assert updated["id"] == saved["id"] and updated["revision"] == 1
     assert not updated["scenes"][0]["layers"][0]["visible"]
-    assert result["structuredContent"]["render_status"] == "pending"
+    assert result["structuredContent"]["status"] == "visibility_updated"
     restored = (
         await rpc(
             app_client,
@@ -583,7 +592,7 @@ async def test_workspace_update_restore_and_revision_conflict_over_http(
             },
         )
     )["result"]
-    assert restored["_meta"]["workspace"] == updated
+    assert restored["_meta"]["mvs"]["workspace"] == updated
     conflict = (
         await rpc(
             app_client,

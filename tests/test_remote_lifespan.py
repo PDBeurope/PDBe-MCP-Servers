@@ -138,7 +138,6 @@ async def test_shutdown_drains_timed_out_work_before_closing_pools(
     monkeypatch, resources, drain_expires
 ):
     graph, _, close_http = resources
-    monkeypatch.setenv("TOOL_TIMEOUT_SECONDS", "0.1")
     monkeypatch.setenv(
         "SHUTDOWN_DRAIN_TIMEOUT_SECONDS", "0.05" if drain_expires else "1"
     )
@@ -165,6 +164,9 @@ async def test_shutdown_drains_timed_out_work_before_closing_pools(
     serving = asyncio.create_task(serve())
     try:
         await asyncio.wait_for(entered.wait(), 1)
+        # Keep lifespan startup on the normal budget; only the blocked operation
+        # under test should receive the deliberately short deadline.
+        monkeypatch.setenv("TOOL_TIMEOUT_SECONDS", "0.1")
         with pytest.raises(ToolDeadlineExceeded):
             await run_blocking_tool(work)
         assert started.is_set()

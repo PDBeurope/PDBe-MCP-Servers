@@ -87,6 +87,7 @@ async def test_all_builders_advertise_only_unique_namespaced_tools(servers):
         "ebi-pdbe-build_mvs",
         "ebi-pdbe-build_mvs_story",
         "ebi-pdbe-update_workspace",
+        "ebi-pdbe-load_structure_annotations",
     }
 
 
