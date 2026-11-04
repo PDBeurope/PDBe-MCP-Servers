@@ -3,6 +3,49 @@
 Access Protein Data Bank in Europe (PDBe) structural biology data from any
 AI client that supports the Model Context Protocol (MCP).
 
+## Capabilities
+
+### Molecular workspace (MCP Apps)
+
+In an MCP Apps client, the Apps server provides a shared Mol* workspace for:
+
+- **Structure Explorer:** inspect chains, residues, ligand instances, and
+  source annotations, with linked sequence and annotation tracks.
+- **Ligand & Binding Site Explorer:** inspect PDBe-reported ligand interaction
+  records, filter evidence, and export contacts.
+- **Structure Comparison:** view PDBe's precomputed superpositions and
+  PDBe/SIFTS residue correspondence, with a correspondence table and CSV export.
+- **MolViewSpec Builder and Stories:** create custom scenes and ordered
+  multi-scene molecular stories.
+- **Workspace management:** save or restore workspace JSON, export MVSJ, and
+  update scenes and layers through MCP tools.
+
+Use `pdbe_apps_server` for the dedicated server or the recommended `all`
+server; connection examples are below. The host needs MCP Apps support, WebGL,
+and access to `https://www.ebi.ac.uk`.
+Clients without UI support receive text and structured data fallbacks.
+
+Comparisons use supplied PDBe transforms and mappings; the app does not
+calculate a new fit, RMSD, or proximity-derived binding sites. The ligand
+explorer displays PDBe-supplied interaction records rather than calculating new
+contacts. Chain selectors use label chain IDs (`struct_asym_id`).
+
+Example prompts for an MCP Apps-capable client:
+
+- “Open PDB entry 1tqn in the molecular workspace.”
+- “Compare the alpha chains of human deoxy- and oxyhemoglobin (PDB 4hhb and
+  1hho) and show their residue correspondence.”
+- “Explore a ligand in PDB entry 1tqn and show its PDBe-reported interactions.”
+- “Build a two-scene molecular story for PDB entry 1tqn, showing the protein
+  first and then highlighting a ligand.”
+
+See the [molecular workspace guide](docs/molecular-workspace.md) for setup,
+tool examples, annotations, saved workspaces, updates, and host routing. The
+Apps and aggregate servers also expose the `molview-spec` skill as MCP
+resources for scene-building guidance.
+
+### Data servers
+
 | Server | Purpose |
 | --- | --- |
 | `all` | API, Search, Apps, and Graph tools through one server |
@@ -79,44 +122,6 @@ Try asking:
 
 See [worked examples](examples/) for questions involving protein function,
 ligand interactions, glycosylation, cryo-EM structures, and EMDB maps.
-
-## Molecular workspace
-
-In an MCP Apps client, the Apps server provides a shared Mol* workspace for:
-
-- **Structure Explorer:** inspect chains, residues, ligand instances, and
-  source annotations, with linked sequence and annotation tracks.
-- **Ligand & Binding Site Explorer:** inspect PDBe-reported ligand interaction
-  records, filter evidence, and export contacts.
-- **Structure Comparison:** view PDBe's precomputed superpositions and
-  PDBe/SIFTS residue correspondence, with a correspondence table and CSV export.
-- **MolViewSpec Builder and Stories:** create custom scenes and ordered
-  multi-scene molecular stories.
-- **Workspace management:** save or restore workspace JSON, export MVSJ, and
-  update scenes and layers through MCP tools.
-
-Add another client entry using `--server-type pdbe_apps_server`, or use `all`.
-The host needs MCP Apps support, WebGL, and access to `https://www.ebi.ac.uk`.
-Clients without UI support receive text and structured data fallbacks.
-
-Comparisons use supplied PDBe transforms and mappings; the app does not
-calculate a new fit, RMSD, or proximity-derived binding sites. The ligand
-explorer displays PDBe-supplied interaction records rather than calculating new
-contacts. Chain selectors use label chain IDs (`struct_asym_id`).
-
-Example prompts for an MCP Apps-capable client:
-
-- “Open PDB entry 1tqn in the molecular workspace.”
-- “Compare the alpha chains of human deoxy- and oxyhemoglobin (PDB 4hhb and
-  1hho) and show their residue correspondence.”
-- “Explore a ligand in PDB entry 1tqn and show its PDBe-reported interactions.”
-- “Build a two-scene molecular story for PDB entry 1tqn, showing the protein
-  first and then highlighting a ligand.”
-
-See the [molecular workspace guide](docs/molecular-workspace.md) for setup,
-tool examples, annotations, saved workspaces, updates, and host routing.
-The Apps and aggregate servers also expose the `molview-spec` skill as MCP
-resources for scene-building guidance.
 
 ## Remote HTTP server
 
