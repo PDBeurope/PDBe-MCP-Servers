@@ -13,7 +13,7 @@ This guide is for developers working on the PDBe MCP Servers project.
 ## Setup
 
 ### Prerequisites
-- Python 3.10 or higher
+- Python 3.11 or higher
 - [uv](https://github.com/astral-sh/uv) package manager
 
 ### Installation

@@ -8,12 +8,25 @@ from mcp.server.lowlevel import Server
 from omegaconf import DictConfig
 
 from pdbe_mcp_server import get_config
-from pdbe_mcp_server.api_tools import create_mcp_tools_from_openapi
+from pdbe_mcp_server.ai_summary_tools import ai_summary_tool, get_ai_summary
+from pdbe_mcp_server.api_tools import (
+    OpenAPIToMCPGenerator,
+    create_mcp_tools_from_openapi,
+    get_shared_api_generator,
+)
+from pdbe_mcp_server.apps import (
+    AppDisplayOptions,
+    app_display_defaults,
+    app_resource_base_uri,
+    build_pdbe_apps_server,
+)
+from pdbe_mcp_server.execution import run_blocking_tool
 from pdbe_mcp_server.graph_tools import GraphTools
 from pdbe_mcp_server.search_tools import SearchTools
+from pdbe_mcp_server.skills import add_skill_result_metadata
+from pdbe_mcp_server.tool_names import PDBeServer
 
 search_tools: SearchTools = SearchTools()
-graph_tools: GraphTools = GraphTools()
 
 conf: DictConfig = get_config()
 
@@ -44,9 +57,13 @@ class MCPServerFactory:
 factory = MCPServerFactory()
 
 
-def build_pdbe_api_server() -> Server:
-    api_server = Server("pdbe-api-server")
-    generator, available_tools = create_mcp_tools_from_openapi(conf.api.openapi_url)
+def build_pdbe_api_server(generator: OpenAPIToMCPGenerator | None = None) -> Server:
+    api_server = PDBeServer("pdbe-api-server")
+    if generator is None:
+        generator, available_tools = create_mcp_tools_from_openapi(conf.api.openapi_url)
+    else:
+        available_tools = generator.list_tools()
+    available_tools = [*available_tools, ai_summary_tool()]
 
     @api_server.list_tools()
     async def list_tools() -> list[types.Tool]:
@@ -58,13 +75,25 @@ def build_pdbe_api_server() -> Server:
     ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
         if arguments is None:
             arguments = {}
-        return generator.call_tool(name, arguments)
+        if name == "pdbe_get_ai_summary":
+            return [
+                types.TextContent(
+                    type="text",
+                    text=await run_blocking_tool(get_ai_summary, arguments),
+                )
+            ]
+        # These tools use requests (including synchronous retries). Keep the
+        # entire operation, including response formatting, off the event loop.
+        return await run_blocking_tool(generator.call_tool, name, arguments)
 
     return api_server
 
 
-def build_graph_server() -> Server:
-    graph_server = Server("pdbe-graph-server")
+def build_graph_server(graph_tools: GraphTools | None = None) -> Server:
+    # Construct explicitly at startup, never while importing this module.
+    if graph_tools is None:
+        graph_tools = GraphTools()
+    graph_server = PDBeServer("pdbe-graph-server")
 
     @graph_server.list_tools()
     async def list_tools() -> list[types.Tool]:
@@ -150,7 +179,7 @@ def build_graph_server() -> Server:
 
 
 def build_pdbe_search_server() -> Server:
-    search_server = Server(
+    search_server = PDBeServer(
         name="pdbe-search-server",
         instructions="""
 You are a PDBe search assistant. You have access to tools that allow you to retrieve the Solr search schema
@@ -171,14 +200,15 @@ in the PDBe database. Always make sure to understand the search schema before co
         name: str, arguments: dict[str, Any]
     ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
         if name == "get_pdbe_search_schema":
-            return [
-                types.TextContent(type="text", text=search_tools.get_search_schema())
-            ]
+            schema = await run_blocking_tool(search_tools.get_search_schema)
+            return [types.TextContent(type="text", text=schema)]
         elif name == "run_pdbe_search_query":
             return [
                 types.TextContent(
                     type="text",
-                    text=search_tools.run_search_query(arguments),
+                    text=await run_blocking_tool(
+                        search_tools.run_search_query, arguments
+                    ),
                 )
             ]
         else:
@@ -190,14 +220,77 @@ in the PDBe database. Always make sure to understand the search schema before co
 def build_all_server(servers: Sequence[Server] | None = None) -> Server:
     """Build one MCP server that exposes the tools from every PDBe server."""
     if servers is None:
+        generator = get_shared_api_generator()
         servers = [
-            build_pdbe_api_server(),
+            build_pdbe_api_server(generator),
             build_pdbe_search_server(),
             build_graph_server(),
+            build_pdbe_apps_server(generator),
         ]
 
-    all_server = Server("pdbe-all-server")
+    all_server = PDBeServer("pdbe-all-server")
+    catalogs = [
+        getattr(child, "skill_catalog", None)
+        for child in servers
+        if getattr(child, "skill_catalog", None) is not None
+    ]
+    if len(catalogs) > 1:
+        raise ValueError("The aggregate server supports one Skills catalog")
+    all_server.skill_catalog = catalogs[0] if catalogs else None
+    for child in servers:
+        all_server.tool_input_normalizers.update(
+            getattr(child, "tool_input_normalizers", {})
+        )
     tool_servers: dict[str, Server] = {}
+
+    @all_server.list_resources()
+    async def list_resources() -> list[types.Resource]:
+        resources: list[types.Resource] = []
+        seen: set[str] = set()
+        for child in servers:
+            handler = child.request_handlers.get(types.ListResourcesRequest)
+            if handler is None:
+                continue
+            result = (await handler(types.ListResourcesRequest())).root
+            if not isinstance(result, types.ListResourcesResult):
+                raise RuntimeError(
+                    f"Unexpected resources/list response from {child.name}"
+                )
+            for resource in result.resources:
+                uri = str(resource.uri)
+                if uri in seen:
+                    raise ValueError(f"Duplicate resource URI in all server: {uri}")
+                seen.add(uri)
+                resources.append(resource)
+        return resources
+
+    # Forward complete results to preserve each resource's CSP and UI metadata.
+    async def read_resource(request: types.ReadResourceRequest) -> types.ServerResult:
+        uri = str(request.params.uri)
+        app_base_uri = app_resource_base_uri(uri)
+        owner: Server | None = None
+        for child in servers:
+            handler = child.request_handlers.get(types.ListResourcesRequest)
+            if handler is None:
+                continue
+            result = (await handler(types.ListResourcesRequest())).root
+            if isinstance(result, types.ListResourcesResult):
+                if any(
+                    str(resource.uri) == uri
+                    or (
+                        app_base_uri is not None
+                        and app_resource_base_uri(str(resource.uri)) == app_base_uri
+                    )
+                    for resource in result.resources
+                ):
+                    if owner is not None:
+                        raise ValueError(f"Duplicate resource URI in all server: {uri}")
+                    owner = child
+        if owner is None:
+            raise ValueError(f"Unknown resource: {uri}")
+        return await owner.request_handlers[types.ReadResourceRequest](request)
+
+    all_server.request_handlers[types.ReadResourceRequest] = read_resource
 
     async def get_tools() -> list[types.Tool]:
         tools: list[types.Tool] = []
@@ -249,16 +342,25 @@ def build_all_server(servers: Sequence[Server] | None = None) -> Server:
             )
         return tool_result
 
+    add_skill_result_metadata(all_server)
     return all_server
 
 
 factory.register("pdbe_graph_server", build_graph_server)
 factory.register("pdbe_api_server", build_pdbe_api_server)
 factory.register("pdbe_search_server", build_pdbe_search_server)
+factory.register("pdbe_apps_server", build_pdbe_apps_server)
+factory.register("all", build_all_server)
 
 
 @click.command()
 @click.option("--port", default=8000, help="Port to run the server on")
+@click.option(
+    "--internal",
+    is_flag=True,
+    default=False,
+    help="Hide App branding and entry search in stdio (equivalent to HTTP ?internal=true).",
+)
 @click.option(
     "--transport",
     type=click.Choice(["sse", "stdio"]),
@@ -268,10 +370,14 @@ factory.register("pdbe_search_server", build_pdbe_search_server)
 @click.option(
     "--server-type",
     type=click.Choice(factory.available_types()),
-    default="pdbe_api_server",
+    default="all",
     help="Type of server to run",
 )
-def main(port: int, transport: str, server_type: str) -> int:
+def main(port: int, transport: str, server_type: str, internal: bool = False) -> int:
+    token = app_display_defaults.set(
+        AppDisplayOptions(show_header=not internal, show_search=not internal)
+    )
+    click.get_current_context().call_on_close(lambda: app_display_defaults.reset(token))
     try:
         server = factory.create(server_type)
     except ValueError as e:
@@ -291,6 +397,8 @@ def main(port: int, transport: str, server_type: str) -> int:
             "pdbe_api_server": f"{ROOT_PREFIX}/api",
             "pdbe_graph_server": f"{ROOT_PREFIX}/graph",
             "pdbe_search_server": f"{ROOT_PREFIX}/search",
+            "pdbe_apps_server": f"{ROOT_PREFIX}/apps",
+            "all": f"{ROOT_PREFIX}/all",
         }
 
         async def handle_sse(request):

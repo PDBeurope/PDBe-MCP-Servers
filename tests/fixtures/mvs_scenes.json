@@ -1,0 +1,1127 @@
+[
+  {
+    "name": "protein and ligand",
+    "input": {
+      "builder": {
+        "pdb_id": "1cbs",
+        "components": [
+          {
+            "selector": "polymer",
+            "color": "blue"
+          },
+          {
+            "selector": "ligand",
+            "representation": "sticks",
+            "color": "orange"
+          }
+        ]
+      }
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "blue"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "ligand"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "ball_and_stick"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "orange"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-20T23:40:55.391531+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "highlight and focus",
+    "input": {
+      "builder": {
+        "pdb_id": "1cbs",
+        "components": [
+          {
+            "selector": {
+              "auth_asym_id": "A",
+              "beg_auth_seq_id": 1,
+              "end_auth_seq_id": 2
+            },
+            "representation": {
+              "type": "surface",
+              "opacity": 0.4
+            },
+            "label": "Range",
+            "focus": {
+              "radius_factor": 1.5
+            }
+          },
+          {
+            "selector": {
+              "auth_asym_id": "B",
+              "auth_seq_id": 501
+            },
+            "representation": "spacefill",
+            "tooltip": "Ligand instance"
+          }
+        ]
+      }
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": {
+                            "auth_asym_id": "A",
+                            "beg_auth_seq_id": 1,
+                            "end_auth_seq_id": 2
+                          }
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "surface"
+                            },
+                            "children": [
+                              {
+                                "kind": "opacity",
+                                "params": {
+                                  "opacity": 0.4
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "kind": "focus",
+                            "params": {
+                              "radius_factor": 1.5
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": {
+                            "auth_asym_id": "B",
+                            "auth_seq_id": 501
+                          }
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "spacefill"
+                            }
+                          },
+                          {
+                            "kind": "tooltip",
+                            "params": {
+                              "text": "Ligand instance"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-20T23:40:55.392512+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "annotation group",
+    "input": {
+      "builder": {
+        "pdb_id": "1cbs",
+        "annotations": [
+          {
+            "group_id": "site",
+            "selector": {
+              "auth_asym_id": "A",
+              "auth_seq_id": 1
+            },
+            "label": "Site",
+            "color": "red"
+          },
+          {
+            "group_id": "site",
+            "selector": {
+              "auth_asym_id": "A",
+              "auth_seq_id": 2
+            },
+            "label": "Site",
+            "color": "red"
+          }
+        ]
+      }
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "#91bfdb"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": {
+                            "auth_asym_id": "A",
+                            "auth_seq_id": 1
+                          }
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "red"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": {
+                            "auth_asym_id": "A",
+                            "auth_seq_id": 2
+                          }
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "red"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": [
+                            {
+                              "auth_asym_id": "A",
+                              "auth_seq_id": 1
+                            },
+                            {
+                              "auth_asym_id": "A",
+                              "auth_seq_id": 2
+                            }
+                          ]
+                        },
+                        "children": [
+                          {
+                            "kind": "label",
+                            "params": {
+                              "text": "Site"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-20T23:40:55.392887+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "assembly",
+    "input": {
+      "builder": {
+        "pdb_id": "1cbs",
+        "structure": {
+          "type": "assembly",
+          "assembly_id": "1"
+        },
+        "components": [
+          {
+            "selector": {
+              "label_asym_id": "A",
+              "instance_id": "ASM-X0-1"
+            },
+            "representation": "carbohydrate"
+          }
+        ]
+      }
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "assembly",
+                      "assembly_id": "1",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": {
+                            "label_asym_id": "A",
+                            "instance_id": "ASM-X0-1"
+                          }
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "carbohydrate"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-20T23:40:55.393035+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "symmetry",
+    "input": {
+      "builder": {
+        "pdb_id": "1cbs",
+        "structure": {
+          "type": "symmetry",
+          "ijk_min": [
+            0,
+            0,
+            0
+          ],
+          "ijk_max": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "symmetry",
+                      "model_index": 0,
+                      "ijk_min": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "ijk_max": [
+                        1,
+                        1,
+                        1
+                      ]
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "#91bfdb"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-20T23:40:55.393240+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "symmetry mates",
+    "input": {
+      "builder": {
+        "pdb_id": "1cbs",
+        "structure": {
+          "type": "symmetry_mates",
+          "radius": 8
+        },
+        "camera": {
+          "position": [
+            20,
+            20,
+            20
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "camera",
+            "params": {
+              "target": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "position": [
+                20.0,
+                20.0,
+                20.0
+              ],
+              "up": [
+                0,
+                1,
+                0
+              ]
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "symmetry_mates",
+                      "model_index": 0,
+                      "radius": 8.0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            },
+                            "children": [
+                              {
+                                "kind": "color",
+                                "params": {
+                                  "color": "#91bfdb"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-20T23:40:55.393368+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "non-water broad selection",
+    "input": {
+      "builder": {
+        "pdb_id": "1cbs",
+        "components": [
+          {
+            "selector": "all"
+          }
+        ]
+      }
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "branched"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "ligand"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "ion"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "cartoon"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-20T23:40:55.393506+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "putty and clipping",
+    "input": {
+      "builder": {
+        "pdb_id": "1cbs",
+        "components": [
+          {
+            "selector": "protein",
+            "representation": {
+              "type": "putty",
+              "size_factor": 1.5,
+              "size_theme": "uncertainty",
+              "clip": [
+                {
+                  "type": "sphere",
+                  "center": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "radius": 10
+                },
+                {
+                  "type": "box",
+                  "center": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "size": [
+                    10,
+                    10,
+                    10
+                  ],
+                  "invert": true,
+                  "variant": "object"
+                },
+                {
+                  "type": "plane",
+                  "point": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "normal": [
+                    1,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "protein"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "putty",
+                              "size_factor": 1.5,
+                              "size_theme": "uncertainty"
+                            },
+                            "children": [
+                              {
+                                "kind": "clip",
+                                "params": {
+                                  "type": "sphere",
+                                  "center": [
+                                    0.0,
+                                    0.0,
+                                    0.0
+                                  ],
+                                  "radius": 10.0,
+                                  "invert": false,
+                                  "variant": "pixel"
+                                }
+                              },
+                              {
+                                "kind": "clip",
+                                "params": {
+                                  "type": "box",
+                                  "center": [
+                                    0.0,
+                                    0.0,
+                                    0.0
+                                  ],
+                                  "size": [
+                                    10.0,
+                                    10.0,
+                                    10.0
+                                  ],
+                                  "invert": true,
+                                  "variant": "object"
+                                }
+                              },
+                              {
+                                "kind": "clip",
+                                "params": {
+                                  "type": "plane",
+                                  "point": [
+                                    0.0,
+                                    0.0,
+                                    0.0
+                                  ],
+                                  "normal": [
+                                    1.0,
+                                    0.0,
+                                    0.0
+                                  ],
+                                  "invert": false,
+                                  "variant": "pixel"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-20T23:40:55.393667+00:00",
+        "version": "1.8"
+      }
+    }
+  },
+  {
+    "name": "density and line",
+    "input": {
+      "builder": {
+        "pdb_id": "1cbs",
+        "components": [
+          {
+            "selector": "polymer",
+            "representation": {
+              "type": "line",
+              "ignore_hydrogens": true,
+              "size_factor": 2
+            }
+          }
+        ],
+        "volumes": [
+          {
+            "url": "https://www.ebi.ac.uk/pdbe/density/test.map",
+            "channel_id": "2FOFCWT",
+            "representation": {
+              "relative_isovalue": 1.5,
+              "show_wireframe": true
+            },
+            "color": "blue",
+            "opacity": 0.4
+          }
+        ]
+      }
+    },
+    "mvsj": {
+      "kind": "single",
+      "root": {
+        "kind": "root",
+        "children": [
+          {
+            "kind": "canvas",
+            "params": {
+              "background_color": "white"
+            }
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/entry-files/download/1cbs.bcif"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "bcif"
+                },
+                "children": [
+                  {
+                    "kind": "structure",
+                    "params": {
+                      "type": "model",
+                      "model_index": 0
+                    },
+                    "children": [
+                      {
+                        "kind": "component",
+                        "params": {
+                          "selector": "polymer"
+                        },
+                        "children": [
+                          {
+                            "kind": "representation",
+                            "params": {
+                              "type": "line",
+                              "size_factor": 2.0,
+                              "ignore_hydrogens": true
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "download",
+            "params": {
+              "url": "https://www.ebi.ac.uk/pdbe/density/test.map"
+            },
+            "children": [
+              {
+                "kind": "parse",
+                "params": {
+                  "format": "map"
+                },
+                "children": [
+                  {
+                    "kind": "volume",
+                    "params": {
+                      "channel_id": "2FOFCWT"
+                    },
+                    "children": [
+                      {
+                        "kind": "volume_representation",
+                        "params": {
+                          "type": "isosurface",
+                          "relative_isovalue": 1.5,
+                          "show_wireframe": true,
+                          "show_faces": true
+                        },
+                        "children": [
+                          {
+                            "kind": "color",
+                            "params": {
+                              "color": "blue"
+                            }
+                          },
+                          {
+                            "kind": "opacity",
+                            "params": {
+                              "opacity": 0.4
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "title": "MolViewSpec for 1CBS",
+        "description_format": "plaintext",
+        "timestamp": "2026-10-20T23:40:55.393888+00:00",
+        "version": "1.8"
+      }
+    }
+  }
+]

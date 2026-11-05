@@ -1,6 +1,6 @@
 """Tests for utils module."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 import requests
@@ -127,7 +127,7 @@ class TestHTTPClient:
             result = HTTPClient.get("https://example.com", params=params)
             assert result == {"result": "data"}
             mock_session.get.assert_called_once_with(
-                "https://example.com", params=params, timeout=30
+                "https://example.com", params=params, timeout=ANY
             )
 
     def test_get_http_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -158,7 +158,7 @@ class TestHTTPClient:
             result = HTTPClient.post("https://example.com", json=json_data)
             assert result == {"status": "created"}
             mock_session.post.assert_called_once_with(
-                "https://example.com", data=None, json=json_data, timeout=30
+                "https://example.com", data=None, json=json_data, timeout=ANY
             )
 
     def test_post_form_data(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -176,7 +176,7 @@ class TestHTTPClient:
             result = HTTPClient.post("https://example.com", data=form_data)
             assert result == {"status": "ok"}
             mock_session.post.assert_called_once_with(
-                "https://example.com", data=form_data, json=None, timeout=30
+                "https://example.com", data=form_data, json=None, timeout=ANY
             )
 
     def test_post_http_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -206,39 +206,41 @@ class TestHTTPClient:
         with patch.object(HTTPClient, "_get_session", return_value=mock_session):
             HTTPClient.get("https://example.com", timeout=60)
             mock_session.get.assert_called_once_with(
-                "https://example.com", params=None, timeout=60
+                "https://example.com", params=None, timeout=ANY
             )
+            budget = mock_session.get.call_args.kwargs["timeout"]
+            assert 0 < budget.total <= 45
+            assert budget.connect_timeout == 5
+            assert budget.read_timeout <= budget.total
 
     def test_custom_retry_parameters(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test that custom retry parameters create a temporary session."""
+        """Custom retry parameters use the same thread's connection pool."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {}
 
-        mock_temp_session = MagicMock()
-        mock_temp_session.get.return_value = mock_response
-
-        # Mock the singleton session to ensure we're not using it
         mock_singleton_session = MagicMock()
+        mock_singleton_session.get.return_value = mock_response
 
         with (
-            patch.object(HTTPClient, "_create_session", return_value=mock_temp_session),
+            patch.object(HTTPClient, "_create_session") as create_session,
             patch.object(
                 HTTPClient, "_get_session", return_value=mock_singleton_session
             ),
         ):
             HTTPClient.get("https://example.com", max_retries=5, retry_delay=2.0)
-            # Verify that the temporary session was used, not the singleton
-            mock_temp_session.get.assert_called_once()
-            mock_singleton_session.get.assert_not_called()
+            mock_singleton_session.get.assert_called_once()
+            create_session.assert_not_called()
 
     def test_create_session_method(self) -> None:
         """Test the _create_session helper method."""
-        session = HTTPClient._create_session(max_retries=5, retry_delay=2.0)
+        session = HTTPClient._create_session()
         assert isinstance(session, requests.Session)
         # The session should have adapters mounted for both http and https
         assert "http://" in session.adapters
         assert "https://" in session.adapters
+        assert session.adapters["https://"].max_retries.total == 0
+        session.close()
 
     def test_default_retry_uses_singleton(
         self, monkeypatch: pytest.MonkeyPatch
@@ -252,7 +254,7 @@ class TestHTTPClient:
         mock_session.get.return_value = mock_response
 
         with patch.object(HTTPClient, "_get_session", return_value=mock_session):
-            HTTPClient.get("https://example.com", max_retries=3, retry_delay=1.0)
+            HTTPClient.get("https://example.com", max_retries=2, retry_delay=1.0)
             mock_session.get.assert_called_once()
             # Should not call mount on the mocked singleton session
             mock_session.mount.assert_not_called()

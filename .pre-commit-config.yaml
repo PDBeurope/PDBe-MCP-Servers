@@ -13,7 +13,7 @@ repos:
         # args: ["--maxkb=3000"]
       - id: check-ast
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.5 # Ruff version.
+    rev: v0.11.12 # Match uv.lock's Ruff version.
     hooks:
       - id: ruff
         args: [--fix]

@@ -7,6 +7,7 @@ import requests
 from omegaconf import DictConfig
 
 from pdbe_mcp_server import get_config
+from pdbe_mcp_server.execution import ToolDeadlineExceeded
 from pdbe_mcp_server.utils import HTTPClient
 
 conf: DictConfig = get_config()
@@ -569,6 +570,8 @@ Retrieves the Solr search schema for the PDBe search service. You can use this t
         search_url = self._build_solr_url(conf.search.search_api, fields)
         try:
             data = HTTPClient.get(search_url, max_retries=1, retry_delay=0.5)
+        except ToolDeadlineExceeded:
+            raise
         except requests.RequestException as e:
             return self._format_search_http_error(e)
 

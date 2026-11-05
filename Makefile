@@ -1,4 +1,4 @@
-.PHONY: help install test lint format typecheck clean build docs all
+.PHONY: help install test lint format typecheck clean build-apps build docs all
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -44,8 +44,12 @@ clean: ## Clean build artifacts and cache
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
-build: clean ## Build package
+build-apps: ## Build the MCP App resources from source
+	cd apps/structure-explorer && npm ci && npm run build
+
+build: clean build-apps ## Build package with verified MCP App resources
 	uv build
+	uv run python scripts/check_app_artifacts.py dist --require-sdist
 
 check-dist: build ## Check distribution files
 	uv run twine check dist/*

@@ -1,0 +1,28 @@
+{
+  "name": "pdbe-structure-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "test": "node --experimental-strip-types --test tests/annotations.test.mjs tests/comparison.test.mjs tests/mvs.test.mjs tests/workspace.test.mjs",
+    "build": "tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^2.0.3",
+    "@nightingale-elements/nightingale-manager": "5.11.0",
+    "@nightingale-elements/nightingale-navigation": "5.11.0",
+    "@nightingale-elements/nightingale-sequence": "5.11.0",
+    "@nightingale-elements/nightingale-track": "5.11.0",
+    "molstar": "5.8.0",
+    "molstar-mvs": "npm:molstar@5.13.1",
+    "pdbe-molstar": "^3.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vite-plugin-singlefile": "^2.3.4"
+  }
+}

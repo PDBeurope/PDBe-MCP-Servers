@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>PDBe Molecular Workspace</title></head>
+<body>
+  <main>
+    <header class="brand-header">
+      <img class="pdbe-logo" src="./src/assets/pdbe-letterhead-white.webp" alt="PDBe — Protein Data Bank in Europe" width="145" height="50" />
+      <div class="header-title"><span class="eyebrow">Structural evidence</span><h1>Molecular Workspace</h1></div>
+    </header>
+    <section class="toolbar"><div><h1 id="title">Molecular view</h1><p id="pdb-ids" class="hint" hidden></p><p id="description"></p></div>
+      <button id="sequence-toggle" type="button" aria-pressed="true">Hide sequence</button>
+      <button id="reset" type="button" disabled>Reset view</button>
+      <button id="download" type="button" disabled>Save MVSJ</button>
+    </section>
+    <p id="status" role="status" aria-live="polite">Waiting for a scene…</p>
+    <div class="workspace-layout"><div id="story-layout">
+      <div class="viewer-sequence">
+      <div id="viewer" aria-label="Interactive molecular structure"></div>
+      <section id="sequence-panel" aria-label="Linked protein sequence and annotation tracks" hidden>
+        <header class="sequence-header"><div><h2>Sequence &amp; annotations</h2><p class="hint">Sequence positions use the entity sequence; structural mapping uses label_seq_id. Missing coordinates remain selectable here.</p></div>
+          <label>Structure and chain <select id="sequence-chain"></select></label>
+        </header>
+        <div id="sequence-status" class="hint" role="status"></div>
+        <nightingale-manager id="sequence-manager" length="1" display-start="1" display-end="1" reflected-attributes="length,display-start,display-end,highlight">
+          <nightingale-navigation id="sequence-navigation" length="1" display-start="1" display-end="1" height="32" show-highlight></nightingale-navigation>
+          <nightingale-sequence id="nightingale-sequence" length="1" display-start="1" display-end="1" height="48"></nightingale-sequence>
+          <div id="sequence-tracks" aria-label="Sequence annotation tracks"></div>
+        </nightingale-manager>
+        <div class="sequence-actions"><button id="sequence-zoom-in" type="button" aria-label="Zoom in on sequence">Zoom in</button><button id="sequence-zoom-out" type="button" aria-label="Zoom out on sequence">Zoom out</button><button id="sequence-zoom-reset" type="button">Show full sequence</button><button id="sequence-focus" type="button" disabled>Focus in 3D</button><button id="sequence-clear" type="button" disabled>Clear selection</button><button id="sequence-show-all" type="button" disabled>Show all tracks</button><span id="sequence-detail" class="hint">Select a sequence position or annotation to inspect it.</span></div>
+        <div id="sequence-tooltip" class="sequence-tooltip" role="region" aria-label="Sequence selection details" hidden><div id="sequence-tooltip-content"></div><button id="sequence-tooltip-close" class="sequence-tooltip-close" type="button" aria-label="Close sequence details">×</button></div>
+      </section>
+      </div>
+      <aside id="story-panel" aria-label="Story" hidden>
+        <nav class="story-navigation" aria-label="Story scenes">
+          <button id="story-prev" type="button" disabled>Previous</button>
+          <button id="story-next" type="button" disabled>Next</button>
+        </nav>
+        <h2 id="story-title">Story</h2>
+        <div id="story-text"></div>
+      </aside>
+    </div>
+    <aside id="workspace-panel" hidden>
+      <h2>Layers</h2><p id="workspace-id" class="hint"></p>
+      <div id="comparison-options" hidden>
+        <p id="optional-data-status" class="hint"></p>
+      </div>
+      <div id="layers"></div>
+      <section id="ligands-panel" aria-label="Ligand molecules">
+        <h3>Ligands</h3><label><input id="show-ligands" type="checkbox" /> Show ligands</label>
+        <p id="ligand-status" class="hint"></p><div id="ligand-layers"></div>
+      </section>
+      <button id="save-workspace" disabled>Save workspace</button>
+      <label>Restore workspace <input id="restore-workspace" type="file" accept="application/json,.json" /></label>
+    </aside></div>
+    <section id="comparison-panel" class="scene-details" hidden><h2>Residue correspondence</h2><p id="comparison-summary"></p>
+      <p class="hint">Residue mappings come from PDBe/SIFTS. The viewer applies supplied PDBe transforms and displays source annotations. No RMSD, displacement or distance-based binding sites are calculated.</p>
+      <button id="export-comparison" disabled>Export residue correspondence CSV</button>
+      <details><summary>Mapped residue pairs</summary><div class="table-scroll"><table><thead><tr><th>UniProt</th><th>Reference residue</th><th>Mobile residue</th></tr></thead><tbody id="comparison-rows"></tbody></table></div></details>
+    </section>
+    <section id="ligand-interaction-panel" class="scene-details" hidden aria-label="Ligand and binding site explorer">
+      <h2>Ligand &amp; Binding Site Explorer</h2>
+      <form id="ligand-explorer-form"><label>PDB entry <input id="ligand-pdb-id" pattern="[1-9][A-Za-z0-9]{3}" maxlength="4" required placeholder="1cbs" /></label><button type="submit">Load ligand instances</button><button id="restore-ligand-workflow" type="button">Restore saved workflow</button></form>
+      <label>Exact ligand instance <select id="ligand-instance" disabled><option value="">Load a PDB entry first</option></select></label>
+      <p id="ligand-evidence-status" class="hint" aria-live="polite"></p>
+      <div id="ligand-filter-controls" hidden>
+        <label>Classification <select id="contact-classification"><option value="">All classifications</option></select></label>
+        <label>Interaction record type <select id="contact-interaction-type"><option value="">All interaction types</option></select></label>
+        <label>Partner chain <select id="contact-chain"><option value="">All chains</option></select></label>
+        <label>Partner type <select id="contact-type"><option value="">All types</option><option value="protein">Protein</option><option value="water">Water</option><option value="metal">Metal</option><option value="other">Other</option></select></label>
+        <label>Maximum distance (Å) <input id="contact-max-distance" type="number" min="0" step="0.1" placeholder="No limit" /></label>
+        <span id="contact-distance-status" class="hint"></span>
+        <button id="export-contacts" type="button" disabled>Export filtered contacts CSV</button>
+      </div>
+      <p class="hint">Distances filter PDBe-returned records only; this control does not discover neighbours or define a binding site. Contact lines are unavailable unless source atom and assembly/model mappings resolve unambiguously.</p>
+      <div class="table-scroll"><table><thead><tr><th>Partner</th><th>Ligand atoms</th><th>Partner atoms</th><th>Interaction</th><th>Classifications</th><th>Distance (Å)</th></tr></thead><tbody id="contact-rows"></tbody></table></div>
+      <details><summary>Evidence and annotations</summary><div id="ligand-evidence"></div></details>
+    </section>
+    <section class="scene-details"><ul id="legend" aria-label="Scene components"></ul><p id="selection">Select a residue or atom to inspect it.</p>
+      <button id="ask-selection">Ask about selection</button>
+      <p id="warnings"></p><p id="source"></p><small>Mol* 5.13.1 · One viewer for structures, alignments, annotations, ligand sites, density and stories. Cross-call updates require host routing by workspace ID.</small></section>
+  </main>
+  <script type="module" src="/src/workspace-main.ts"></script>
+</body>
+</html>

@@ -8,3 +8,18 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Test reports, caches, and browser automation output
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.playwright-mcp/
+
+# MCP App dependencies and generated HTML (build before packaging)
+apps/structure-explorer/node_modules/
+pdbe_mcp_server/ui/*.html
