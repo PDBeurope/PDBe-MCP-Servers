@@ -150,6 +150,7 @@ class HTTPClient:
                                     delay, Retry().parse_retry_after(retry_after)
                                 )
                             except InvalidHeader:
+                                # Ignore malformed hints; keep the computed backoff.
                                 pass
                 finally:
                     if response is not None:
