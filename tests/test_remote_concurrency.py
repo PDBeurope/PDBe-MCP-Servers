@@ -22,7 +22,7 @@ from pdbe_mcp_server.graph_tools import GraphTools
 async def test_slow_tool_leaves_remote_server_responsive(
     monkeypatch, slow_tool, timeout
 ):
-    monkeypatch.setenv("TOOL_TIMEOUT_SECONDS", "0.2" if timeout else "3")
+    monkeypatch.setenv("TOOL_TIMEOUT_SECONDS", "3")
     # sse-starlette keeps this event globally; pytest uses a loop per case.
     monkeypatch.setattr(AppStatus, "should_exit_event", None)
     started = threading.Event()
@@ -56,6 +56,7 @@ async def test_slow_tool_leaves_remote_server_responsive(
     prefix = remote.ROOT_PREFIX
 
     async with app.app.router.lifespan_context(app.app):
+        monkeypatch.setenv("TOOL_TIMEOUT_SECONDS", "0.2" if timeout else "3")
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://testserver"
         ) as client:

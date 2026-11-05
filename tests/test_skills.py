@@ -165,8 +165,11 @@ async def test_modern_http_standard_method_reaches_sdk_with_replayed_body():
 @pytest.mark.parametrize("json_response", [True, False])
 @pytest.mark.parametrize("aggregate", [True, False], ids=["all", "apps"])
 async def test_modern_discovery_and_lists_through_mcp_sdk(
-    json_response, aggregate, monkeypatch
+    json_response, aggregate, monkeypatch, tmp_path
 ):
+    ui_file = tmp_path / "structure-explorer.html"
+    ui_file.write_text("<html>" + "x" * 1200 + "</html>", encoding="utf-8")
+    monkeypatch.setattr("pdbe_mcp_server.apps.UI_FILE", ui_file)
     monkeypatch.setattr(AppStatus, "should_exit_event", None)
     child = build_pdbe_apps_server(Mock())
     server = build_all_server([child]) if aggregate else child

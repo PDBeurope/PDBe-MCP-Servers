@@ -61,7 +61,7 @@ subset of the tools.
 
 ## Quick start
 
-Requires **Python 3.10+** and **[uv](https://github.com/astral-sh/uv)**.
+Requires **Python 3.11+** and **[uv](https://github.com/astral-sh/uv)**.
 Run directly from PyPI without a separate installation:
 
 ```bash

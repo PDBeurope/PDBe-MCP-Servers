@@ -3,7 +3,7 @@ name = "pdbe-mcp-server"
 version = "2.0.0"
 description = "A Model Context Protocol (MCP) server for accessing PDBe (Protein Data Bank in Europe) structural biology data and services"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "Sreenath Sasidharan Nair", email = "sreenath@ebi.ac.uk" }]
 keywords = ["mcp", "llm", "automation", "web", "fetch", "http", "streamable", "stateless"]
 license = { text = "Apache-2.0" }
@@ -55,7 +55,7 @@ ignore = []
 [tool.ruff]
 line-length = 88
 indent-width = 4
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.format]
 quote-style = "double"
