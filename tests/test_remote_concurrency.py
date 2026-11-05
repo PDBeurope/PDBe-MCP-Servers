@@ -94,9 +94,9 @@ async def test_slow_tool_leaves_remote_server_responsive(
                         await asyncio.sleep(0.005)
 
                 await asyncio.wait_for(wait_started(), timeout=1)
-                assert (
-                    not slow.done()
-                ), "Slow tool blocked the event loop until completion"
+                assert not slow.done(), (
+                    "Slow tool blocked the event loop until completion"
+                )
                 health, ping, fast = await asyncio.wait_for(
                     asyncio.gather(
                         client.get(f"{prefix}/health"),
