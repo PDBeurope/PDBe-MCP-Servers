@@ -380,6 +380,25 @@ async def test_display_preferences_are_isolated_between_clients(app_client):
     assert 'data-pdbe-show-search="true"' in html
 
 
+@pytest.mark.anyio
+@pytest.mark.parametrize("endpoint", ["apps", "all"])
+async def test_annotation_loader_is_app_only_and_structure_open_is_model_visible(
+    app_client, endpoint
+):
+    tools = (await rpc(app_client, f"/mcp/{endpoint}/", "tools/list"))["result"][
+        "tools"
+    ]
+    by_name = {tool["name"]: tool for tool in tools}
+    annotation_tool = by_name["ebi-pdbe-load_structure_annotations"]
+    assert annotation_tool["_meta"]["ui"]["visibility"] == ["app"]
+    description = annotation_tool["description"]
+    assert "never call this" in description
+    assert "including when they provide only an entry ID" in description
+    assert "ebi-pdbe-open_structure" in description
+    assert "already open" in description
+    assert "visibility" not in by_name["ebi-pdbe-open_structure"]["_meta"]["ui"]
+
+
 @pytest.mark.asyncio
 async def test_stdio_tools_keep_original_resource_uris():
     server = build_pdbe_apps_server(Mock())

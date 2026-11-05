@@ -159,8 +159,10 @@ schema and returns raw JSON with source and retrieval time. API tools format
 that JSON as text or TOON; the app normalizes it directly. The HTTP server
 shares one executor instance between `/api/`, `/apps/`, and `/all/`.
 `enableMCP` controls model-visible tools; schema GET operations such as residue
-listing can also be called internally by the app. This shares request handling
-and schema loading, but does not cache API responses across calls.
+listing can also be called internally by the app. The annotation-loader tool is
+App-only and adds tracks to an already-open workspace; initial structure requests
+use `pdbe_open_structure`. This shares request handling and schema loading, but
+does not cache API responses across calls.
 
 For each polymer entity, the app retrieves domains, residue annotations,
 binding sites, and UniProt mapping tracks through that executor. Annotations

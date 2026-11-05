@@ -370,7 +370,7 @@ factory.register("all", build_all_server)
 @click.option(
     "--server-type",
     type=click.Choice(factory.available_types()),
-    default="pdbe_api_server",
+    default="all",
     help="Type of server to run",
 )
 def main(port: int, transport: str, server_type: str, internal: bool = False) -> int:

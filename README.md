@@ -68,7 +68,8 @@ Run directly from PyPI without a separate installation:
 uvx pdbe-mcp-server
 ```
 
-This starts the API server over stdio. To use Search instead:
+With no server type specified, this starts the aggregate `all` server over
+stdio. To run only Search instead:
 
 ```bash
 uvx pdbe-mcp-server --server-type pdbe_search_server
@@ -83,7 +84,7 @@ through one stdio connection:
 ```json
 {
   "mcpServers": {
-    "PDBe All": {
+    "PDBe": {
       "command": "uvx",
       "args": ["pdbe-mcp-server", "--server-type", "all"]
     }

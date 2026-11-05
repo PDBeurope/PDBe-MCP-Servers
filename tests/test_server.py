@@ -126,8 +126,11 @@ def test_all_server_is_registered_and_advertised_in_cli():
     assert "|all]" in result.output
 
 
+@pytest.mark.parametrize("server_type_args", [[], ["--server-type=all"]])
 @pytest.mark.parametrize("explicit_stdio", [False, True])
-def test_cli_all_runs_the_aggregate_server_over_stdio(monkeypatch, explicit_stdio):
+def test_cli_all_runs_the_aggregate_server_over_stdio(
+    monkeypatch, server_type_args, explicit_stdio
+):
     server = MagicMock()
     server.run = AsyncMock()
     monkeypatch.setitem(factory._builders, "all", lambda: server)
@@ -140,7 +143,7 @@ def test_cli_all_runs_the_aggregate_server_over_stdio(monkeypatch, explicit_stdi
         yield streams
 
     monkeypatch.setattr("mcp.server.stdio.stdio_server", stdio)
-    args = ["--server-type=all"]
+    args = list(server_type_args)
     if explicit_stdio:
         args.extend(["--transport", "stdio"])
     result = CliRunner().invoke(main, args)

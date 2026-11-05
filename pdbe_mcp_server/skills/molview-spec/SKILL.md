@@ -11,6 +11,10 @@ Use the advertised `ebi-pdbe-build_mvs` tool for custom single scenes and
 `ebi-pdbe-build_mvs_story` for a guided story. Use their advertised legacy aliases
 only on servers that expose those names. Ordinary structure exploration uses
 `ebi-pdbe-open_structure`; aligned comparison uses `ebi-pdbe-compare_structures`.
+For any initial request to open, view, inspect, or show a structure or PDB entry—including
+a request that only supplies an entry ID—call `ebi-pdbe-open_structure`. Never call
+`ebi-pdbe-load_structure_annotations` for a user request: it is an App-only helper for
+loading optional annotations into a workspace that is already open and does not create a scene.
 A successful explorer result (`status: "prepared"`) completes that viewing
 request. Stop calling visualization tools; do not repeatedly reopen the entry
 or switch to another viewer tool to wait for browser rendering.

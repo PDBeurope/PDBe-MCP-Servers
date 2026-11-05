@@ -222,9 +222,10 @@ The tool response is formatted as JSON by default, but can be converted to TOON 
 
 ## Transports and deployment
 
-Stdio is the default for `pdbe-mcp-server`. Choose a server with `--server-type`:
-`pdbe_api_server`, `pdbe_search_server`, `pdbe_graph_server`, `pdbe_apps_server`,
-or `all`.
+Stdio is the default for `pdbe-mcp-server`. When `--server-type` is omitted,
+the CLI starts the aggregate `all` server. To expose only selected tools, pass
+`--server-type` with `pdbe_api_server`, `pdbe_search_server`, `pdbe_graph_server`,
+or `pdbe_apps_server`.
 
 For Streamable HTTP:
 

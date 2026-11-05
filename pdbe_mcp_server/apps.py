@@ -641,9 +641,10 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
             types.Tool(
                 name="pdbe_load_structure_annotations",
                 description=(
-                    "Load PDBe-supplied residue annotations for an already open PDB entry. "
-                    "Returns normalized annotation records and their visual track layers only; "
-                    "it does not return coordinates or rebuild the molecular scene."
+                    "Internal App-only helper; never call this in response to a user's request to open, view, inspect, or show a structure or PDB entry, including when they provide only an entry ID. "
+                    "For every initial structure-viewing request, call ebi-pdbe-open_structure. "
+                    "This helper is only for the App to load optional PDBe-supplied residue annotations into a workspace that is already open. "
+                    "Returns annotation records and track layers only, not coordinates or an MVS scene."
                 ),
                 inputSchema={
                     "type": "object",
@@ -661,7 +662,10 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     readOnlyHint=True, destructiveHint=False, openWorldHint=True
                 ),
                 _meta={
-                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                    "ui": {
+                        "resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI),
+                        "visibility": ["app"],
+                    }
                 },
             ),
             types.Tool(
