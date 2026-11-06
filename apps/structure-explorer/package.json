@@ -18,6 +18,9 @@
     "molstar-mvs": "npm:molstar@5.13.1",
     "pdbe-molstar": "^3.12.0"
   },
+  "overrides": {
+    "lodash-es": "^4.18.1"
+  },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/react-dom": "^19.3.0",
