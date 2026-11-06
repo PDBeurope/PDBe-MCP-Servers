@@ -218,7 +218,7 @@ Execute custom read-only Cypher queries against your configured Neo4j graph data
 
 **Security:** Only read-only queries are allowed (MATCH, OPTIONAL MATCH). Write operations (MERGE, CREATE, DELETE, REMOVE, SET, LOAD CSV, FOREACH) are blocked to prevent accidental data modification.
 
-The tool response is formatted as JSON by default, but can be converted to TOON format by setting `TOON_ENABLED=true`.
+Neo4j Cypher query results use TOON by default; set `TOON_ENABLED=false` to use JSON instead.
 
 ## Transports and deployment
 
@@ -260,12 +260,11 @@ Use the HTTP endpoints above on port 8000.
 ## Output format
 
 
-You can enable experimental TOON-formatted output for PDBe API tool responses and Neo4j Cypher query results by setting
-the environment variable `TOON_ENABLED=true`.
+PDBe API tool responses and Neo4j Cypher query results use TOON by default. Set
+the environment variable `TOON_ENABLED=false` to use JSON output instead.
 See the TOON format specification at https://toonformat.dev/.
 
 - If TOON encoding fails for any reason, the server falls back to JSON output.
-- This feature is experimental and intended for opt-in usage only.
 
 
 ## Troubleshooting

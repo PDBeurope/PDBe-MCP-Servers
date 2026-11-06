@@ -136,7 +136,7 @@ Connect to `http://127.0.0.1:8000/api/`, `/search/`, `/apps/`, or `/graph/`.
 The `--all` flag also exposes `/all/`. Use `ROOT_PREFIX` for a path prefix.
 
 See the [server reference](docs/server-reference.md) for Docker, legacy SSE,
-search parameters, graph setup, and experimental TOON output.
+search parameters, graph setup, and TOON output configuration.
 
 ## PDBe-hosted beta server
 

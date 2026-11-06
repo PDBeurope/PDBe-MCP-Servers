@@ -3,7 +3,14 @@
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from pdbe_mcp_server.graph_tools import GraphTools
+from pdbe_mcp_server.graph_tools import GraphTools, _toon_enabled
+
+
+def test_toon_enabled_by_default_and_can_be_disabled() -> None:
+    with patch.dict("os.environ", {}, clear=True):
+        assert _toon_enabled()
+    with patch.dict("os.environ", {"TOON_ENABLED": "false"}, clear=True):
+        assert not _toon_enabled()
 
 
 class TestGraphTools:
