@@ -162,7 +162,8 @@ class TestOpenAPIToMCPGenerator:
 
         arguments = {"id": "test123", "format": "json"}
         tool_name = get_expected_shortened_name("get_test")
-        result = generator.call_tool(tool_name, arguments)
+        with patch.dict("os.environ", {"TOON_ENABLED": "false"}):
+            result = generator.call_tool(tool_name, arguments)
 
         assert len(result) == 1
         assert result[0].type == "text"
@@ -214,7 +215,7 @@ class TestOpenAPIToMCPGenerator:
         generator.list_tools()
 
         tool_name = get_expected_shortened_name("get_test")
-        with patch.dict("os.environ", {"TOON_ENABLED": "true"}):
+        with patch.dict("os.environ", {}, clear=True):
             result = generator.call_tool(tool_name, {"id": "test123"})
 
         assert len(result) == 1

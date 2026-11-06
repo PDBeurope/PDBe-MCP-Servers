@@ -66,8 +66,8 @@ def _neo4j_enabled() -> bool:
 
 
 def _toon_enabled() -> bool:
-    """Check if TOON output is enabled."""
-    return os.getenv("TOON_ENABLED", "").lower() in ("true", "1", "yes")
+    """Check if TOON output is enabled (enabled by default)."""
+    return os.getenv("TOON_ENABLED", "true").lower() in ("true", "1", "yes")
 
 
 def _validate_cypher_query(query: str) -> tuple[bool, str | None]:

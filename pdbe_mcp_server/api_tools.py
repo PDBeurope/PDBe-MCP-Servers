@@ -21,7 +21,7 @@ conf: DictConfig = get_config()
 
 
 def _toon_enabled() -> bool:
-    return os.getenv("TOON_ENABLED", "false").lower() == "true"
+    return os.getenv("TOON_ENABLED", "true").lower() in ("true", "1", "yes")
 
 
 class OpenAPIToMCPGenerator:
