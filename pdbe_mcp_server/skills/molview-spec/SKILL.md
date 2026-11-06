@@ -29,6 +29,10 @@ Coordinate loading and camera navigation do not establish new scientific results
 Ground biological claims, residue mappings, ligand instances and scene choices
 in PDBe evidence. Read [scene guidance](references/scenes.md) when building or
 modifying a scene, and [story guidance](references/stories.md) for a tour or story.
+For every custom view or story, apply the default molecular styling and label
+readability rules in those references unless the user explicitly requests a
+conflicting style. These defaults do not change ordinary structure opening or
+aligned comparison.
 The tool schemas are authoritative; full schema resources are available at
 [scene schema](references/scene.schema.json) and [story schema](references/story.schema.json)
 when exact field details are needed. Read the [builder API reference](references/builder-api.md)

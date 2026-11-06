@@ -25,6 +25,13 @@ Omitted IDs and titles become scene-1/Scene 1, scene-2/Scene 2, etc.; explicit
 values are preferred. `linger_duration_ms` is accepted as an alias for duration_ms.
 Each scene has a complete builder using the single-scene schema, so different
 entries, assemblies, selectors, and viewpoints can appear in successive scenes.
+Apply the [default molecular styling and label placement rules](scenes.md#default-molecular-styling-and-label-placement)
+to every scene builder: retain the polymer overview, add element-colored protein
+side-chain sticks, and use concise, readable residue labels. If the user's request
+mentions surface, SASA, or exposed, include the context-appropriate translucent
+surface in each scene where that structure is shown; preserve the existing
+representations underneath it. Keep label crossings to a best-effort minimum and
+use tooltips/legend for details that do not fit cleanly.
 For a translucent component, use
 `{"selector":"polymer","representation":{"type":"cartoon","opacity":0.3}}`.
 Opacity must be nested in `representation`, not directly on a component or

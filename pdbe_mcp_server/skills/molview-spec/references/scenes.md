@@ -88,6 +88,29 @@ evidence-backed names and put category/source details in tooltips. Focus the
 feature when it is the user's requested point; avoid cluttering overview scenes.
 Scene descriptions accept `description_format: "plaintext" | "markdown"`.
 
+## Default molecular styling and label placement
+
+For every custom molecular view, retain the overview polymer representation and
+add protein side chains as a ball-and-stick component. Select side-chain atoms
+with a valid serialized MolQL query, not by the mmCIF `is_het`/HETATM flag:
+protein side chains may be recorded as either ATOM or HETATM. Use element-based
+color selectors so oxygen is red (`#ff0000`), nitrogen is blue (`#0000ff`), and
+other elements retain the viewer's standard element colors. Keep this layer
+subordinate to an explicitly requested representation or color scheme.
+
+If the user's visualization request mentions “surface”, “SASA”, or “exposed”
+(case-insensitive), add a translucent molecular surface for the relevant protein
+or other structure specified by context. Keep the existing cartoon/stick layers;
+do not replace them with the surface. Treat this as a display choice, not a
+calculated SASA result or a claim that a particular region is solvent-exposed.
+
+Place residue labels close to their residues and toward the outer edge of the
+scene, arranging their leader lines to avoid crossing where possible. MolViewSpec
+does not expose collision-aware label routing, so do not promise crossing-free
+placement. In dense scenes, show only essential labels; move supporting detail
+to tooltips or the legend rather than crowding the view. Do not add residue
+labels when none are relevant to the user's request.
+
 
 ## Input normalization and recovery
 
