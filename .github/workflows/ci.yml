@@ -40,6 +40,7 @@ jobs:
       with:
         name: mcp-app-resources
         path: |
+          pdbe_mcp_server/ui/workspace.html
           pdbe_mcp_server/ui/structure-explorer.html
           pdbe_mcp_server/ui/structure-comparison.html
           pdbe_mcp_server/ui/mvs-viewer.html
