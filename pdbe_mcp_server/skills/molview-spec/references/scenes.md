@@ -27,7 +27,11 @@ Resolve author residue numbering to label numbering for polymer selections:
 `end_label_seq_id`; an array of expressions selects their union. Keep chain IDs
 case-sensitive. For a ligand instance, use its label chain, author residue ID,
 and insertion code when applicable; non-polymer label sequence IDs are undefined.
-`instance_id` identifies a particular assembly or crystal copy.
+`instance_id` identifies a particular assembly or crystal copy. For a requested
+chain-instance color scheme, use selector-specific colors that include the
+supported `instance_id` together with the chain selector, and use only IDs
+available from the structure/viewer context. Do not infer copy IDs or imply
+that ordinary structure opening applies these colors.
 
 Inline `annotations` accept component fields plus `group_id`. Related records
 with one label text and expression selectors can share a group label while

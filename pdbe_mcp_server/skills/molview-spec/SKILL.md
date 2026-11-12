@@ -19,6 +19,16 @@ A successful explorer result (`status: "prepared"`) completes that viewing
 request. Stop calling visualization tools; do not repeatedly reopen the entry
 or switch to another viewer tool to wait for browser rendering.
 
+Ordinary structure opening shows the deposited asymmetric unit unless a valid
+`assembly_id` is supplied; do not describe it as an assembly view by default.
+When an assembly-focused view is requested, use a known deposited assembly ID
+with `ebi-pdbe-open_structure`. For a custom MVS scene, set the structure type
+to `assembly`; use a known ID or omit it so Mol* selects the first available
+assembly—never invent an ID. The ordinary open tool does not expose a
+chain-instance coloring option. If chain-instance colors are requested, use a
+custom MVS scene and distinguish copies only with supported, evidence-backed
+`instance_id` selectors; do not claim ordinary opens are colored by instance.
+
 The App displays supplied scientific data. Preserve PDBe/SIFTS residue
 correspondence and supplied alignment transforms. Do not calculate RMSD,
 per-residue displacement, distance-cutoff ligand neighbourhoods or inferred
