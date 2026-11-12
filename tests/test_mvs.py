@@ -37,6 +37,232 @@ def test_default_scene_is_downloadable_mvs_with_roundtrippable_spec():
     assert again["builder"] == result["builder"]
 
 
+def test_native_animation_tracks_compile_with_references_and_roundtrip():
+    builder = {
+        "pdb_id": "1cbs",
+        "structure": {
+            "ref": "structure",
+            "transform": {"translation": [-10, 0, 0], "ref": "xform"},
+        },
+        "components": [
+            {
+                "selector": "ligand",
+                "representation": {
+                    "type": "ball_and_stick",
+                    "ref": "ligand",
+                    "opacity": 0,
+                    "opacity_ref": "ligand-opacity",
+                    "emissive": 0,
+                },
+                "color": {"color": "blue", "ref": "ligand-color"},
+            }
+        ],
+        "animation": {
+            "autoplay": True,
+            "loop": False,
+            "duration_ms": 4000,
+            "trackball": {"name": "rock", "speed": 0.15},
+            "interpolations": [
+                {
+                    "kind": "scalar",
+                    "target_ref": "ligand-opacity",
+                    "property": "opacity",
+                    "duration_ms": 500,
+                    "start_ms": 1000,
+                    "end": 1,
+                },
+                {
+                    "kind": "color",
+                    "target_ref": "ligand-color",
+                    "property": "color",
+                    "duration_ms": 1000,
+                    "end": "red",
+                    "palette": {"kind": "continuous", "colors": ["blue", "red"]},
+                },
+                {
+                    "kind": "vec3",
+                    "target_ref": "xform",
+                    "property": "translation",
+                    "duration_ms": 2000,
+                    "end": [0, 0, 0],
+                },
+                {
+                    "kind": "rotation_matrix",
+                    "target_ref": "xform",
+                    "property": "rotation",
+                    "duration_ms": 2000,
+                    "noise_magnitude": 0.2,
+                },
+                {
+                    "kind": "transform_matrix",
+                    "target_ref": "xform",
+                    "property": "matrix",
+                    "duration_ms": 2000,
+                    "translation_end": [0, 0, 0],
+                    "rotation_frequency": 2,
+                    "rotation_alternate_direction": True,
+                },
+                {
+                    "kind": "scalar",
+                    "target_ref": "ligand",
+                    "property": [
+                        "custom",
+                        "molstar_representation_params",
+                        "emissive",
+                    ],
+                    "duration_ms": 2000,
+                    "frequency": 4,
+                    "alternate_direction": True,
+                    "end": 1,
+                },
+            ],
+        },
+    }
+    result = build_mvs({"builder": builder})
+    root = result["mvsj"]["root"]
+    animation = next(nodes(root, "animation"))
+    assert animation["params"]["autoplay"] is True
+    assert animation["custom"]["molstar_trackball"]["name"] == "rock"
+    assert len(list(nodes(animation, "interpolate"))) == 6
+    assert next(nodes(root, "transform"))["ref"] == "xform"
+    rep = next(nodes(root, "representation"))
+    assert rep["ref"] == "ligand"
+    assert rep["custom"]["molstar_representation_params"]["emissive"] == 0
+    assert next(nodes(root, "opacity"))["ref"] == "ligand-opacity"
+    assert next(nodes(root, "color"))["ref"] == "ligand-color"
+    again = build_mvs({"builder": result["builder"]})
+    assert again["mvsj"]["root"] == root
+
+
+def test_story_rejects_autoplay_animation_that_outlives_scene():
+    data = story_input()
+    scene = data["story"]["scenes"][0]
+    scene["builder"]["components"] = [
+        {"representation": {"opacity": 0, "opacity_ref": "protein-opacity"}}
+    ]
+    scene["builder"]["animation"] = {
+        "interpolations": [
+            {
+                "kind": "scalar",
+                "target_ref": "protein-opacity",
+                "property": "opacity",
+                "duration_ms": 8000,
+                "end": 1,
+            }
+        ]
+    }
+    with pytest.raises(ValueError, match="Scene duration_ms"):
+        build_mvs_story(data)
+
+
+def test_story_animation_is_compiled_inside_its_native_snapshot():
+    data = story_input()
+    data["story"]["scenes"][0]["builder"]["components"] = [
+        {
+            "selector": "polymer",
+            "representation": {"opacity": 0, "opacity_ref": "protein-opacity"},
+        }
+    ]
+    data["story"]["scenes"][0]["builder"]["animation"] = {
+        "interpolations": [
+            {
+                "kind": "scalar",
+                "target_ref": "protein-opacity",
+                "property": "opacity",
+                "duration_ms": 500,
+                "end": 1,
+            }
+        ]
+    }
+    result = build_mvs_story(data)
+    assert len(list(nodes(result["mvsj"]["snapshots"][0]["root"], "animation"))) == 1
+    assert not list(nodes(result["mvsj"]["snapshots"][1]["root"], "animation"))
+    again = build_mvs_story({"story": result["story"]})
+    assert again["mvsj"]["snapshots"] == result["mvsj"]["snapshots"]
+
+
+@pytest.mark.parametrize(
+    "animation,components",
+    [
+        (
+            {
+                "interpolations": [
+                    {
+                        "kind": "scalar",
+                        "target_ref": "missing",
+                        "property": "opacity",
+                        "duration_ms": 10,
+                    }
+                ]
+            },
+            [{"representation": {"opacity": 0, "opacity_ref": "real"}}],
+        ),
+        (
+            {
+                "interpolations": [
+                    {
+                        "kind": "scalar",
+                        "target_ref": "alpha",
+                        "property": "opacity",
+                        "duration_ms": 10,
+                        "end": 1,
+                    }
+                ]
+            },
+            [{"color": {"color": "blue", "ref": "alpha"}}],
+        ),
+        (
+            {
+                "interpolations": [
+                    {
+                        "kind": "scalar",
+                        "target_ref": "rep",
+                        "property": [
+                            "custom",
+                            "molstar_representation_params",
+                            "emissive",
+                        ],
+                        "duration_ms": 10,
+                        "end": 1,
+                    }
+                ]
+            },
+            [{"representation": {"ref": "rep"}}],
+        ),
+    ],
+)
+def test_animation_rejects_unknown_or_incompatible_references(animation, components):
+    with pytest.raises(ValueError):
+        compile_scene(components=components, animation=animation)
+
+
+@pytest.mark.parametrize(
+    "kind,property_value",
+    [
+        ("scalar", "translation"),
+        ("vec3", "position"),
+        ("rotation_matrix", "translation"),
+        ("transform_matrix", "translation"),
+    ],
+)
+def test_transform_animation_rejects_unsupported_properties(kind, property_value):
+    animation = {
+        "interpolations": [
+            {
+                "kind": kind,
+                "target_ref": "xform",
+                "property": property_value,
+                "duration_ms": 10,
+            }
+        ]
+    }
+    with pytest.raises(ValueError):
+        compile_scene(
+            structure={"transform": {"translation": [0, 0, 0], "ref": "xform"}},
+            animation=animation,
+        )
+
+
 def test_residue_ranges_and_ligand_instances_preserve_identifier_systems():
     polymer = {"label_asym_id": "A", "beg_label_seq_id": 10, "end_label_seq_id": 20}
     ligand = {

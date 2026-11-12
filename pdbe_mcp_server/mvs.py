@@ -256,6 +256,7 @@ class Camera(Spec):
     target: Vec3
     position: Vec3
     up: Vec3 = (0, 1, 0)
+    ref: Ref | None = None
 
     @model_validator(mode="after")
     def check_orientation(self):
@@ -274,6 +275,7 @@ class Camera(Spec):
 
 class Canvas(Spec):
     background_color: str = "white"
+    ref: Ref | None = None
     _color = field_validator("background_color")(valid_color)
 
 
@@ -282,6 +284,7 @@ class Transform(Spec):
     translation: Vec3 | None = None
     rotation_center: Vec3 | Literal["centroid"] | None = None
     matrix: Annotated[list[float], Field(min_length=16, max_length=16)] | None = None
+    ref: Ref | None = None
 
     @model_validator(mode="after")
     def geometry(self):
@@ -290,7 +293,7 @@ class Transform(Spec):
             for v in (self.rotation, self.translation, self.rotation_center)
         ):
             raise ValueError("Use matrix or rotation/translation/rotation_center")
-        if not self.model_dump(exclude_none=True):
+        if not self.model_dump(exclude_none=True, exclude={"ref"}):
             raise ValueError("Provide a transform matrix, rotation or translation")
         if self.matrix is not None and any(
             abs(self.matrix[i] - expected) > 1e-6
@@ -313,6 +316,176 @@ class Transform(Spec):
             if abs(determinant - 1) > 1e-5:
                 raise ValueError("rotation must have determinant 1")
         return self
+
+
+Easing = Literal[
+    "linear",
+    "bounce-in",
+    "bounce-out",
+    "bounce-in-out",
+    "circle-in",
+    "circle-out",
+    "circle-in-out",
+    "cubic-in",
+    "cubic-out",
+    "cubic-in-out",
+    "exp-in",
+    "exp-out",
+    "exp-in-out",
+    "quad-in",
+    "quad-out",
+    "quad-in-out",
+    "sin-in",
+    "sin-out",
+    "sin-in-out",
+]
+
+
+AnimationProperty = str | list[str | int]
+
+
+class AnimationTrackball(Spec):
+    name: Literal["rock", "spin"]
+    speed: float = Field(default=0.05, gt=0, le=1)
+
+
+class AnimationPalette(Spec):
+    kind: Literal["continuous", "discrete"]
+    colors: list[str] = Field(min_length=2, max_length=32)
+    reverse: bool = False
+    mode: Literal["absolute", "normalized"] = "normalized"
+    value_domain: tuple[float | None, float | None] | None = None
+    underflow_color: str | None = None
+    overflow_color: str | None = None
+
+    @field_validator("colors")
+    @classmethod
+    def palette_colors(cls, values):
+        return [valid_color(value) for value in values]
+
+    @field_validator("underflow_color", "overflow_color")
+    @classmethod
+    def palette_edge_colors(cls, value):
+        return valid_color(value) if value not in (None, "auto") else value
+
+
+class InterpolationBase(Spec):
+    target_ref: Ref
+    property: AnimationProperty
+    start_ms: int = Field(default=0, ge=0, le=300000, strict=True)
+    duration_ms: int = Field(ge=0, le=300000, strict=True)
+    easing: Easing | None = None
+    frequency: float | None = Field(default=None, gt=0, le=1000)
+    alternate_direction: bool | None = None
+
+    @field_validator("property")
+    @classmethod
+    def property_path(cls, value):
+        if isinstance(value, list) and (
+            not value
+            or len(value) > 12
+            or any(not isinstance(part, (str, int)) for part in value)
+        ):
+            raise ValueError("property paths must contain 1–12 string/integer parts")
+        if isinstance(value, str) and not value:
+            raise ValueError("property must not be empty")
+        return value
+
+
+class ScalarInterpolation(InterpolationBase):
+    kind: Literal["scalar"]
+    start: float | list[float] | None = None
+    end: float | list[float] | None = None
+    noise_magnitude: float | None = Field(default=None, ge=0)
+    discrete: bool | None = None
+
+
+class Vec3Interpolation(InterpolationBase):
+    kind: Literal["vec3"]
+    start: list[float] | None = Field(default=None, min_length=3, max_length=3000)
+    end: list[float] | None = Field(default=None, min_length=3, max_length=3000)
+    noise_magnitude: float | None = Field(default=None, ge=0)
+    spherical: bool | None = None
+
+    @model_validator(mode="after")
+    def vector_lengths(self):
+        if any(
+            values is not None and len(values) % 3 for values in (self.start, self.end)
+        ):
+            raise ValueError("vec3 values must contain complete xyz triples")
+        return self
+
+
+class RotationMatrixInterpolation(InterpolationBase):
+    kind: Literal["rotation_matrix"]
+    start: list[float] | None = Field(default=None, min_length=9, max_length=9)
+    end: list[float] | None = Field(default=None, min_length=9, max_length=9)
+    noise_magnitude: float | None = Field(default=None, ge=0)
+
+
+class TransformMatrixInterpolation(InterpolationBase):
+    kind: Literal["transform_matrix"]
+    pivot: Vec3 | None = None
+    rotation_start: list[float] | None = Field(default=None, min_length=9, max_length=9)
+    rotation_end: list[float] | None = Field(default=None, min_length=9, max_length=9)
+    rotation_noise_magnitude: float | None = Field(default=None, ge=0)
+    rotation_easing: Easing | None = None
+    rotation_frequency: float | None = Field(default=None, gt=0, le=1000)
+    rotation_alternate_direction: bool | None = None
+    translation_start: Vec3 | None = None
+    translation_end: Vec3 | None = None
+    translation_noise_magnitude: float | None = Field(default=None, ge=0)
+    translation_easing: Easing | None = None
+    translation_frequency: float | None = Field(default=None, gt=0, le=1000)
+    translation_alternate_direction: bool | None = None
+    scale_start: Vec3 | None = None
+    scale_end: Vec3 | None = None
+    scale_noise_magnitude: float | None = Field(default=None, ge=0)
+    scale_easing: Easing | None = None
+    scale_frequency: float | None = Field(default=None, gt=0, le=1000)
+    scale_alternate_direction: bool | None = None
+
+
+AnimationColor = str | dict[str, str]
+
+
+class ColorInterpolation(InterpolationBase):
+    kind: Literal["color"]
+    start: AnimationColor | None = None
+    end: AnimationColor | None = None
+    palette: AnimationPalette | None = None
+
+    @field_validator("start", "end")
+    @classmethod
+    def colors(cls, value):
+        if isinstance(value, str):
+            return valid_color(value)
+        if value is not None:
+            return {key: valid_color(color) for key, color in value.items()}
+        return value
+
+
+Interpolation = Annotated[
+    Union[
+        ScalarInterpolation,
+        Vec3Interpolation,
+        RotationMatrixInterpolation,
+        TransformMatrixInterpolation,
+        ColorInterpolation,
+    ],
+    Field(discriminator="kind"),
+]
+
+
+class MVSAnimation(Spec):
+    frame_time_ms: float = Field(default=1000 / 60, gt=0, le=1000)
+    duration_ms: int | None = Field(default=None, ge=0, le=300000, strict=True)
+    autoplay: bool = True
+    loop: bool = False
+    include_camera: bool = False
+    include_canvas: bool = False
+    trackball: AnimationTrackball | None = None
+    interpolations: list[Interpolation] = Field(default_factory=list, max_length=100)
 
 
 class PositionExpressions(Spec):
@@ -564,6 +737,9 @@ class Clip(Spec):
 
 
 class Representation(Spec):
+    ref: Ref | None = None
+    opacity_ref: Ref | None = None
+    emissive: float | None = Field(default=None, ge=0, le=10)
     type: Literal[
         "cartoon",
         "ball_and_stick",
@@ -604,6 +780,8 @@ class Representation(Spec):
 
     @model_validator(mode="after")
     def options(self):
+        if self.opacity_ref is not None and self.opacity is None:
+            raise ValueError("opacity_ref requires representation.opacity")
         for key, allowed in {
             "size_theme": {"putty"},
             "surface_type": {"surface"},
@@ -699,6 +877,7 @@ class Color(Spec):
     _selector_case = field_validator("selector", mode="before")(_static_selector)
     color: str
     selector: Selector | None = None
+    ref: Ref | None = None
     _color = field_validator("color")(valid_color)
 
 
@@ -981,6 +1160,7 @@ class Scene(StructureLayer):
     volumes: list[Volume] = Field(default_factory=list, max_length=20)
     canvas: Canvas = Field(default_factory=Canvas)
     camera: Camera | None = None
+    animation: MVSAnimation | None = None
     additional_structures: list[StructureLayer] = Field(
         default_factory=list, max_length=9
     )
@@ -988,18 +1168,110 @@ class Scene(StructureLayer):
     @model_validator(mode="after")
     def references(self):
         layers = [self, *self.additional_structures]
-        refs = [
-            layer.structure.ref for layer in layers if layer.structure.ref is not None
-        ]
-        if len(refs) != len(set(refs)):
-            raise ValueError("Structure references must be unique within a scene")
+        refs: dict[str, str] = {}
+        emissive_refs: set[str] = set()
+
+        def add_ref(ref, kind):
+            if ref is None:
+                return
+            if ref in refs:
+                raise ValueError(f"References must be unique within a scene: {ref}")
+            refs[ref] = kind
+
+        for layer in layers:
+            add_ref(layer.structure.ref, "structure")
+            if layer.structure.transform:
+                add_ref(layer.structure.transform.ref, "transform")
+            for transform in layer.structure.instances:
+                add_ref(transform.ref, "transform")
+            for item in [*layer.components, *layer.annotations]:
+                add_ref(item.representation.ref, "representation")
+                if item.representation.ref and item.representation.emissive is not None:
+                    emissive_refs.add(item.representation.ref)
+                if (
+                    item.representation.opacity_ref
+                    and item.representation.opacity is None
+                ):
+                    raise ValueError("opacity_ref requires representation.opacity")
+                add_ref(item.representation.opacity_ref, "opacity")
+                for color in ([item.color] if item.color else []) + item.colors:
+                    add_ref(color.ref, "color")
+        add_ref(self.camera.ref if self.camera else None, "camera")
+        add_ref(self.canvas.ref, "canvas")
+
+        structure_refs = {ref for ref, kind in refs.items() if kind == "structure"}
         for layer in layers:
             for primitive in layer.primitives:
                 for name in ("center", "start", "end", "a", "b", "c", "position"):
                     position = getattr(primitive, name, None)
                     ref = getattr(position, "structure_ref", None)
-                    if ref is not None and ref not in refs:
+                    if ref is not None and ref not in structure_refs:
                         raise ValueError(f"Unknown primitive structure_ref: {ref}")
+        if self.animation:
+            if self.animation.duration_ms is not None and any(
+                track.start_ms + track.duration_ms > self.animation.duration_ms
+                for track in self.animation.interpolations
+            ):
+                raise ValueError("animation.duration_ms must cover every interpolation")
+            for interpolation in self.animation.interpolations:
+                target_kind = refs.get(interpolation.target_ref)
+                if target_kind is None:
+                    raise ValueError(
+                        f"Unknown animation target_ref: {interpolation.target_ref}"
+                    )
+                expected = {
+                    "scalar": {"opacity", "representation"},
+                    "color": {"color", "canvas"},
+                    "vec3": {"transform", "camera"},
+                    "rotation_matrix": {"transform"},
+                    "transform_matrix": {"transform"},
+                }[interpolation.kind]
+                if target_kind not in expected:
+                    raise ValueError(
+                        f"{interpolation.kind} animation cannot target {target_kind} ref {interpolation.target_ref}"
+                    )
+                property_value = interpolation.property
+                if target_kind == "opacity" and (
+                    interpolation.kind != "scalar" or property_value != "opacity"
+                ):
+                    raise ValueError("Opacity refs require scalar property='opacity'")
+                if target_kind == "color" and (
+                    interpolation.kind != "color" or property_value != "color"
+                ):
+                    raise ValueError("Color refs require color property='color'")
+                if target_kind == "canvas" and (
+                    interpolation.kind != "color"
+                    or property_value != "background_color"
+                ):
+                    raise ValueError(
+                        "Canvas refs require color property='background_color'"
+                    )
+                if target_kind == "camera" and (
+                    interpolation.kind != "vec3"
+                    or property_value not in ("position", "target", "up")
+                ):
+                    raise ValueError(
+                        "Camera refs support vec3 position, target, or up properties"
+                    )
+                if target_kind == "transform":
+                    transform_properties = {
+                        "vec3": "translation",
+                        "rotation_matrix": "rotation",
+                        "transform_matrix": "matrix",
+                    }
+                    if property_value != transform_properties.get(interpolation.kind):
+                        raise ValueError(
+                            f"{interpolation.kind} animation has an incompatible transform property"
+                        )
+                if target_kind == "representation" and (
+                    interpolation.kind != "scalar"
+                    or property_value
+                    != ["custom", "molstar_representation_params", "emissive"]
+                    or interpolation.target_ref not in emissive_refs
+                ):
+                    raise ValueError(
+                        "Representation refs may only animate configured emissive values with a scalar interpolation"
+                    )
         return self
 
 
@@ -1051,6 +1323,24 @@ class StoryScene(Spec):
     transition: Transition | None = None
     description_format: Literal["plaintext", "markdown"] = "plaintext"
     builder: Scene
+
+    @model_validator(mode="after")
+    def animation_fits_scene(self):
+        animation = self.builder.animation
+        if animation and animation.autoplay and not animation.loop:
+            end_ms = max(
+                (
+                    track.start_ms + track.duration_ms
+                    for track in animation.interpolations
+                ),
+                default=0,
+            )
+            required_ms = max(end_ms, animation.duration_ms or 0)
+            if required_ms > self.duration_ms:
+                raise ValueError(
+                    "Scene duration_ms must cover its autoplaying non-looping animation"
+                )
+        return self
 
 
 class Story(Spec):
@@ -1185,7 +1475,7 @@ def _compile_primitives(structure, primitives):
         getattr(group, item.type)(**params)
 
 
-def _compile_layer(root, layer, legend, representation_specs):
+def _compile_layer(root, layer, legend, representation_specs, style_specs):
     if layer.structure.url is None and layer.structure.format != "bcif":
         raise ValueError("A custom URL is required for formats other than bcif")
     layer.structure.url = (
@@ -1217,9 +1507,11 @@ def _compile_layer(root, layer, legend, representation_specs):
     structure = getattr(parsed, f"{options.type}_structure")(**params)
     groups: dict[str, list[tuple[Annotation, Any]]] = {}
     if options.transform is not None:
-        structure.transform(**options.transform.model_dump(exclude_none=True))
+        structure.transform(
+            **options.transform.model_dump(exclude_none=True, exclude={"ref"})
+        )
     for instance in options.instances:
-        structure.instance(**instance.model_dump(exclude_none=True))
+        structure.instance(**instance.model_dump(exclude_none=True, exclude={"ref"}))
     for data in layer.labels_from:
         _annotation_call(structure, "label", data)
     for data in layer.tooltips_from:
@@ -1293,6 +1585,7 @@ def _compile_layer(root, layer, legend, representation_specs):
                 else item.representation.type
             )
             representation_specs.append(item.representation)
+            style_specs.append(item)
             if item.representation.opacity is not None:
                 rep.opacity(opacity=item.representation.opacity)
             for color in ([item.color] if item.color else []) + item.colors:
@@ -1348,6 +1641,42 @@ def _normalized_layer(layer):
     return spec
 
 
+def _attach_scene_refs(root, scene, layers):
+    if scene.canvas.ref is not None:
+        next(node for node in root["children"] if node["kind"] == "canvas")["ref"] = (
+            scene.canvas.ref
+        )
+    if scene.camera and scene.camera.ref is not None:
+        next(node for node in root["children"] if node["kind"] == "camera")["ref"] = (
+            scene.camera.ref
+        )
+
+    structures = iter(layers)
+
+    def visit(node):
+        if node["kind"] == "structure":
+            layer = next(structures)
+            if layer.structure.ref is not None:
+                node["ref"] = layer.structure.ref
+            transforms = iter(
+                [layer.structure.transform] if layer.structure.transform else []
+            )
+            instances = iter(layer.structure.instances)
+            for child in node.get("children", []):
+                if child["kind"] == "transform":
+                    transform = next(transforms, None)
+                    if transform and transform.ref is not None:
+                        child["ref"] = transform.ref
+                elif child["kind"] == "instance":
+                    transform = next(instances, None)
+                    if transform and transform.ref is not None:
+                        child["ref"] = transform.ref
+        for child in node.get("children", []):
+            visit(child)
+
+    visit(root)
+
+
 def build_mvs(arguments: dict[str, Any]) -> dict[str, Any]:
     """Compile a complete replacement scene; never execute caller-supplied code."""
     scene = BuildMvsInput.model_validate(arguments).builder
@@ -1359,16 +1688,20 @@ def build_mvs(arguments: dict[str, Any]) -> dict[str, Any]:
         or f"https://www.ebi.ac.uk/pdbe/entry-files/download/{scene.pdb_id}.bcif"
     )
     root = create_builder()
-    root.canvas(**scene.canvas.model_dump())
+    root.canvas(**scene.canvas.model_dump(exclude={"ref"}))
     if scene.camera:
-        root.camera(**scene.camera.model_dump())
+        root.camera(**scene.camera.model_dump(exclude={"ref"}))
     legend = []
     warnings = [
         "Scene selections and descriptions are caller-supplied; compilation does not verify biological claims."
     ]
     representation_specs: list[Representation] = []
-    for layer in [scene, *scene.additional_structures]:
-        structure = _compile_layer(root, layer, legend, representation_specs)
+    style_specs: list[ComponentStyle] = []
+    layers = [scene, *scene.additional_structures]
+    for layer in layers:
+        structure = _compile_layer(
+            root, layer, legend, representation_specs, style_specs
+        )
         if layer is not scene and layer.focus:
             _focus(structure.component(selector="all"), layer.focus)
     for volume_spec in scene.volumes:
@@ -1401,13 +1734,34 @@ def build_mvs(arguments: dict[str, Any]) -> dict[str, Any]:
         ).model_dump_json(exclude_none=True, by_alias=True)
     )
     specs = iter(representation_specs)
+    styles = iter(style_specs)
 
     def viewer_parameters(node):
         if node["kind"] == "representation":
             spec = next(specs)
+            style = next(styles)
             node["params"] = spec.model_dump(
-                mode="json", exclude_none=True, exclude={"opacity", "clip"}
+                mode="json",
+                exclude_none=True,
+                exclude={"opacity", "clip", "ref", "opacity_ref", "emissive"},
             )
+            if spec.ref is not None:
+                node["ref"] = spec.ref
+            if spec.emissive is not None:
+                node["custom"] = {
+                    "molstar_representation_params": {"emissive": spec.emissive}
+                }
+            opacity_ref = spec.opacity_ref
+            color_specs = ([style.color] if style.color else []) + style.colors
+            color_nodes = [
+                child for child in node.get("children", []) if child["kind"] == "color"
+            ]
+            for child, color_spec in zip(color_nodes, color_specs):
+                if color_spec.ref is not None:
+                    child["ref"] = color_spec.ref
+            for child in node.get("children", []):
+                if child["kind"] == "opacity" and opacity_ref is not None:
+                    child["ref"] = opacity_ref
             clips = (
                 spec.clip
                 if isinstance(spec.clip, list)
@@ -1426,6 +1780,30 @@ def build_mvs(arguments: dict[str, Any]) -> dict[str, Any]:
             viewer_parameters(child)
 
     viewer_parameters(mvsj["root"])
+    _attach_scene_refs(mvsj["root"], scene, layers)
+    if scene.animation is not None:
+        animation = scene.animation
+        animation_params = animation.model_dump(
+            exclude_none=True,
+            exclude={"trackball", "interpolations"},
+        )
+        animation_node = {"kind": "animation", "params": animation_params}
+        if animation.trackball is not None:
+            animation_node["custom"] = {
+                "molstar_trackball": {
+                    "name": animation.trackball.name,
+                    "params": {"speed": animation.trackball.speed},
+                }
+            }
+        if animation.interpolations:
+            animation_node["children"] = [
+                {
+                    "kind": "interpolate",
+                    "params": interpolation.model_dump(exclude_none=True),
+                }
+                for interpolation in animation.interpolations
+            ]
+        mvsj["root"].setdefault("children", []).append(animation_node)
     normalized = _normalized_layer(scene)
     normalized["additional_structures"] = [
         _normalized_layer(layer) for layer in scene.additional_structures
