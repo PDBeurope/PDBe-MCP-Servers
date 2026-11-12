@@ -558,7 +558,6 @@ async function mutate(operations: WorkspaceOperation[], prepare?: () => Promise<
         workspace,
         builder: { pdb_id: firstStructure.pdb_id, title: updatedScene.title },
         mvsj: data.mvsj,
-        legend: [],
         warnings: data.warnings ?? workspace.warnings ?? [],
         coordinate_url: data.coordinate_url ?? scene.coordinate_url,
       };
@@ -697,38 +696,6 @@ function showSceneDetails(): void {
   const identifiers = el("pdb-ids");
   identifiers.hidden = !pdbIds.length;
   identifiers.textContent = pdbIds.length ? `${pdbIds.length === 1 ? "PDB ID" : "PDB IDs"}: ${pdbIds.join(" · ")}` : "";
-  const layers = activeWorkspace?.layers;
-  const legend: LegendItem[] = layers ? layers.filter(layer => layer.visible && layerCategory(layer) !== "annotations").map(layer => {
-    const definition = layer.component ?? layer.annotation;
-    const colorSpecs = [definition?.["color"], ...(Array.isArray(definition?.["colors"]) ? definition["colors"] : [])];
-    let colors: string[] = [];
-    for (const value of colorSpecs) {
-      const spec = value as { color?: string; selector?: unknown } | undefined;
-      if (typeof spec?.color !== "string") continue;
-      // Match builder ordering: an unconditional colour replaces earlier ones.
-      if (spec.selector == null) colors = [];
-      if (!colors.includes(spec.color)) colors.push(spec.color);
-    }
-    return { label: layer.name, colors,
-      representation: String((definition?.["representation"] as { type?: string } | undefined)?.type ?? "cartoon") };
-  }) : active?.legend ?? scene?.legend ?? [];
-  el("legend").replaceChildren(...legend.map(item => {
-    const li = document.createElement("li");
-    const colors = [...new Set(item.colors ?? [])].filter(color => CSS.supports("color", color));
-    for (const color of colors) {
-      const swatch = document.createElement("span");
-      swatch.className = "legend-swatch";
-      swatch.style.backgroundColor = color;
-      swatch.title = `Highlight color: ${color}`;
-      swatch.setAttribute("aria-hidden", "true");
-      li.append(swatch);
-    }
-    const label = document.createElement("span");
-    label.textContent = `${item.label} · ${item.representation.replaceAll("_", " ")}`;
-    li.append(label);
-    if (colors.length) li.setAttribute("aria-label", `${label.textContent}; highlight colors: ${colors.join(", ")}`);
-    return li;
-  }));
   el("source").textContent = `Coordinates: ${active?.coordinate_url ?? scene?.coordinate_url ?? ""}`;
 
 }
