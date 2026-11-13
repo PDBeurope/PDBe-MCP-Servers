@@ -213,10 +213,13 @@ JSON; Save MVSJ exports the compiled molecular visualization.
 
 **Host routing:** sharing a resource URI does not by itself join separate App
 instances. To update an existing viewer across model tool calls, the host must
-route matching workspace IDs to that instance. Otherwise the returned complete
-state opens as a new viewer. App-initiated layer changes use `callServerTool` and
-apply its result to the originating viewer. No global process-wide workspace
-store or cross-user session state is introduced.
+route matching workspace IDs to that instance. Viewer-scoped edits must use the
+workspace update contract and preserve the target ID; if a result has a different
+or unidentifiable workspace, the host leaves the selected viewer unchanged and
+reports the mismatch instead of opening a second viewer. Main-chat requests for
+new views may still open separately. App-initiated layer changes use
+`callServerTool` and apply their result to the originating viewer. No global
+process-wide workspace store or cross-user session state is introduced.
 
 Workspace restore and updates accept scientific definitions, not executable code
 or arbitrary MVS trees. Coordinate and annotation URLs retain the existing

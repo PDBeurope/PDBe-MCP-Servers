@@ -172,5 +172,13 @@ annotation palettes, or every optional primitive/group style from the package.
 Use supported fields and state any material limitation. A compiled result proves
 construction only; the App reports resource loading separately. Preserve the
 complete normalized specification for follow-ups and stop after compilation.
-The host determines placement: viewer edits use `replace_in_place` and main-chat
-requests use `new_viewer`. Always compile through the same builder tools.
+For a viewer-scoped edit on a server advertising `ebi-pdbe-update_workspace`,
+use that operation with the complete latest workspace, its current revision, and
+minimal operations; preserve the workspace ID and unrelated state. Do not request
+a compact response unless the host explicitly supports merging it into the
+current workspace. Do not use a fresh `build_mvs` result as a substitute for
+updating that workspace. Use the
+full-replacement builder workflow only on older servers without workspace
+updates. Main-chat requests for new views use the builder tools. Host placement
+fields such as `pdbe_visualization_request.mode` are routing context, not MCP
+arguments.
