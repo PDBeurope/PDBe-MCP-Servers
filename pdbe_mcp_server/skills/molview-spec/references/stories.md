@@ -54,12 +54,12 @@ bounce/circle/cubic/exp/quad/sin in/out/in-out variants). This controls entry in
 that snapshot and takes precedence over legacy snapshot transition timing.
 Use explicit camera or focus settings to make the intended camera change visible.
 
-For follow-up edits, retain the latest full story from host context, modify only
-the relevant scene(s), and submit a complete replacement. To add surfaces to
-ligands throughout a story, preserve all scene IDs, timing and narratives and
+For follow-up visualization requests, retain the latest full story from the
+available context, modify only the relevant scene(s), and submit a complete
+replacement as a new viewer. Existing viewers remain unchanged. To add surfaces
+to ligands throughout a story, preserve all scene IDs, timing and narratives and
 append a ligand surface component to each relevant scene. If the user refers to
-one named scene, modify that scene. A replacement updates the originating viewer for host mode `replace_in_place`;
-main-chat mode `new_viewer` creates a separate viewer.
+one named scene, modify that scene.
 
 ## Optional kinase story pattern
 

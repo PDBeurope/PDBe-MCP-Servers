@@ -518,8 +518,8 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     "workspace from tool results or App context, expected_revision, and atomic operations. "
                     "Supports adding/removing scenes and structures, component or annotation layers, "
                     "and changing layer visibility. IDs must match exactly. No operations validates and restores "
-                    "a saved workspace. No global server state is stored. The host must route matching workspace "
-                    "IDs to an existing App for cross-call updates; otherwise a new viewer opens. "
+                    "a saved workspace. This tool is available only to the interactive App for its controls and "
+                    "saved-workspace restore; it is not available to chat responses. No global server state is stored. "
                     "The App displays supplied coordinates, transforms, residue mappings and annotations; it does not calculate scientific measurements."
                 ),
                 inputSchema=UpdateWorkspaceInput.model_json_schema(),
@@ -527,7 +527,10 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     readOnlyHint=True, destructiveHint=False, openWorldHint=True
                 ),
                 _meta={
-                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                    "ui": {
+                        "resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI),
+                        "visibility": ["app"],
+                    }
                 },
             ),
             types.Tool(
@@ -537,7 +540,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     "Each scene has a unique id, title, description and complete builder specification "
                     "using the same schema as build_mvs. Set component opacity inside representation.opacity, never directly on a component. Ground all narrative claims and selections "
                     "in PDBe evidence. Returns one native multi-state MVSJ with timed playback, "
-                    "scene navigation and download. The host can update the originating viewer or open a new result. "
+                    "scene navigation and download. Every chat request opens a separate new viewer. "
                     "Default duration is 6500 ms per scene and camera transition is 1500 ms. "
                     "Stop after a compiled result. On validation failure, correct the input and retry once; never repeat identical input. Compilation does not establish coordinate availability or verify biological claims."
                 ),
@@ -554,7 +557,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                 description=(
                     "Build a custom single-scene molecular visualization with MolViewSpec "
                     "and open it in Mol* 5.13.1. Supply a complete builder specification, "
-                    "including existing choices for follow-up changes; the host routes each result to an existing viewer or a new one. "
+                    "including choices from the recent visualization context. Every chat request opens a separate new viewer. "
                     "Supports chains, residue ranges, ligand instances, representations, colors, "
                     "opacity, inline annotations, labels, tooltips, focus and camera. Set component opacity inside representation.opacity, never directly on a component. "
                     "Ground selections in PDBe data; use label_seq_id for polymer residues "

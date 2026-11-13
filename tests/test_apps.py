@@ -382,7 +382,7 @@ async def test_display_preferences_are_isolated_between_clients(app_client):
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("endpoint", ["apps", "all"])
-async def test_annotation_loader_is_app_only_and_structure_open_is_model_visible(
+async def test_workspace_and_annotation_helpers_are_app_only(
     app_client, endpoint
 ):
     tools = (await rpc(app_client, f"/mcp/{endpoint}/", "tools/list"))["result"][
@@ -391,6 +391,9 @@ async def test_annotation_loader_is_app_only_and_structure_open_is_model_visible
     by_name = {tool["name"]: tool for tool in tools}
     annotation_tool = by_name["ebi-pdbe-load_structure_annotations"]
     assert annotation_tool["_meta"]["ui"]["visibility"] == ["app"]
+    workspace_tools = [tool for tool in tools if tool["name"].endswith("update_workspace")]
+    assert workspace_tools
+    assert all(tool["_meta"]["ui"]["visibility"] == ["app"] for tool in workspace_tools)
     description = annotation_tool["description"]
     assert "never call this" in description
     assert "including when they provide only an entry ID" in description

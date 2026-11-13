@@ -115,7 +115,6 @@ function workspaceControls() {
 }
 function renderWorkspaceControls() {
   const active = activeWorkspaceScene();
-  el("workspace-id").textContent = workspace ? `${workspace.id} · revision ${workspace.revision}` : "";
   el("layers").replaceChildren();
   el("ligand-layers").replaceChildren();
   if (!active) { workspaceControls(); return; }

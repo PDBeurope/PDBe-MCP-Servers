@@ -49,21 +49,14 @@ when exact field details are needed. Read the [builder API reference](references
 for transforms, instances, additional structures, primitives, annotation tables
 and serialized MolQL. The same operations work inside each story scene.
 
-On servers advertising `ebi-pdbe-update_workspace`, recover the latest complete
-workspace for the exact target viewer from App context or structured tool output.
-For follow-up changes, call that tool with the workspace, its revision as
-`expected_revision`, and a suitable operation batch. Preserve unrelated layers,
-structures, source annotations and transforms. Upserts replace complete named
-definitions. Use only component/annotation layers with explicit data selections;
-calculated `binding_site` layers and cutoff fields are unsupported. Use the
-source PDBe/SIFTS residue correspondence table and export without adding geometric
-measurements. A shared resource URI alone does not route results to an existing
-viewer: the host must match the target workspace ID.
-
-On older servers without workspace updates, recover the complete builder and
-use the established full-replacement builder workflow. Do not pass host routing
-fields such as `pdbe_visualization_request.mode` to PDBe tools. If the requested
-viewer state is unavailable, recover it before constructing the edit.
+Visualization follow-ups arrive through main chat with normal user/assistant
+history and only the latest available visualization context. Use that context
+to build a complete new view; each chat visualization request opens a separate
+viewer and leaves existing viewers unchanged. Workspace IDs and revisions are
+internal App/server state and are omitted from model-facing context and tool results.
+`ebi-pdbe-update_workspace` is App-only for viewer controls and saved-workspace
+restore, not for chat responses. Do not claim to mutate an existing viewer or
+route a result by workspace ID.
 
 ## Ligand interaction workflow
 

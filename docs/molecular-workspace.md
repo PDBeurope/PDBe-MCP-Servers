@@ -211,15 +211,15 @@ visibility persists in the workspace definitions. Explicit file restoration can
 restore an older saved revision and its camera. Save workspace exports editable
 JSON; Save MVSJ exports the compiled molecular visualization.
 
-**Host routing:** sharing a resource URI does not by itself join separate App
-instances. To update an existing viewer across model tool calls, the host must
-route matching workspace IDs to that instance. Viewer-scoped edits must use the
-workspace update contract and preserve the target ID; if a result has a different
-or unidentifiable workspace, the host leaves the selected viewer unchanged and
-reports the mismatch instead of opening a second viewer. Main-chat requests for
-new views may still open separately. App-initiated layer changes use
-`callServerTool` and apply their result to the originating viewer. No global
-process-wide workspace store or cross-user session state is introduced.
+**Host and tool boundary:** workspace IDs and revisions are internal to App/server
+state for validation, visibility updates, and saved-workspace restore. They are
+not included in model-facing context or tool results, and are not used for chat
+result routing.
+`pdbe_update_workspace` is visible only to the interactive App; it remains
+available for viewer controls and restore workflows. Chat visualization follow-ups
+use normal conversation history plus only the latest available app context, and
+each request opens a separate new viewer while existing viewers remain unchanged.
+No global process-wide workspace store or cross-user session state is introduced.
 
 Workspace restore and updates accept scientific definitions, not executable code
 or arbitrary MVS trees. Coordinate and annotation URLs retain the existing
