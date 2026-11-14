@@ -39,9 +39,9 @@ interface LegendItem {
 interface SceneResult {
   version: 1;
   workspace?: Workspace;
-  builder?: { pdb_id: string; title: string; description?: string };
+  builder?: { pdb_id?: string; model_id?: string; source_name?: string; model_kind?: "experimental" | "predicted" | "other"; display_name?: string; title: string; description?: string };
   story?: { title: string; description?: string };
-  scenes?: { id: string; title: string; description?: string; builder: { pdb_id: string }; legend: LegendItem[]; coordinate_url: string }[];
+  scenes?: { id: string; title: string; description?: string; builder: NonNullable<SceneResult["builder"]>; legend: LegendItem[]; coordinate_url: string }[];
   mvsj: Record<string, unknown>;
   legend?: LegendItem[];
   warnings: string[];
@@ -67,7 +67,7 @@ function theme(context: McpUiHostContext): void {
   if (context.styles?.variables) applyHostStyleVariables(context.styles.variables);
 }
 
-const app = new App({ name: "PDBe Molecular Workspace", version: "0.1.0" });
+const app = new App({ name: "Molecular Structure Viewer", version: "0.1.0" });
 let viewer: Viewer | undefined;
 let scene: SceneResult | undefined;
 let connected = false;
@@ -96,7 +96,7 @@ let sequenceTrackFeatureAnnotations = new Map<string, import("./annotations").An
 let sequenceTooltipTarget: HTMLElement | undefined;
 let sequenceTooltipPinned = false;
 let sequenceVisible = true;
-let sequenceTargetsByValue = new Map<string, { structureId: string; pdbId: string; structure: Structure; chainId: string; authChainId: string; sequence: LinkedSequence }>();
+let sequenceTargetsByValue = new Map<string, { structureId: string; pdbId?: string; label: string; structure: Structure; chainId: string; authChainId: string; sequence: LinkedSequence }>();
 let sequenceTrackCatalog: { id: string; label: string; feature_count: number }[] = [];
 let sequenceTrackSelection: Set<string> | undefined;
 
@@ -106,7 +106,7 @@ function activeWorkspaceScene() {
 }
 function workspaceControls() {
   const disabled = !connected || !workspace || !viewer || updating || disposed || !["loaded", "empty"].includes(loadState);
-  for (const id of ["save-workspace", "export-comparison"]) el<HTMLButtonElement>(id).disabled = disabled;
+  el<HTMLButtonElement>("export-comparison").disabled = disabled;
   for (const input of el("workspace-panel").querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.disabled = disabled;
   el("workspace-panel").hidden = !workspace || !!scene?.story;
   el("comparison-panel").hidden = !activeWorkspaceScene()?.comparison;
@@ -125,9 +125,12 @@ function renderWorkspaceControls() {
     input.indeterminate = input.checked && layers.some(layer => !layer.visible);
   }
   el("optional-data-status").textContent = active.structures.map(structure => {
+    const label = structure.display_name ?? structure.model_id ?? structure.pdb_id ?? structure.source_name ?? "Structure";
     const labels = (["ligands", "annotations"] as const).map(kind => `${kind}: ${structure.data_status?.[kind] ?? (structure[kind]?.length ? "loaded" : "not requested")}`);
-    return `${structure.pdb_id.toUpperCase()} · ${labels.join("; ")}`;
+    return `${label} · ${labels.join("; ")}`;
   }).join(" · ");
+  el("ligands-panel").hidden = active.structures.every(structure => !structure.pdb_id);
+  el<HTMLButtonElement>("show-ligands").disabled = active.structures.every(structure => !structure.pdb_id);
   const ligandLayers = active.layers.filter(layer => layerCategory(layer) === "ligands");
   const ligandDataLoaded = active.structures.every(structure => structure.data_status?.ligands === "loaded");
   el("ligand-status").textContent = ligandLayers.length
@@ -163,16 +166,17 @@ function availableChains(structure?: import("./workspace").WorkspaceStructure) {
 }
 
 function sequenceTargets() {
-  const targets: { value: string; structureId: string; pdbId: string; structure: Structure; chainId: string; authChainId: string; sequence: LinkedSequence }[] = [];
+  const targets: { value: string; structureId: string; pdbId?: string; label: string; structure: Structure; chainId: string; authChainId: string; sequence: LinkedSequence }[] = [];
   const active = activeWorkspaceScene();
   if (active && viewer) {
     for (const definition of active.structures) {
       const structure = displayedStructure(viewer, definition.id);
       if (!structure) continue;
+      const label = definition.display_name ?? definition.model_id ?? definition.pdb_id ?? definition.source_name ?? "Structure";
       for (const chain of availableChains(definition)) {
         const sequence = linkedSequence(structure, chain.label_asym_id);
         if (sequence) targets.push({ value: JSON.stringify([definition.id, chain.label_asym_id]), structureId: definition.id,
-          pdbId: definition.pdb_id, structure, chainId: chain.label_asym_id, authChainId: chain.auth_asym_id, sequence });
+          pdbId: definition.pdb_id, label, structure, chainId: chain.label_asym_id, authChainId: chain.auth_asym_id, sequence });
       }
     }
   } else if (viewer) {
@@ -183,7 +187,8 @@ function sequenceTargets() {
       for (const chain of inventory.chains) {
         const sequence = linkedSequence(structure, chain.label_asym_id);
         if (sequence) targets.push({ value: JSON.stringify([ref.cell.transform.ref, chain.label_asym_id]),
-          structureId: ref.cell.transform.ref, pdbId: currentScene()?.builder.pdb_id ?? scene?.builder?.pdb_id ?? "", structure,
+          structureId: ref.cell.transform.ref, pdbId: currentScene()?.builder.pdb_id ?? scene?.builder?.pdb_id,
+          label: currentScene()?.builder.display_name ?? currentScene()?.builder.model_id ?? currentScene()?.builder.pdb_id ?? "Structure", structure,
           chainId: chain.label_asym_id, authChainId: chain.auth_asym_id, sequence });
       }
     }
@@ -360,7 +365,7 @@ function renderDynamicSequenceTracks(sequence: LinkedSequence) {
     container.append(heading, track);
   }
   const structure = activeWorkspaceScene()?.structures.find(item => item.id === sequenceStructureId);
-  if (!sequenceAnnotations.length && structure?.data_status?.annotations !== "loaded" && structure?.data_status?.annotations !== "unavailable") {
+  if (structure?.pdb_id && !sequenceAnnotations.length && structure.data_status?.annotations !== "loaded" && structure.data_status?.annotations !== "unavailable") {
     const load = document.createElement("button");
     load.type = "button"; load.className = "sequence-load-annotations";
     load.textContent = "Load annotations";
@@ -376,6 +381,7 @@ function renderDynamicSequenceTracks(sequence: LinkedSequence) {
 
 function renderSequencePanel() {
   if (!viewer || disposed || scene?.story) {
+    el<HTMLButtonElement>("sequence-toggle").hidden = true;
     el("sequence-panel").hidden = true; sequenceMap = undefined; sequenceCoordinates = undefined; sequenceTrackCatalog = [];
     sequenceTargetsByValue = new Map(); return;
   }
@@ -383,11 +389,13 @@ function renderSequencePanel() {
   sequenceTargetsByValue = new Map(targets.map(target => [target.value, target]));
   const select = el<HTMLSelectElement>("sequence-chain"), previous = select.value;
   select.replaceChildren(...targets.map(target => new Option(
-    `${target.pdbId.toUpperCase()} · label ${target.chainId} / author ${target.authChainId} · ${target.sequence.residues.length} residues`, target.value)));
+    `${target.label} · label ${target.chainId} / author ${target.authChainId} · ${target.sequence.residues.length} residues`, target.value)));
   if (!targets.length) {
+    el<HTMLButtonElement>("sequence-toggle").hidden = true;
     el("sequence-panel").hidden = true; sequenceMap = undefined; sequenceCoordinates = undefined; sequenceTrackCatalog = [];
     sequenceTargetsByValue = new Map(); return;
   }
+  el<HTMLButtonElement>("sequence-toggle").hidden = false;
   el("sequence-panel").hidden = !sequenceVisible;
   el<HTMLButtonElement>("sequence-toggle").textContent = sequenceVisible ? "Hide sequence" : "Show sequence";
   el<HTMLButtonElement>("sequence-toggle").setAttribute("aria-pressed", String(sequenceVisible));
@@ -695,7 +703,16 @@ function showSceneDetails(): void {
   const identifiers = el("pdb-ids");
   identifiers.hidden = !pdbIds.length;
   identifiers.textContent = pdbIds.length ? `${pdbIds.length === 1 ? "PDB ID" : "PDB IDs"}: ${pdbIds.join(" · ")}` : "";
-  el("source").textContent = `Coordinates: ${active?.coordinate_url ?? scene?.coordinate_url ?? ""}`;
+  const activeStructure = activeWorkspace?.structures[0];
+  const modelLabel = activeStructure?.display_name ?? activeStructure?.model_id ?? activeStructure?.source_name
+    ?? active?.builder.display_name ?? active?.builder.model_id ?? active?.builder.source_name;
+  const kind = activeStructure?.model_kind ?? active?.builder.model_kind;
+  const coordinateUrl = active?.coordinate_url ?? scene?.coordinate_url ?? "";
+  el("source").textContent = [
+    modelLabel ? `Model: ${modelLabel}` : "",
+    kind ? `Type: ${kind}` : "",
+    coordinateUrl ? `Coordinates: ${coordinateUrl}` : "",
+  ].filter(Boolean).join(" · ");
 
 }
 
@@ -720,7 +737,7 @@ async function publish(data: Record<string, unknown>): Promise<void> {
           source_annotations: activeWorkspaceScene()?.structures.map(structure => ({ structure_id: structure.id, annotations: structure.annotations ?? [] })),
           comparison: activeWorkspaceScene()?.comparison ?? null,
         } : null,
-        pdbe_sequence_track_capabilities: sequenceMap ? {
+        pdbe_sequence_track_capabilities: sequenceMap && sequencePdbId ? {
           workspace_id: workspace?.id ?? null,
           structure_id: sequenceStructureId,
           pdb_id: sequencePdbId,
@@ -748,7 +765,11 @@ async function load(result: SceneResult, token: number): Promise<void> {
     else attachLayerRefs(renderedMvs.root as SceneNode, workspace.scenes[0].layers);
   }
   inventories = new Map();
-  if (!preserve) { sequenceTrackSelection = undefined; sequenceCommittedPositions = []; }
+  if (!preserve) {
+    sequenceVisible = true;
+    sequenceTrackSelection = undefined;
+    sequenceCommittedPositions = [];
+  }
   if (!preserve || selectionContext?.structure_id && !workspace?.scenes.some(s => s.structures.some(structure => structure.id === selectionContext!.structure_id))
       || selectionContext?.uniprot_position && !workspace?.scenes.some(s => s.comparison)) selectionContext = undefined;
   loadState = "loading";
@@ -1056,7 +1077,7 @@ function receive(result: ToolResult): void {
   } | undefined;
   if (trackConfig) {
     const currentTarget = sequenceTargetsByValue.get(JSON.stringify([trackConfig.structure_id, trackConfig.label_asym_id]));
-    if (!currentTarget || (trackConfig.workspace_id ?? undefined) !== (workspace?.id ?? undefined)
+    if (!currentTarget || !currentTarget.pdbId || (trackConfig.workspace_id ?? undefined) !== (workspace?.id ?? undefined)
       || currentTarget.pdbId.toLowerCase() !== trackConfig.pdb_id.toLowerCase()) {
       status("Ignored a sequence-track choice for a different or outdated structure/chain.", true);
       return;
@@ -1113,31 +1134,6 @@ el("download").addEventListener("click", event => {
   })().catch(error => status(`Could not save MVSJ: ${error instanceof Error ? error.message : String(error)}`, true));
 });
 
-async function saveJson(value: unknown, name: string) {
-  if (connected && app.getHostCapabilities()?.downloadFile) {
-    const result = await app.downloadFile({ contents: [{ type: "resource", resource: {
-      uri: `workspace://pdbe/${name}`, mimeType: "application/json", text: JSON.stringify(value, null, 2),
-    } }] });
-    if (result.isError) throw new Error("The host could not save the workspace");
-    return;
-  }
-  if (downloadUrl) URL.revokeObjectURL(downloadUrl);
-  downloadUrl = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: "application/json" }));
-  const link = document.createElement("a"); link.href = downloadUrl; link.download = name; link.click();
-}
-el("save-workspace").addEventListener("click", () => { if (workspace) { captureView(); void saveJson(workspace, `${workspace.id}.json`).catch(error => status(String(error), true)); } });
-el("restore-workspace").addEventListener("change", event => {
-  const file = (event.target as HTMLInputElement).files?.[0];
-  if (!file) return;
-  void (async () => {
-    if (file.size > 10_000_000) throw new Error("Workspace files must be smaller than 10 MB");
-    const saved = validateEnvelope(JSON.parse(await file.text()));
-    // Restoration always goes through the same scientific schema and compiler.
-    const result = await app.callServerTool({ name: "ebi-pdbe-update_workspace", arguments: { workspace: saved, expected_revision: saved.revision, operations: [] } });
-    if (!result.isError) workspace = undefined;
-    receive(result);
-  })().catch(error => status(String(error), true));
-});
 el<HTMLSelectElement>("sequence-chain").addEventListener("change", () => {
   sequenceTrackSelection = undefined; sequenceCommittedPositions = [];
   viewer?.plugin.managers.interactivity.lociSelects.deselectAll();

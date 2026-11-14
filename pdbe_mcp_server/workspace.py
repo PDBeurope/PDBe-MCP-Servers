@@ -35,8 +35,14 @@ class LigandInstance(Spec):
 
 class WorkspaceStructure(Spec):
     id: Identifier
-    pdb_id: str = Field(pattern=r"^(?:[1-9][a-z0-9]{3}|pdb_[a-z0-9]{8})$")
+    pdb_id: str | None = Field(
+        default=None, pattern=r"^(?:[1-9][a-z0-9]{3}|pdb_[a-z0-9]{8})$"
+    )
     options: Structure = Field(default_factory=Structure)
+    model_id: str | None = None
+    source_name: str | None = None
+    model_kind: Literal["experimental", "predicted", "other"] | None = None
+    display_name: str | None = None
     focus: bool | Focus = False
     include_water: bool = False
     labels_from: list[AnnotationData] = Field(default_factory=list, max_length=20)
@@ -50,6 +56,12 @@ class WorkspaceStructure(Spec):
     data_status: dict[str, Literal["not_requested", "loaded", "unavailable"]] = Field(
         default_factory=dict
     )
+
+    @model_validator(mode="after")
+    def coordinate_source(self):
+        if self.pdb_id is None and self.options.url is None:
+            raise ValueError("A workspace structure requires pdb_id or a coordinate URL")
+        return self
 
     @field_serializer("options")
     def sparse_options(self, value):
@@ -299,6 +311,10 @@ def scene_builder(scene: WorkspaceScene) -> dict[str, Any]:
                     k: definition[k]
                     for k in (
                         "pdb_id",
+                        "model_id",
+                        "source_name",
+                        "model_kind",
+                        "display_name",
                         "focus",
                         "include_water",
                         "labels_from",
@@ -306,6 +322,7 @@ def scene_builder(scene: WorkspaceScene) -> dict[str, Any]:
                         "primitives",
                         "sources",
                     )
+                    if k in definition
                 },
                 "structure": options,
                 # Keep coordinates available to viewing even with all layers hidden.
@@ -451,8 +468,32 @@ def workspace_from_mvs(data: dict[str, Any]) -> Workspace:
             structures.append(
                 {
                     "id": sid,
-                    "pdb_id": source["pdb_id"],
                     "options": options,
+                    **(
+                        {"pdb_id": source["pdb_id"]}
+                        if source.get("pdb_id")
+                        else {}
+                    ),
+                    **{
+                        k: source[k]
+                        for k in (
+                            "model_id",
+                            "source_name",
+                            "model_kind",
+                            "display_name",
+                        )
+                        if k in source
+                    },
+                    **(
+                        {
+                            "data_status": {
+                                "annotations": "unavailable",
+                                "ligands": "unavailable",
+                            }
+                        }
+                        if not source.get("pdb_id")
+                        else {}
+                    ),
                     **{
                         k: source[k]
                         for k in (
@@ -483,7 +524,10 @@ def workspace_from_mvs(data: dict[str, Any]) -> Workspace:
                             "id": layer_id,
                             "structure_id": sid,
                             "kind": kind,
-                            "name": f"{source['pdb_id'].upper()} {kind} {j + 1}",
+                            "name": (
+                                f"{source.get('display_name') or source.get('model_id') or source.get('source_name') or source.get('pdb_id') or 'Structure'} "
+                                f"{kind} {j + 1}"
+                            ),
                             kind: component,
                         }
                     )

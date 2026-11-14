@@ -25,6 +25,8 @@ from pydantic import (
     model_validator,
 )
 
+from pdbe_mcp_server.structure_sources import validate_coordinate_url
+
 
 class Spec(BaseModel):
     model_config = ConfigDict(
@@ -154,10 +156,15 @@ def _scene_input(value: Any) -> Any:
                 result[key] = item
         result["structure"] = structure
         if "pdb_id" not in result and isinstance(structure.get("url"), str):
-            match = re.search(
-                r"/((?:[1-9][a-z0-9]{3}|pdb_[a-z0-9]{8}))\.(?:bcif|cif|mmcif|pdb)$",
-                urlsplit(structure["url"]).path,
-                re.I,
+            parts = urlsplit(structure["url"])
+            match = (
+                re.search(
+                    r"/pdbe/entry-files/download/((?:[1-9][a-z0-9]{3}|pdb_[a-z0-9]{8}))\.(?:bcif|cif|mmcif|pdb)$",
+                    parts.path,
+                    re.I,
+                )
+                if parts.hostname == "www.ebi.ac.uk"
+                else None
             )
             if match:
                 result["pdb_id"] = match.group(1)
@@ -985,7 +992,7 @@ class Annotation(ComponentStyle):
 
 
 class Structure(Spec):
-    source: Literal["pdbe_bcif"] = "pdbe_bcif"
+    source: Literal["pdbe_bcif", "url"] = "pdbe_bcif"
     type: Literal["model", "assembly", "symmetry", "symmetry_mates"] = "model"
     format: Literal[
         "bcif", "mmcif", "pdb", "pdbqt", "gro", "xyz", "mol", "sdf", "mol2", "lammpstrj"
@@ -1022,17 +1029,7 @@ class Structure(Spec):
     @field_validator("url")
     @classmethod
     def coordinate_url(cls, value):
-        if value is not None:
-            parts = urlsplit(value)
-            if (
-                parts.scheme != "https"
-                or parts.netloc != "www.ebi.ac.uk"
-                or parts.fragment
-            ):
-                raise ValueError(
-                    "Coordinate URLs must use https://www.ebi.ac.uk (the App's allowed origin)"
-                )
-        return value
+        return validate_coordinate_url(value) if value is not None else value
 
     @model_validator(mode="after")
     def structure_options(self):
@@ -1076,8 +1073,14 @@ class StructureLayer(Spec):
     def normalize(cls, value):
         return _scene_input(value)
 
-    pdb_id: str = Field(pattern=r"^(?:[1-9][a-z0-9]{3}|pdb_[a-z0-9]{8})$")
+    pdb_id: str | None = Field(
+        default=None, pattern=r"^(?:[1-9][a-z0-9]{3}|pdb_[a-z0-9]{8})$"
+    )
     structure: Structure = Field(default_factory=Structure)
+    model_id: Text | None = None
+    source_name: Text | None = None
+    model_kind: Literal["experimental", "predicted", "other"] | None = None
+    display_name: Text | None = None
     include_water: bool = False
     components: list[Component] = Field(
         default_factory=lambda: [Component(color=Color(color="#91bfdb"))],
@@ -1099,6 +1102,16 @@ class StructureLayer(Spec):
     @classmethod
     def lowercase_id(cls, value):
         return value.strip().lower() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def coordinate_source(self):
+        if self.pdb_id is None and self.structure.url is None:
+            raise ValueError(
+                "Provide pdb_id or structure.url with a supported coordinate format"
+            )
+        if self.pdb_id is None:
+            self.structure.source = "url"
+        return self
 
     @field_validator("annotations")
     @classmethod
@@ -1278,6 +1291,24 @@ class Scene(StructureLayer):
 class BuildMvsInput(Spec):
     version: Literal[1] = 1
     builder: Scene
+
+
+class OpenStructureUrlInput(Spec):
+    """Provider-neutral request for opening one remote coordinate file."""
+
+    coordinate_url: str
+    format: Literal[
+        "bcif", "mmcif", "pdb", "pdbqt", "gro", "xyz", "mol", "sdf", "mol2", "lammpstrj"
+    ]
+    model_id: Text | None = None
+    source_name: Text | None = None
+    model_kind: Literal["experimental", "predicted", "other"] = "other"
+    display_name: Text | None = None
+
+    @field_validator("coordinate_url")
+    @classmethod
+    def coordinate_url_allowed(cls, value):
+        return validate_coordinate_url(value)
 
 
 class Transition(Spec):
@@ -1476,12 +1507,14 @@ def _compile_primitives(structure, primitives):
 
 
 def _compile_layer(root, layer, legend, representation_specs, style_specs):
-    if layer.structure.url is None and layer.structure.format != "bcif":
-        raise ValueError("A custom URL is required for formats other than bcif")
-    layer.structure.url = (
-        layer.structure.url
-        or f"https://www.ebi.ac.uk/pdbe/entry-files/download/{layer.pdb_id}.bcif"
-    )
+    if layer.structure.url is None:
+        if layer.pdb_id is None:
+            raise ValueError("A coordinate URL is required when pdb_id is not supplied")
+        if layer.structure.format != "bcif":
+            raise ValueError("A custom URL is required for formats other than bcif")
+        layer.structure.url = (
+            f"https://www.ebi.ac.uk/pdbe/entry-files/download/{layer.pdb_id}.bcif"
+        )
     tables = [
         *layer.labels_from,
         *layer.tooltips_from,
@@ -1680,13 +1713,22 @@ def _attach_scene_refs(root, scene, layers):
 def build_mvs(arguments: dict[str, Any]) -> dict[str, Any]:
     """Compile a complete replacement scene; never execute caller-supplied code."""
     scene = BuildMvsInput.model_validate(arguments).builder
-    scene.title = scene.title or f"MolViewSpec for {scene.pdb_id.upper()}"
-    if scene.structure.url is None and scene.structure.format != "bcif":
-        raise ValueError("A custom URL is required for formats other than bcif")
-    scene.structure.url = (
-        scene.structure.url
-        or f"https://www.ebi.ac.uk/pdbe/entry-files/download/{scene.pdb_id}.bcif"
+    label = (
+        scene.display_name
+        or scene.model_id
+        or scene.pdb_id
+        or scene.source_name
+        or "structure"
     )
+    scene.title = scene.title or f"MolViewSpec for {label}"
+    if scene.structure.url is None:
+        if scene.pdb_id is None:
+            raise ValueError("A coordinate URL is required when pdb_id is not supplied")
+        if scene.structure.format != "bcif":
+            raise ValueError("A custom URL is required for formats other than bcif")
+        scene.structure.url = (
+            f"https://www.ebi.ac.uk/pdbe/entry-files/download/{scene.pdb_id}.bcif"
+        )
     root = create_builder()
     root.canvas(**scene.canvas.model_dump(exclude={"ref"}))
     if scene.camera:

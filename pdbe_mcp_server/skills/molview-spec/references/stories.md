@@ -1,8 +1,9 @@
 # Guided molecular stories
 
 For a requested story, guided tour, or walkthrough, call
-`ebi-pdbe-build_mvs_story` once with the complete story. Do not approximate it by
-calling the single-scene tool repeatedly. Input:
+`ebi-pdbe-build_structure_story` once with the complete story. The
+`ebi-pdbe-build_mvs_story` name is a compatibility alias. Do not approximate
+the story by calling the single-scene tool repeatedly. Input:
 
 ```json
 {
@@ -24,7 +25,11 @@ Use 2–20 ordered scenes with unique short IDs, titles, and concise description
 Omitted IDs and titles become scene-1/Scene 1, scene-2/Scene 2, etc.; explicit
 values are preferred. `linger_duration_ms` is accepted as an alias for duration_ms.
 Each scene has a complete builder using the single-scene schema, so different
-entries, assemblies, selectors, and viewpoints can appear in successive scenes.
+provider sources, entries, assemblies, selectors, and viewpoints can appear in
+successive scenes. Use the exact provider-returned URL and format for non-PDBe
+models. A story may mix experimental and predicted models, but explicitly label
+their source and model type. Different sources or scene order do not establish
+alignment or correspondence; use only evidence-backed transforms and mappings.
 Apply the [default molecular styling and label placement rules](scenes.md#default-molecular-styling-and-label-placement)
 to every scene builder: retain the polymer overview, add element-colored protein
 side-chain sticks, and use concise, readable residue labels. If the user's request
@@ -37,8 +42,9 @@ For a translucent component, use
 Opacity must be nested in `representation`, not directly on a component or
 annotation. The same rule applies to every scene's complete builder.
 Choose one structural point per scene and progress from overview to relevant
-detail. A scene can contain up to ten coordinate sources using `additional_structures`;
-provide evidence-backed transforms for aligned overlays. Use adjacent scenes
+detail. A scene can contain up to ten coordinate sources using
+`additional_structures`; each structure may use a different configured source.
+Provide evidence-backed transforms for aligned overlays. Use adjacent scenes
 when a separate viewpoint or explanation is clearer.
 
 Defaults are `duration_ms: 6500` and `transition_duration_ms: 1500`. Durations are

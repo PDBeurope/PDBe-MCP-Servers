@@ -9,20 +9,24 @@ AI client that supports the Model Context Protocol (MCP).
 
 In an MCP Apps client, the Apps server provides a shared Mol* workspace for:
 
-- **Structure Explorer:** inspect chains, residues, ligand instances, and
-  source annotations, with linked sequence and annotation tracks.
+- **Universal Structure Viewer:** load PDBe entries or provider-supplied
+  coordinates in supported formats; show sequence and annotation tracks when
+  available.
 - **Ligand & Binding Site Explorer:** inspect PDBe-reported ligand interaction
   records, filter evidence, and export contacts.
 - **Structure Comparison:** view PDBe's precomputed superpositions and
   PDBe/SIFTS residue correspondence, with a correspondence table and CSV export.
 - **MolViewSpec Builder and Stories:** create custom scenes and ordered
-  multi-scene molecular stories.
-- **Workspace management:** save or restore workspace JSON, export MVSJ, and
-  update scenes and layers through MCP tools.
+  multi-scene stories from provider-neutral coordinate sources.
+- **Workspace controls:** adjust layers and scenes in the viewer and export the
+  compiled MVSJ.
 
 Use `pdbe_apps_server` for the dedicated server or the recommended `all`
 server; connection examples are below. The host needs MCP Apps support, WebGL,
-and access to `https://www.ebi.ac.uk`.
+and network access to the configured coordinate origins. PDBe and AlphaFold DB
+origins are built in. Add other HTTPS origins with the
+`PDBe_MCP_STRUCTURE_ORIGINS` environment variable (comma-separated exact
+origins; no wildcards).
 Clients without UI support receive text and structured data fallbacks.
 
 Comparisons use supplied PDBe transforms and mappings; the app does not
@@ -38,9 +42,11 @@ Example prompts for an MCP Apps-capable client:
 - “Explore a ligand in PDB entry 1tqn and show its PDBe-reported interactions.”
 - “Build a two-scene molecular story for PDB entry 1tqn, showing the protein
   first and then highlighting a ligand.”
+- “Open this provider-supplied coordinate URL in the molecular viewer:
+  https://alphafold.ebi.ac.uk/files/AF-Q9I1F6-F1-model_v6.bcif”
 
 See the [molecular workspace guide](docs/molecular-workspace.md) for setup,
-tool examples, annotations, saved workspaces, updates, and host routing. The
+tool examples, annotations, workspace updates, and host routing. The
 Apps and aggregate servers also expose the `molview-spec` skill as MCP
 resources for scene-building guidance.
 

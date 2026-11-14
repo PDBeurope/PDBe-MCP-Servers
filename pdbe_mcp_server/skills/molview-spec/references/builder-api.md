@@ -1,8 +1,10 @@
 # Structured MolViewSpec builder API
 
-Use `ebi-pdbe-build_mvs` with `{"version": 1, "builder": {...}}` or put the
-same builder inside each scene of `ebi-pdbe-build_mvs_story`. These are data
-inputs: never send Python, JavaScript, arbitrary MVS nodes or shell commands.
+Use `ebi-pdbe-build_structure_scene` with `{"version": 1, "builder": {...}}`
+or put the same builder inside each scene of `ebi-pdbe-build_structure_story`.
+`ebi-pdbe-build_mvs` and `ebi-pdbe-build_mvs_story` remain compatibility aliases.
+These are data inputs: never send Python, JavaScript, arbitrary MVS nodes or
+shell commands.
 The generated scene/story schemas are authoritative, including bounds and
 representation-specific options. This reference describes the exposed methods
 of the installed Python builder and the pinned Mol* 5.13.1 viewer.
@@ -57,9 +59,12 @@ an explicit identity instance if the original copy should also be present.
 Transforms do not calculate alignment: retrieve a valid alignment first.
 
 `additional_structures` accepts up to nine complete structure layers alongside
-the primary entry. Every layer has its own `pdb_id`, `structure`, components,
+the primary structure. Every layer has its own `pdb_id` or
+provider-supplied `structure.url` and `structure.format`, components,
 inline/table annotations, primitives, water setting, evidence sources and focus.
-Canvas, camera, volumes, title and description belong to the enclosing scene.
+Optional `model_id`, `source_name`, `model_kind` (`experimental`, `predicted`,
+or `other`), and `display_name` preserve provider metadata. Canvas, camera,
+volumes, title and description belong to the enclosing scene.
 Structure references are optional but must be unique within a scene.
 
 Example layout (identities and transforms are illustrative, not biological evidence):
@@ -76,9 +81,12 @@ Example layout (identities and transforms are illustrative, not biological evide
 }
 ```
 
-Coordinates still require HTTPS on `www.ebi.ac.uk`. Other coordinate origins,
-standalone trajectories/topologies, shape-file loading and raw MVS trees are not
-exposed. Adding a structure does not independently align it.
+Coordinates require HTTPS on a built-in or explicitly configured origin.
+Configure custom origins using `PDBe_MCP_STRUCTURE_ORIGINS`; origins are exact,
+without wildcards, paths, or non-default ports. Coordinate origins are also
+declared in the App CSP. Standalone trajectories/topologies, shape-file loading
+and raw MVS trees are not exposed. Adding a structure does not independently
+align it.
 
 ## Primitives and measurements
 
@@ -175,5 +183,5 @@ complete normalized specification for follow-ups and stop after compilation.
 Main-chat visualization requests use the latest available visualization
 context to construct a complete new view; every request opens a separate viewer
 and leaves existing viewers unchanged. `pdbe_update_workspace` is App-only for
-viewer controls and saved-workspace restore. Workspace IDs and revisions are
+viewer controls and internal in-view workflows. Workspace IDs and revisions are
 internal to App/server operations and are omitted from model-facing context and tool results.

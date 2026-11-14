@@ -1,0 +1,5237 @@
+{
+  "$defs": {
+    "Angle": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        },
+        "type": {
+          "const": "angle",
+          "title": "Type",
+          "type": "string"
+        },
+        "a": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "A"
+        },
+        "b": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "B"
+        },
+        "c": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "C"
+        },
+        "label_template": {
+          "default": "{{angle}}",
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Label Template",
+          "type": "string"
+        },
+        "label_size": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Size"
+        },
+        "label_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Color"
+        },
+        "show_vector": {
+          "default": true,
+          "title": "Show Vector",
+          "type": "boolean"
+        },
+        "show_section": {
+          "default": true,
+          "title": "Show Section",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "a",
+        "b",
+        "c"
+      ],
+      "title": "Angle",
+      "type": "object"
+    },
+    "AnimationPalette": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "continuous",
+            "discrete"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "colors": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 2,
+          "title": "Colors",
+          "type": "array"
+        },
+        "reverse": {
+          "default": false,
+          "title": "Reverse",
+          "type": "boolean"
+        },
+        "mode": {
+          "default": "normalized",
+          "enum": [
+            "absolute",
+            "normalized"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "value_domain": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Domain"
+        },
+        "underflow_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Underflow Color"
+        },
+        "overflow_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Overflow Color"
+        }
+      },
+      "required": [
+        "kind",
+        "colors"
+      ],
+      "title": "AnimationPalette",
+      "type": "object"
+    },
+    "AnimationTrackball": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "enum": [
+            "rock",
+            "spin"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "speed": {
+          "default": 0.05,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Speed",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "AnimationTrackball",
+      "type": "object"
+    },
+    "Annotation": {
+      "additionalProperties": false,
+      "properties": {
+        "representation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Representation"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Visual style; use an object with type and opacity for transparency, e.g. {type: 'cartoon', opacity: 0.3}. Opacity belongs inside representation, not on the component or annotation."
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "colors": {
+          "items": {
+            "$ref": "#/$defs/Color"
+          },
+          "maxItems": 100,
+          "title": "Colors",
+          "type": "array"
+        },
+        "color_from": {
+          "items": {
+            "$ref": "#/$defs/AnnotationData"
+          },
+          "maxItems": 20,
+          "title": "Color From",
+          "type": "array"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Label"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Tooltip"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "focus": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/Focus"
+            }
+          ],
+          "default": false,
+          "title": "Focus"
+        },
+        "selector": {
+          "anyOf": [
+            {
+              "enum": [
+                "all",
+                "polymer",
+                "protein",
+                "nucleic",
+                "branched",
+                "ligand",
+                "ion",
+                "water",
+                "coarse"
+              ],
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/MolQL"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/Expression"
+              },
+              "maxItems": 500,
+              "minItems": 1,
+              "type": "array"
+            }
+          ],
+          "title": "Selector"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Id"
+        }
+      },
+      "required": [
+        "selector"
+      ],
+      "title": "Annotation",
+      "type": "object"
+    },
+    "AnnotationData": {
+      "additionalProperties": false,
+      "description": "Annotation table in an allowed HTTPS resource or the coordinate CIF.",
+      "properties": {
+        "schema": {
+          "enum": [
+            "whole_structure",
+            "entity",
+            "chain",
+            "auth_chain",
+            "residue",
+            "auth_residue",
+            "residue_range",
+            "auth_residue_range",
+            "atom",
+            "auth_atom",
+            "all_atomic"
+          ],
+          "title": "Schema",
+          "type": "string"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uri"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "cif",
+                "bcif",
+                "json"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        },
+        "block_header": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Header"
+        },
+        "block_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Index"
+        },
+        "category_name": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category Name"
+        },
+        "field_name": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field Name"
+        },
+        "field_remapping": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field Remapping"
+        }
+      },
+      "required": [
+        "schema"
+      ],
+      "title": "AnnotationData",
+      "type": "object"
+    },
+    "Arrow": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        },
+        "type": {
+          "const": "arrow",
+          "title": "Type",
+          "type": "string"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Direction"
+        },
+        "length": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Length"
+        },
+        "show_start_cap": {
+          "default": false,
+          "title": "Show Start Cap",
+          "type": "boolean"
+        },
+        "show_end_cap": {
+          "default": true,
+          "title": "Show End Cap",
+          "type": "boolean"
+        },
+        "show_tube": {
+          "default": true,
+          "title": "Show Tube",
+          "type": "boolean"
+        },
+        "tube_radius": {
+          "default": 0.05,
+          "exclusiveMinimum": 0,
+          "title": "Tube Radius",
+          "type": "number"
+        },
+        "tube_dash_length": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tube Dash Length"
+        },
+        "start_cap_length": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Cap Length"
+        },
+        "start_cap_radius": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Cap Radius"
+        },
+        "end_cap_length": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Cap Length"
+        },
+        "end_cap_radius": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Cap Radius"
+        }
+      },
+      "required": [
+        "type",
+        "start"
+      ],
+      "title": "Arrow",
+      "type": "object"
+    },
+    "Box": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "box",
+          "title": "Type",
+          "type": "string"
+        },
+        "center": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "Center"
+        },
+        "extent": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          ],
+          "title": "Extent",
+          "type": "array"
+        },
+        "show_faces": {
+          "default": true,
+          "title": "Show Faces",
+          "type": "boolean"
+        },
+        "face_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Face Color"
+        },
+        "show_edges": {
+          "default": false,
+          "title": "Show Edges",
+          "type": "boolean"
+        },
+        "edge_radius": {
+          "default": 0.1,
+          "exclusiveMinimum": 0,
+          "title": "Edge Radius",
+          "type": "number"
+        },
+        "edge_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Edge Color"
+        },
+        "show_wireframe": {
+          "default": false,
+          "title": "Show Wireframe",
+          "type": "boolean"
+        },
+        "wireframe_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wireframe Color"
+        },
+        "wireframe_width": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wireframe Width"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        }
+      },
+      "required": [
+        "type",
+        "center",
+        "extent"
+      ],
+      "title": "Box",
+      "type": "object"
+    },
+    "Camera": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Target",
+          "type": "array"
+        },
+        "position": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "up": {
+          "default": [
+            0,
+            1,
+            0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Up",
+          "type": "array"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        }
+      },
+      "required": [
+        "target",
+        "position"
+      ],
+      "title": "Camera",
+      "type": "object"
+    },
+    "Canvas": {
+      "additionalProperties": false,
+      "properties": {
+        "background_color": {
+          "default": "white",
+          "title": "Background Color",
+          "type": "string"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        }
+      },
+      "title": "Canvas",
+      "type": "object"
+    },
+    "Clip": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "plane",
+            "sphere",
+            "box"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "point": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Point"
+        },
+        "normal": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normal"
+        },
+        "center": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Center"
+        },
+        "radius": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Radius"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size"
+        },
+        "invert": {
+          "default": false,
+          "title": "Invert",
+          "type": "boolean"
+        },
+        "variant": {
+          "default": "pixel",
+          "enum": [
+            "object",
+            "pixel"
+          ],
+          "title": "Variant",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "Clip",
+      "type": "object"
+    },
+    "Color": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "title": "Color",
+          "type": "string"
+        },
+        "selector": {
+          "anyOf": [
+            {
+              "enum": [
+                "all",
+                "polymer",
+                "protein",
+                "nucleic",
+                "branched",
+                "ligand",
+                "ion",
+                "water",
+                "coarse"
+              ],
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/MolQL"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/Expression"
+              },
+              "maxItems": 500,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selector"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        }
+      },
+      "required": [
+        "color"
+      ],
+      "title": "Color",
+      "type": "object"
+    },
+    "ColorInterpolation": {
+      "additionalProperties": false,
+      "properties": {
+        "target_ref": {
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "title": "Target Ref",
+          "type": "string"
+        },
+        "property": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Property"
+        },
+        "start_ms": {
+          "default": 0,
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "easing": {
+          "anyOf": [
+            {
+              "enum": [
+                "linear",
+                "bounce-in",
+                "bounce-out",
+                "bounce-in-out",
+                "circle-in",
+                "circle-out",
+                "circle-in-out",
+                "cubic-in",
+                "cubic-out",
+                "cubic-in-out",
+                "exp-in",
+                "exp-out",
+                "exp-in-out",
+                "quad-in",
+                "quad-out",
+                "quad-in-out",
+                "sin-in",
+                "sin-out",
+                "sin-in-out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Easing"
+        },
+        "frequency": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency"
+        },
+        "alternate_direction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alternate Direction"
+        },
+        "kind": {
+          "const": "color",
+          "title": "Kind",
+          "type": "string"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "palette": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationPalette"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "target_ref",
+        "property",
+        "duration_ms",
+        "kind"
+      ],
+      "title": "ColorInterpolation",
+      "type": "object"
+    },
+    "Component": {
+      "additionalProperties": false,
+      "properties": {
+        "representation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Representation"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Visual style; use an object with type and opacity for transparency, e.g. {type: 'cartoon', opacity: 0.3}. Opacity belongs inside representation, not on the component or annotation."
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "colors": {
+          "items": {
+            "$ref": "#/$defs/Color"
+          },
+          "maxItems": 100,
+          "title": "Colors",
+          "type": "array"
+        },
+        "color_from": {
+          "items": {
+            "$ref": "#/$defs/AnnotationData"
+          },
+          "maxItems": 20,
+          "title": "Color From",
+          "type": "array"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Label"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Tooltip"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "focus": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/Focus"
+            }
+          ],
+          "default": false,
+          "title": "Focus"
+        },
+        "selector": {
+          "anyOf": [
+            {
+              "enum": [
+                "all",
+                "polymer",
+                "protein",
+                "nucleic",
+                "branched",
+                "ligand",
+                "ion",
+                "water",
+                "coarse"
+              ],
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/MolQL"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/Expression"
+              },
+              "maxItems": 500,
+              "minItems": 1,
+              "type": "array"
+            }
+          ],
+          "default": "polymer",
+          "title": "Selector"
+        },
+        "annotation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComponentData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Component",
+      "type": "object"
+    },
+    "ComponentData": {
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "enum": [
+            "whole_structure",
+            "entity",
+            "chain",
+            "auth_chain",
+            "residue",
+            "auth_residue",
+            "residue_range",
+            "auth_residue_range",
+            "atom",
+            "auth_atom",
+            "all_atomic"
+          ],
+          "title": "Schema",
+          "type": "string"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uri"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "cif",
+                "bcif",
+                "json"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        },
+        "block_header": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Header"
+        },
+        "block_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Index"
+        },
+        "category_name": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category Name"
+        },
+        "field_name": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field Name"
+        },
+        "field_remapping": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field Remapping"
+        },
+        "field_values": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 500,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field Values"
+        }
+      },
+      "required": [
+        "schema"
+      ],
+      "title": "ComponentData",
+      "type": "object"
+    },
+    "Distance": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        },
+        "type": {
+          "const": "distance",
+          "title": "Type",
+          "type": "string"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "End"
+        },
+        "radius": {
+          "default": 0.05,
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "dash_length": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dash Length"
+        },
+        "label_template": {
+          "default": "{{distance}}",
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Label Template",
+          "type": "string"
+        },
+        "label_size": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Size"
+        },
+        "label_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Color"
+        }
+      },
+      "required": [
+        "type",
+        "start",
+        "end"
+      ],
+      "title": "Distance",
+      "type": "object"
+    },
+    "Ellipse": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        },
+        "type": {
+          "const": "ellipse",
+          "title": "Type",
+          "type": "string"
+        },
+        "center": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "Center"
+        },
+        "major_axis": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Major Axis",
+          "type": "array"
+        },
+        "minor_axis": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Minor Axis",
+          "type": "array"
+        },
+        "radius_major": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Radius Major"
+        },
+        "radius_minor": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Radius Minor"
+        },
+        "as_circle": {
+          "default": false,
+          "title": "As Circle",
+          "type": "boolean"
+        },
+        "theta_start": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Theta Start"
+        },
+        "theta_end": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Theta End"
+        }
+      },
+      "required": [
+        "type",
+        "center",
+        "major_axis",
+        "minor_axis"
+      ],
+      "title": "Ellipse",
+      "type": "object"
+    },
+    "Ellipsoid": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        },
+        "type": {
+          "const": "ellipsoid",
+          "title": "Type",
+          "type": "string"
+        },
+        "center": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "Center"
+        },
+        "radius": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "number"
+                },
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "number"
+                },
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            }
+          ],
+          "title": "Radius"
+        },
+        "major_axis": {
+          "default": [
+            1,
+            0,
+            0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Major Axis",
+          "type": "array"
+        },
+        "minor_axis": {
+          "default": [
+            0,
+            1,
+            0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Minor Axis",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "center",
+        "radius"
+      ],
+      "title": "Ellipsoid",
+      "type": "object"
+    },
+    "Expression": {
+      "additionalProperties": false,
+      "description": "Explicit mmCIF identifiers; author and label numbering remain distinct.",
+      "properties": {
+        "label_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Entity Id"
+        },
+        "label_asym_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Asym Id"
+        },
+        "auth_asym_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auth Asym Id"
+        },
+        "label_comp_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Comp Id"
+        },
+        "auth_comp_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auth Comp Id"
+        },
+        "pdbx_PDB_ins_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pdbx Pdb Ins Code"
+        },
+        "label_atom_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Atom Id"
+        },
+        "auth_atom_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auth Atom Id"
+        },
+        "type_symbol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type Symbol"
+        },
+        "instance_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instance Id"
+        },
+        "label_seq_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Seq Id"
+        },
+        "auth_seq_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auth Seq Id"
+        },
+        "beg_label_seq_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Beg Label Seq Id"
+        },
+        "end_label_seq_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Label Seq Id"
+        },
+        "beg_auth_seq_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Beg Auth Seq Id"
+        },
+        "end_auth_seq_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Auth Seq Id"
+        },
+        "residue_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Residue Index"
+        },
+        "atom_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Atom Id"
+        },
+        "atom_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Atom Index"
+        }
+      },
+      "title": "Expression",
+      "type": "object"
+    },
+    "Focus": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Direction"
+        },
+        "up": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Up"
+        },
+        "radius": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Radius"
+        },
+        "radius_factor": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Radius Factor"
+        },
+        "radius_extent": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Radius Extent"
+        }
+      },
+      "title": "Focus",
+      "type": "object"
+    },
+    "Isosurface": {
+      "additionalProperties": false,
+      "properties": {
+        "relative_isovalue": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relative Isovalue"
+        },
+        "absolute_isovalue": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Absolute Isovalue"
+        },
+        "show_faces": {
+          "default": true,
+          "title": "Show Faces",
+          "type": "boolean"
+        },
+        "show_wireframe": {
+          "default": false,
+          "title": "Show Wireframe",
+          "type": "boolean"
+        }
+      },
+      "title": "Isosurface",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Label": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "scene": {
+          "default": false,
+          "title": "Scene",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Label",
+      "type": "object"
+    },
+    "Lines": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        },
+        "type": {
+          "const": "lines",
+          "title": "Type",
+          "type": "string"
+        },
+        "vertices": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 30000,
+          "minItems": 6,
+          "title": "Vertices",
+          "type": "array"
+        },
+        "indices": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 30000,
+          "minItems": 2,
+          "title": "Indices",
+          "type": "array"
+        },
+        "width": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "vertices",
+        "indices"
+      ],
+      "title": "Lines",
+      "type": "object"
+    },
+    "MVSAnimation": {
+      "additionalProperties": false,
+      "properties": {
+        "frame_time_ms": {
+          "default": 16.666666666666668,
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Frame Time Ms",
+          "type": "number"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "maximum": 300000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "autoplay": {
+          "default": true,
+          "title": "Autoplay",
+          "type": "boolean"
+        },
+        "loop": {
+          "default": false,
+          "title": "Loop",
+          "type": "boolean"
+        },
+        "include_camera": {
+          "default": false,
+          "title": "Include Camera",
+          "type": "boolean"
+        },
+        "include_canvas": {
+          "default": false,
+          "title": "Include Canvas",
+          "type": "boolean"
+        },
+        "trackball": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationTrackball"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "interpolations": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "color": "#/$defs/ColorInterpolation",
+                "rotation_matrix": "#/$defs/RotationMatrixInterpolation",
+                "scalar": "#/$defs/ScalarInterpolation",
+                "transform_matrix": "#/$defs/TransformMatrixInterpolation",
+                "vec3": "#/$defs/Vec3Interpolation"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ScalarInterpolation"
+              },
+              {
+                "$ref": "#/$defs/Vec3Interpolation"
+              },
+              {
+                "$ref": "#/$defs/RotationMatrixInterpolation"
+              },
+              {
+                "$ref": "#/$defs/TransformMatrixInterpolation"
+              },
+              {
+                "$ref": "#/$defs/ColorInterpolation"
+              }
+            ]
+          },
+          "maxItems": 100,
+          "title": "Interpolations",
+          "type": "array"
+        }
+      },
+      "title": "MVSAnimation",
+      "type": "object"
+    },
+    "Mesh": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        },
+        "type": {
+          "const": "mesh",
+          "title": "Type",
+          "type": "string"
+        },
+        "vertices": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 30000,
+          "minItems": 9,
+          "title": "Vertices",
+          "type": "array"
+        },
+        "indices": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 30000,
+          "minItems": 3,
+          "title": "Indices",
+          "type": "array"
+        },
+        "show_triangles": {
+          "default": true,
+          "title": "Show Triangles",
+          "type": "boolean"
+        },
+        "show_wireframe": {
+          "default": false,
+          "title": "Show Wireframe",
+          "type": "boolean"
+        },
+        "wireframe_width": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wireframe Width"
+        },
+        "wireframe_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wireframe Color"
+        }
+      },
+      "required": [
+        "type",
+        "vertices",
+        "indices"
+      ],
+      "title": "Mesh",
+      "type": "object"
+    },
+    "MolQL": {
+      "additionalProperties": false,
+      "description": "Serialized base-language query; never executable Python/JavaScript.",
+      "properties": {
+        "molql": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Molql",
+          "type": "object"
+        }
+      },
+      "required": [
+        "molql"
+      ],
+      "title": "MolQL",
+      "type": "object"
+    },
+    "PositionExpressions": {
+      "additionalProperties": false,
+      "properties": {
+        "structure_ref": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Structure Ref"
+        },
+        "expressions": {
+          "items": {
+            "$ref": "#/$defs/Expression"
+          },
+          "maxItems": 500,
+          "minItems": 1,
+          "title": "Expressions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "expressions"
+      ],
+      "title": "PositionExpressions",
+      "type": "object"
+    },
+    "PrimitiveLabel": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "label",
+          "title": "Type",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "Position"
+        },
+        "text": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "label_size": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Label Size",
+          "type": "number"
+        },
+        "label_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Color"
+        },
+        "label_offset": {
+          "default": 0,
+          "title": "Label Offset",
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "position",
+        "text"
+      ],
+      "title": "PrimitiveLabel",
+      "type": "object"
+    },
+    "QueryPosition": {
+      "additionalProperties": false,
+      "properties": {
+        "molql": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Molql",
+          "type": "object"
+        },
+        "structure_ref": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Structure Ref"
+        }
+      },
+      "required": [
+        "molql"
+      ],
+      "title": "QueryPosition",
+      "type": "object"
+    },
+    "Representation": {
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "opacity_ref": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Opacity Ref"
+        },
+        "emissive": {
+          "anyOf": [
+            {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Emissive"
+        },
+        "type": {
+          "default": "cartoon",
+          "enum": [
+            "cartoon",
+            "ball_and_stick",
+            "surface",
+            "spacefill",
+            "carbohydrate",
+            "backbone",
+            "line",
+            "putty"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "opacity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Representation opacity: 0 is transparent and 1 is opaque. Set components[].representation.opacity (or annotations[].representation.opacity), not component-level opacity.",
+          "title": "Opacity"
+        },
+        "size_factor": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Factor"
+        },
+        "ignore_hydrogens": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ignore Hydrogens"
+        },
+        "size_theme": {
+          "anyOf": [
+            {
+              "enum": [
+                "uniform",
+                "uncertainty"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Theme"
+        },
+        "surface_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "molecular",
+                "gaussian"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Surface Type"
+        },
+        "tubular_helices": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tubular Helices"
+        },
+        "clip": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Clip"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/Clip"
+              },
+              "maxItems": 20,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip"
+        }
+      },
+      "title": "Representation",
+      "type": "object"
+    },
+    "RotationMatrixInterpolation": {
+      "additionalProperties": false,
+      "properties": {
+        "target_ref": {
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "title": "Target Ref",
+          "type": "string"
+        },
+        "property": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Property"
+        },
+        "start_ms": {
+          "default": 0,
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "easing": {
+          "anyOf": [
+            {
+              "enum": [
+                "linear",
+                "bounce-in",
+                "bounce-out",
+                "bounce-in-out",
+                "circle-in",
+                "circle-out",
+                "circle-in-out",
+                "cubic-in",
+                "cubic-out",
+                "cubic-in-out",
+                "exp-in",
+                "exp-out",
+                "exp-in-out",
+                "quad-in",
+                "quad-out",
+                "quad-in-out",
+                "sin-in",
+                "sin-out",
+                "sin-in-out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Easing"
+        },
+        "frequency": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency"
+        },
+        "alternate_direction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alternate Direction"
+        },
+        "kind": {
+          "const": "rotation_matrix",
+          "title": "Kind",
+          "type": "string"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 9,
+              "minItems": 9,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 9,
+              "minItems": 9,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "noise_magnitude": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Noise Magnitude"
+        }
+      },
+      "required": [
+        "target_ref",
+        "property",
+        "duration_ms",
+        "kind"
+      ],
+      "title": "RotationMatrixInterpolation",
+      "type": "object"
+    },
+    "ScalarInterpolation": {
+      "additionalProperties": false,
+      "properties": {
+        "target_ref": {
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "title": "Target Ref",
+          "type": "string"
+        },
+        "property": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Property"
+        },
+        "start_ms": {
+          "default": 0,
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "easing": {
+          "anyOf": [
+            {
+              "enum": [
+                "linear",
+                "bounce-in",
+                "bounce-out",
+                "bounce-in-out",
+                "circle-in",
+                "circle-out",
+                "circle-in-out",
+                "cubic-in",
+                "cubic-out",
+                "cubic-in-out",
+                "exp-in",
+                "exp-out",
+                "exp-in-out",
+                "quad-in",
+                "quad-out",
+                "quad-in-out",
+                "sin-in",
+                "sin-out",
+                "sin-in-out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Easing"
+        },
+        "frequency": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency"
+        },
+        "alternate_direction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alternate Direction"
+        },
+        "kind": {
+          "const": "scalar",
+          "title": "Kind",
+          "type": "string"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "noise_magnitude": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Noise Magnitude"
+        },
+        "discrete": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Discrete"
+        }
+      },
+      "required": [
+        "target_ref",
+        "property",
+        "duration_ms",
+        "kind"
+      ],
+      "title": "ScalarInterpolation",
+      "type": "object"
+    },
+    "Scene": {
+      "additionalProperties": false,
+      "properties": {
+        "pdb_id": {
+          "anyOf": [
+            {
+              "pattern": "^(?:[1-9][a-z0-9]{3}|pdb_[a-z0-9]{8})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pdb Id"
+        },
+        "structure": {
+          "$ref": "#/$defs/Structure"
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Id"
+        },
+        "source_name": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Name"
+        },
+        "model_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "experimental",
+                "predicted",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Kind"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "include_water": {
+          "default": false,
+          "title": "Include Water",
+          "type": "boolean"
+        },
+        "components": {
+          "items": {
+            "$ref": "#/$defs/Component"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Components",
+          "type": "array"
+        },
+        "annotations": {
+          "items": {
+            "$ref": "#/$defs/Annotation"
+          },
+          "maxItems": 500,
+          "title": "Annotations",
+          "type": "array"
+        },
+        "labels_from": {
+          "items": {
+            "$ref": "#/$defs/AnnotationData"
+          },
+          "maxItems": 20,
+          "title": "Labels From",
+          "type": "array"
+        },
+        "tooltips_from": {
+          "items": {
+            "$ref": "#/$defs/AnnotationData"
+          },
+          "maxItems": 20,
+          "title": "Tooltips From",
+          "type": "array"
+        },
+        "primitives": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "angle": "#/$defs/Angle",
+                "arrow": "#/$defs/Arrow",
+                "box": "#/$defs/Box",
+                "distance": "#/$defs/Distance",
+                "ellipse": "#/$defs/Ellipse",
+                "ellipsoid": "#/$defs/Ellipsoid",
+                "label": "#/$defs/PrimitiveLabel",
+                "lines": "#/$defs/Lines",
+                "mesh": "#/$defs/Mesh",
+                "sphere": "#/$defs/Sphere",
+                "tube": "#/$defs/Tube"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Sphere"
+              },
+              {
+                "$ref": "#/$defs/Tube"
+              },
+              {
+                "$ref": "#/$defs/Arrow"
+              },
+              {
+                "$ref": "#/$defs/Distance"
+              },
+              {
+                "$ref": "#/$defs/Angle"
+              },
+              {
+                "$ref": "#/$defs/PrimitiveLabel"
+              },
+              {
+                "$ref": "#/$defs/Ellipse"
+              },
+              {
+                "$ref": "#/$defs/Ellipsoid"
+              },
+              {
+                "$ref": "#/$defs/Box"
+              },
+              {
+                "$ref": "#/$defs/Mesh"
+              },
+              {
+                "$ref": "#/$defs/Lines"
+              }
+            ]
+          },
+          "maxItems": 100,
+          "title": "Primitives",
+          "type": "array"
+        },
+        "focus": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/Focus"
+            }
+          ],
+          "default": false,
+          "title": "Focus"
+        },
+        "sources": {
+          "description": "Evidence URLs used to select or describe features; supplied by the caller.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Sources",
+          "type": "array"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "description_format": {
+          "default": "plaintext",
+          "enum": [
+            "plaintext",
+            "markdown"
+          ],
+          "title": "Description Format",
+          "type": "string"
+        },
+        "volumes": {
+          "items": {
+            "$ref": "#/$defs/Volume"
+          },
+          "maxItems": 20,
+          "title": "Volumes",
+          "type": "array"
+        },
+        "canvas": {
+          "$ref": "#/$defs/Canvas"
+        },
+        "camera": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Camera"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "animation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MVSAnimation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "additional_structures": {
+          "items": {
+            "$ref": "#/$defs/StructureLayer"
+          },
+          "maxItems": 9,
+          "title": "Additional Structures",
+          "type": "array"
+        }
+      },
+      "title": "Scene",
+      "type": "object"
+    },
+    "Sphere": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        },
+        "type": {
+          "const": "sphere",
+          "title": "Type",
+          "type": "string"
+        },
+        "center": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "Center"
+        },
+        "radius": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "center"
+      ],
+      "title": "Sphere",
+      "type": "object"
+    },
+    "Structure": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "default": "pdbe_bcif",
+          "enum": [
+            "pdbe_bcif",
+            "url"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "type": {
+          "default": "model",
+          "enum": [
+            "model",
+            "assembly",
+            "symmetry",
+            "symmetry_mates"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "format": {
+          "default": "bcif",
+          "enum": [
+            "bcif",
+            "mmcif",
+            "pdb",
+            "pdbqt",
+            "gro",
+            "xyz",
+            "mol",
+            "sdf",
+            "mol2",
+            "lammpstrj"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "assembly_id": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assembly Id"
+        },
+        "model_index": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Model Index",
+          "type": "integer"
+        },
+        "block_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Index"
+        },
+        "block_header": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Header"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "transform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Transform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "instances": {
+          "items": {
+            "$ref": "#/$defs/Transform"
+          },
+          "maxItems": 100,
+          "title": "Instances",
+          "type": "array"
+        },
+        "ijk_min": {
+          "default": [
+            -1,
+            -1,
+            -1
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Ijk Min",
+          "type": "array"
+        },
+        "ijk_max": {
+          "default": [
+            1,
+            1,
+            1
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Ijk Max",
+          "type": "array"
+        },
+        "radius": {
+          "default": 5,
+          "exclusiveMinimum": 0,
+          "maximum": 50,
+          "title": "Radius",
+          "type": "number"
+        }
+      },
+      "title": "Structure",
+      "type": "object"
+    },
+    "StructureLayer": {
+      "additionalProperties": false,
+      "properties": {
+        "pdb_id": {
+          "anyOf": [
+            {
+              "pattern": "^(?:[1-9][a-z0-9]{3}|pdb_[a-z0-9]{8})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pdb Id"
+        },
+        "structure": {
+          "$ref": "#/$defs/Structure"
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Id"
+        },
+        "source_name": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Name"
+        },
+        "model_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "experimental",
+                "predicted",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Kind"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "include_water": {
+          "default": false,
+          "title": "Include Water",
+          "type": "boolean"
+        },
+        "components": {
+          "items": {
+            "$ref": "#/$defs/Component"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Components",
+          "type": "array"
+        },
+        "annotations": {
+          "items": {
+            "$ref": "#/$defs/Annotation"
+          },
+          "maxItems": 500,
+          "title": "Annotations",
+          "type": "array"
+        },
+        "labels_from": {
+          "items": {
+            "$ref": "#/$defs/AnnotationData"
+          },
+          "maxItems": 20,
+          "title": "Labels From",
+          "type": "array"
+        },
+        "tooltips_from": {
+          "items": {
+            "$ref": "#/$defs/AnnotationData"
+          },
+          "maxItems": 20,
+          "title": "Tooltips From",
+          "type": "array"
+        },
+        "primitives": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "angle": "#/$defs/Angle",
+                "arrow": "#/$defs/Arrow",
+                "box": "#/$defs/Box",
+                "distance": "#/$defs/Distance",
+                "ellipse": "#/$defs/Ellipse",
+                "ellipsoid": "#/$defs/Ellipsoid",
+                "label": "#/$defs/PrimitiveLabel",
+                "lines": "#/$defs/Lines",
+                "mesh": "#/$defs/Mesh",
+                "sphere": "#/$defs/Sphere",
+                "tube": "#/$defs/Tube"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Sphere"
+              },
+              {
+                "$ref": "#/$defs/Tube"
+              },
+              {
+                "$ref": "#/$defs/Arrow"
+              },
+              {
+                "$ref": "#/$defs/Distance"
+              },
+              {
+                "$ref": "#/$defs/Angle"
+              },
+              {
+                "$ref": "#/$defs/PrimitiveLabel"
+              },
+              {
+                "$ref": "#/$defs/Ellipse"
+              },
+              {
+                "$ref": "#/$defs/Ellipsoid"
+              },
+              {
+                "$ref": "#/$defs/Box"
+              },
+              {
+                "$ref": "#/$defs/Mesh"
+              },
+              {
+                "$ref": "#/$defs/Lines"
+              }
+            ]
+          },
+          "maxItems": 100,
+          "title": "Primitives",
+          "type": "array"
+        },
+        "focus": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/Focus"
+            }
+          ],
+          "default": false,
+          "title": "Focus"
+        },
+        "sources": {
+          "description": "Evidence URLs used to select or describe features; supplied by the caller.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "title": "StructureLayer",
+      "type": "object"
+    },
+    "Tooltip": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Tooltip",
+      "type": "object"
+    },
+    "Transform": {
+      "additionalProperties": false,
+      "properties": {
+        "rotation": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 9,
+              "minItems": 9,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation"
+        },
+        "translation": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation"
+        },
+        "rotation_center": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "const": "centroid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation Center"
+        },
+        "matrix": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 16,
+              "minItems": 16,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Matrix"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        }
+      },
+      "title": "Transform",
+      "type": "object"
+    },
+    "TransformMatrixInterpolation": {
+      "additionalProperties": false,
+      "properties": {
+        "target_ref": {
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "title": "Target Ref",
+          "type": "string"
+        },
+        "property": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Property"
+        },
+        "start_ms": {
+          "default": 0,
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "easing": {
+          "anyOf": [
+            {
+              "enum": [
+                "linear",
+                "bounce-in",
+                "bounce-out",
+                "bounce-in-out",
+                "circle-in",
+                "circle-out",
+                "circle-in-out",
+                "cubic-in",
+                "cubic-out",
+                "cubic-in-out",
+                "exp-in",
+                "exp-out",
+                "exp-in-out",
+                "quad-in",
+                "quad-out",
+                "quad-in-out",
+                "sin-in",
+                "sin-out",
+                "sin-in-out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Easing"
+        },
+        "frequency": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency"
+        },
+        "alternate_direction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alternate Direction"
+        },
+        "kind": {
+          "const": "transform_matrix",
+          "title": "Kind",
+          "type": "string"
+        },
+        "pivot": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pivot"
+        },
+        "rotation_start": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 9,
+              "minItems": 9,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation Start"
+        },
+        "rotation_end": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 9,
+              "minItems": 9,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation End"
+        },
+        "rotation_noise_magnitude": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation Noise Magnitude"
+        },
+        "rotation_easing": {
+          "anyOf": [
+            {
+              "enum": [
+                "linear",
+                "bounce-in",
+                "bounce-out",
+                "bounce-in-out",
+                "circle-in",
+                "circle-out",
+                "circle-in-out",
+                "cubic-in",
+                "cubic-out",
+                "cubic-in-out",
+                "exp-in",
+                "exp-out",
+                "exp-in-out",
+                "quad-in",
+                "quad-out",
+                "quad-in-out",
+                "sin-in",
+                "sin-out",
+                "sin-in-out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation Easing"
+        },
+        "rotation_frequency": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation Frequency"
+        },
+        "rotation_alternate_direction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation Alternate Direction"
+        },
+        "translation_start": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Start"
+        },
+        "translation_end": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation End"
+        },
+        "translation_noise_magnitude": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Noise Magnitude"
+        },
+        "translation_easing": {
+          "anyOf": [
+            {
+              "enum": [
+                "linear",
+                "bounce-in",
+                "bounce-out",
+                "bounce-in-out",
+                "circle-in",
+                "circle-out",
+                "circle-in-out",
+                "cubic-in",
+                "cubic-out",
+                "cubic-in-out",
+                "exp-in",
+                "exp-out",
+                "exp-in-out",
+                "quad-in",
+                "quad-out",
+                "quad-in-out",
+                "sin-in",
+                "sin-out",
+                "sin-in-out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Easing"
+        },
+        "translation_frequency": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Frequency"
+        },
+        "translation_alternate_direction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Alternate Direction"
+        },
+        "scale_start": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scale Start"
+        },
+        "scale_end": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scale End"
+        },
+        "scale_noise_magnitude": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scale Noise Magnitude"
+        },
+        "scale_easing": {
+          "anyOf": [
+            {
+              "enum": [
+                "linear",
+                "bounce-in",
+                "bounce-out",
+                "bounce-in-out",
+                "circle-in",
+                "circle-out",
+                "circle-in-out",
+                "cubic-in",
+                "cubic-out",
+                "cubic-in-out",
+                "exp-in",
+                "exp-out",
+                "exp-in-out",
+                "quad-in",
+                "quad-out",
+                "quad-in-out",
+                "sin-in",
+                "sin-out",
+                "sin-in-out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scale Easing"
+        },
+        "scale_frequency": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scale Frequency"
+        },
+        "scale_alternate_direction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scale Alternate Direction"
+        }
+      },
+      "required": [
+        "target_ref",
+        "property",
+        "duration_ms",
+        "kind"
+      ],
+      "title": "TransformMatrixInterpolation",
+      "type": "object"
+    },
+    "Tube": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "tooltip": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tooltip"
+        },
+        "type": {
+          "const": "tube",
+          "title": "Type",
+          "type": "string"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "$ref": "#/$defs/PositionExpressions"
+            },
+            {
+              "$ref": "#/$defs/QueryPosition"
+            }
+          ],
+          "title": "End"
+        },
+        "radius": {
+          "default": 0.05,
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "dash_length": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dash Length"
+        }
+      },
+      "required": [
+        "type",
+        "start",
+        "end"
+      ],
+      "title": "Tube",
+      "type": "object"
+    },
+    "Vec3Interpolation": {
+      "additionalProperties": false,
+      "properties": {
+        "target_ref": {
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "title": "Target Ref",
+          "type": "string"
+        },
+        "property": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Property"
+        },
+        "start_ms": {
+          "default": 0,
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "maximum": 300000,
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "easing": {
+          "anyOf": [
+            {
+              "enum": [
+                "linear",
+                "bounce-in",
+                "bounce-out",
+                "bounce-in-out",
+                "circle-in",
+                "circle-out",
+                "circle-in-out",
+                "cubic-in",
+                "cubic-out",
+                "cubic-in-out",
+                "exp-in",
+                "exp-out",
+                "exp-in-out",
+                "quad-in",
+                "quad-out",
+                "quad-in-out",
+                "sin-in",
+                "sin-out",
+                "sin-in-out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Easing"
+        },
+        "frequency": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency"
+        },
+        "alternate_direction": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alternate Direction"
+        },
+        "kind": {
+          "const": "vec3",
+          "title": "Kind",
+          "type": "string"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 3000,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 3000,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "noise_magnitude": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Noise Magnitude"
+        },
+        "spherical": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Spherical"
+        }
+      },
+      "required": [
+        "target_ref",
+        "property",
+        "duration_ms",
+        "kind"
+      ],
+      "title": "Vec3Interpolation",
+      "type": "object"
+    },
+    "Volume": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "format": {
+          "default": "map",
+          "enum": [
+            "map",
+            "bcif",
+            "mmcif",
+            "dx",
+            "dxbin"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "channel_id": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Channel Id"
+        },
+        "representation": {
+          "$ref": "#/$defs/Isosurface"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "opacity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Opacity"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "Volume",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "builder": {
+      "$ref": "#/$defs/Scene"
+    }
+  },
+  "required": [
+    "builder"
+  ],
+  "title": "BuildMvsInput",
+  "type": "object"
+}

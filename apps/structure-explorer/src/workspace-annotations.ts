@@ -27,7 +27,7 @@ export function ligandLayerLabel(scene: WorkspaceScene, layer: WorkspaceLayer): 
   const ligand = structure.ligands.find(ligand => ligand.label_asym_id === selector["label_asym_id"]
     && ligand.auth_seq_id === selector["auth_seq_id"] && ligand.comp_id === selector["label_comp_id"]
     && (ligand.insertion_code ?? "") === (selector["pdbx_PDB_ins_code"] ?? ""));
-  return ligand ? `${structure.pdb_id.toUpperCase()} · ${ligand.comp_id} · label chain ${ligand.label_asym_id}${ligand.auth_asym_id ? ` / author ${ligand.auth_asym_id}` : ""} · residue ${ligand.auth_seq_id}${ligand.insertion_code ?? ""}` : layer.name;
+  return ligand ? `${structure.pdb_id?.toUpperCase() ?? structure.display_name ?? structure.model_id ?? "Structure"} · ${ligand.comp_id} · label chain ${ligand.label_asym_id}${ligand.auth_asym_id ? ` / author ${ligand.auth_asym_id}` : ""} · residue ${ligand.auth_seq_id}${ligand.insertion_code ?? ""}` : layer.name;
 }
 function canonical(value: unknown): string {
   return JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -43,7 +43,7 @@ export function uniqueAnnotations(annotations: Annotation[]): Annotation[] {
   });
 }
 export interface AnnotationGroup {
-  structureId: string; pdbId: string; chainId: string; provider: string;
+  structureId: string; pdbId?: string; chainId: string; provider: string;
   features: Annotation[]; layerIds: string[]; covered: number; total: number; percent: number | null;
 }
 /** Coverage counts unique listed residue identities, never geometric neighbourhoods or scores. */
@@ -91,7 +91,7 @@ export function mergeOptionalAnnotations(base: WorkspaceScene, fetched: FetchedA
   const scene = structuredClone(base);
   for (const result of fetched) {
     const target = scene.structures.find(structure => structure.id === result.structureId);
-    if (!target || target.pdb_id.toLowerCase() !== result.pdb_id.toLowerCase()) {
+    if (!target?.pdb_id || target.pdb_id.toLowerCase() !== result.pdb_id.toLowerCase()) {
       throw new Error("Optional annotations do not match the intended structure");
     }
     const allowedChains = new Set(target.chains?.map(chain => chain.label_asym_id));
@@ -118,7 +118,7 @@ export function mergeOptionalAnnotations(base: WorkspaceScene, fetched: FetchedA
       if (existing && layerCategory(existing) === "annotations") continue;
       let suffix = 1;
       while (scene.layers.some(item => item.id === id)) id = `${target.id}-${incoming.id}-${suffix++}`;
-      scene.layers.push({ ...layer, id, structure_id: target.id, name: `${target.pdb_id.toUpperCase()} · ${layer.name}`, visible });
+      scene.layers.push({ ...layer, id, structure_id: target.id, name: `${target.pdb_id?.toUpperCase() ?? target.display_name ?? target.model_id ?? "Structure"} · ${layer.name}`, visible });
     }
   }
   for (const layer of scene.layers) if (layerCategory(layer) === "annotations") {
@@ -132,7 +132,7 @@ export function mergeOptionalScene(base: WorkspaceScene, fetched: FetchedStructu
   for (const result of fetched) {
     const target = scene.structures.find(structure => structure.id === result.structureId);
     const supplied = result.scene.structures[0];
-    if (!target || !supplied || target.pdb_id !== supplied.pdb_id) throw new Error("Optional data does not match the intended structure");
+    if (!target?.pdb_id || !supplied?.pdb_id || target.pdb_id !== supplied.pdb_id) throw new Error("Optional data does not match the intended structure");
     const allowedChains = new Set(target.chains?.map(chain => chain.label_asym_id));
     if (kind === "ligands") target.ligands = structuredClone(supplied.ligands);
     else target.annotations = uniqueAnnotations((supplied.annotations ?? []).map(feature => ({ ...feature,
@@ -161,7 +161,7 @@ export function mergeOptionalScene(base: WorkspaceScene, fetched: FetchedStructu
       if (existing && layerCategory(existing) === kind) continue; // preserve existing edits
       let suffix = 1;
       while (scene.layers.some(layer => layer.id === id)) id = `${target.id}-${incoming.id}-${suffix++}`;
-      scene.layers.push({ ...layer, id, structure_id: target.id, name: `${target.pdb_id.toUpperCase()} · ${layer.name}`, visible });
+      scene.layers.push({ ...layer, id, structure_id: target.id, name: `${target.pdb_id?.toUpperCase() ?? target.display_name ?? target.model_id ?? "Structure"} · ${layer.name}`, visible });
     }
   }
   for (const layer of scene.layers) if (layerCategory(layer) === kind) {

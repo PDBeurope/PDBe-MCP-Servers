@@ -27,10 +27,12 @@ from pdbe_mcp_server.execution import run_blocking_tool, tool_deadline
 from pdbe_mcp_server.mvs import (
     BuildMvsInput,
     BuildStoryInput,
+    OpenStructureUrlInput,
     build_mvs,
     build_mvs_story,
 )
 from pdbe_mcp_server.skills import SkillCatalog, add_skill_result_metadata
+from pdbe_mcp_server.structure_sources import app_connect_domains
 from pdbe_mcp_server.tool_names import PDBeServer
 from pdbe_mcp_server.workspace import (
     UpdateWorkspaceInput,
@@ -50,10 +52,10 @@ UI_FILE = Path(__file__).parent / "ui" / "structure-explorer.html"
 COMPARISON_UI_FILE = UI_FILE.with_name("structure-comparison.html")
 MVS_UI_FILE = UI_FILE.with_name("mvs-viewer.html")
 APP_RESOURCES = {
-    WORKSPACE_RESOURCE_URI: "PDBe Molecular Workspace",
+    WORKSPACE_RESOURCE_URI: "Universal Molecular Structure Viewer",
     RESOURCE_URI: "PDBe Structure Explorer",
     COMPARISON_RESOURCE_URI: "PDBe Structure Comparison Workbench",
-    MVS_RESOURCE_URI: "PDBe Custom Molecular View",
+    MVS_RESOURCE_URI: "Molecular Structure Scene Viewer",
 }
 
 
@@ -503,6 +505,10 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
         "ebi-pdbe-build_mvs_story": lambda arguments: normalize_mvs_arguments(
             arguments, story=True
         ),
+        "ebi-pdbe-build_structure_scene": normalize_mvs_arguments,
+        "ebi-pdbe-build_structure_story": lambda arguments: normalize_mvs_arguments(
+            arguments, story=True
+        ),
     }
     catalog = SkillCatalog()
     server.skill_catalog = catalog
@@ -512,14 +518,65 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
         display = request_display_options(server)
         return [
             types.Tool(
+                name="open_structure_url",
+                description=(
+                    "Open a structure from a provider-supplied HTTPS coordinate URL in the shared Mol* viewer. "
+                    "Provide the exact URL and supported format returned by the structure provider; do not construct a URL from an identifier. "
+                    "Optional model metadata is displayed as supplied. Sequence is shown when it can be read from the coordinates; "
+                    "annotations and PDBe-specific metadata are optional and are not inferred. "
+                    "The URL origin must be configured on this server. A successful result completes the viewing request."
+                ),
+                inputSchema=OpenStructureUrlInput.model_json_schema(),
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=True
+                ),
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                },
+            ),
+            types.Tool(
+                name="build_structure_story",
+                description=(
+                    "Build a guided molecular story with 2–20 ordered scenes in the shared Mol* viewer. "
+                    "Each scene uses the same provider-neutral source contract as build_structure_scene; "
+                    "different scenes may use different configured HTTPS coordinate sources and supported formats. "
+                    "Ground selections and narrative claims in provider evidence. Do not infer alignment or scientific results. "
+                    "Returns one native multi-state MVSJ with timed playback, scene navigation, and download."
+                ),
+                inputSchema=BuildStoryInput.model_json_schema(),
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=True
+                ),
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                },
+            ),
+            types.Tool(
+                name="build_structure_scene",
+                description=(
+                    "Build a custom single-scene molecular visualization in the shared Mol* viewer. "
+                    "Use either a PDBe entry ID or a provider-supplied coordinate URL and explicit supported format. "
+                    "Additional structures may use their own sources. Supports components, representations, colors, "
+                    "annotations, labels, tooltips, focus, camera, transforms, density, primitives, and serialized MolQL selectors. "
+                    "Use source-provided evidence and residue identifiers; no scientific claims, alignment, or measurements are inferred."
+                ),
+                inputSchema=BuildMvsInput.model_json_schema(),
+                annotations=types.ToolAnnotations(
+                    readOnlyHint=True, destructiveHint=False, openWorldHint=True
+                ),
+                _meta={
+                    "ui": {"resourceUri": display.resource_uri(WORKSPACE_RESOURCE_URI)}
+                },
+            ),
+            types.Tool(
                 name="pdbe_update_workspace",
                 description=(
-                    "Compose or restore a molecular workspace in the shared viewer. Supply the latest complete "
+                    "Update the current molecular workspace in the shared viewer. Supply the latest complete "
                     "workspace from tool results or App context, expected_revision, and atomic operations. "
                     "Supports adding/removing scenes and structures, component or annotation layers, "
-                    "and changing layer visibility. IDs must match exactly. No operations validates and restores "
-                    "a saved workspace. This tool is available only to the interactive App for its controls and "
-                    "saved-workspace restore; it is not available to chat responses. No global server state is stored. "
+                    "and changing layer visibility. IDs must match exactly. An empty operation list validates "
+                    "the current snapshot. This tool is available only to the interactive App for in-view controls; "
+                    "it is not available to chat responses. No global server state is stored. "
                     "The App displays supplied coordinates, transforms, residue mappings and annotations; it does not calculate scientific measurements."
                 ),
                 inputSchema=UpdateWorkspaceInput.model_json_schema(),
@@ -536,13 +593,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
             types.Tool(
                 name="pdbe_build_mvs_story",
                 description=(
-                    "Build a guided molecular story with 2–20 ordered scenes and open it in Mol* 5.13.1. "
-                    "Each scene has a unique id, title, description and complete builder specification "
-                    "using the same schema as build_mvs. Set component opacity inside representation.opacity, never directly on a component. Ground all narrative claims and selections "
-                    "in PDBe evidence. Returns one native multi-state MVSJ with timed playback, "
-                    "scene navigation and download. Every chat request opens a separate new viewer. "
-                    "Default duration is 6500 ms per scene and camera transition is 1500 ms. "
-                    "Stop after a compiled result. On validation failure, correct the input and retry once; never repeat identical input. Compilation does not establish coordinate availability or verify biological claims."
+                    "Compatibility alias for build_structure_story. Accepts provider-neutral coordinate sources as well as PDBe entry IDs."
                 ),
                 inputSchema=BuildStoryInput.model_json_schema(),
                 annotations=types.ToolAnnotations(
@@ -555,18 +606,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
             types.Tool(
                 name="pdbe_build_mvs",
                 description=(
-                    "Build a custom single-scene molecular visualization with MolViewSpec "
-                    "and open it in Mol* 5.13.1. Supply a complete builder specification, "
-                    "including choices from the recent visualization context. Every chat request opens a separate new viewer. "
-                    "Supports chains, residue ranges, ligand instances, representations, colors, "
-                    "opacity, inline annotations, labels, tooltips, focus and camera. Set component opacity inside representation.opacity, never directly on a component. "
-                    "Ground selections in PDBe data; use label_seq_id for polymer residues "
-                    "and auth_seq_id with insertion code for non-polymers. "
-                    "Water is excluded from broad all selections unless include_water=true. "
-                    "Supports density isosurfaces and clipping; structure transforms/instances, multiple structures per scene, annotation tables, primitives and serialized MolQL selectors. No raw MVS trees, executable code or PyMOL text. "
-                    "Returns the complete normalized builder in structuredContent for follow-ups; "
-                    "full MVSJ is delivered to the App with download support. "
-                    "A compiled result completes the build; do not rebuild while waiting for viewer loading. Compilation does not verify biological claims or coordinate availability."
+                    "Compatibility alias for build_structure_scene. Accepts provider-neutral coordinate sources as well as PDBe entry IDs."
                 ),
                 inputSchema=BuildMvsInput.model_json_schema(),
                 annotations=types.ToolAnnotations(
@@ -991,8 +1031,88 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                         )
                     ],
                 )
-        if name in {"pdbe_build_mvs", "pdbe_build_mvs_story"}:
-            is_story = name == "pdbe_build_mvs_story"
+        if name == "open_structure_url":
+            try:
+                source = OpenStructureUrlInput.model_validate(arguments)
+                label = (
+                    source.display_name
+                    or source.model_id
+                    or source.source_name
+                    or "Structure"
+                )
+                builder = {
+                    "title": label,
+                    "structure": {
+                        "url": source.coordinate_url,
+                        "format": source.format,
+                    },
+                    "model_id": source.model_id,
+                    "source_name": source.source_name,
+                    "model_kind": source.model_kind,
+                    "display_name": source.display_name,
+                    "components": [
+                        {
+                            "selector": "polymer",
+                            "representation": {"type": "cartoon"},
+                        },
+                        {
+                            "selector": "ligand",
+                            "representation": {"type": "ball_and_stick"},
+                        },
+                        {
+                            "selector": "branched",
+                            "representation": {"type": "ball_and_stick"},
+                        },
+                        {
+                            "selector": "ion",
+                            "representation": {"type": "ball_and_stick"},
+                        },
+                    ],
+                }
+                data = await run_blocking_tool(
+                    lambda: build_mvs(
+                        {
+                            "builder": {
+                                key: value
+                                for key, value in builder.items()
+                                if value is not None
+                            }
+                        }
+                    )
+                )
+                workspace = workspace_from_mvs(data)
+                data = await run_blocking_tool(
+                    lambda: compile_workspace(workspace)
+                )
+            except ValueError as error:
+                return mvs_validation_failure(error)
+            compact = {
+                key: value
+                for key, value in data.items()
+                if key not in {"mvsj", "scenes"}
+            }
+            compact.update(status="compiled", render_status="pending")
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text=(
+                            f"Prepared {label} for the shared molecular viewer. "
+                            "The source URL and format were supplied by the caller; "
+                            "the App loads coordinates separately."
+                        ),
+                    )
+                ],
+                structuredContent=compact,
+                _meta={"mvs": data, "workspace": data["workspace"]},
+            )
+        if name in {
+            "pdbe_build_mvs",
+            "pdbe_build_mvs_story",
+            "build_structure_scene",
+            "build_structure_story",
+        }:
+            is_story = name in {"pdbe_build_mvs_story", "build_structure_story"}
             try:
                 data = await run_blocking_tool(
                     lambda: build_mvs_story(arguments)
@@ -1262,15 +1382,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     "ui": {
                         "prefersBorder": True,
                         "csp": {
-                            "connectDomains": (
-                                [
-                                    "https://www.ebi.ac.uk",
-                                    "https://ebi.ac.uk",
-                                    "https://*.ebi.ac.uk",
-                                    "https://wwpdb.org",
-                                    "https://*.wwpdb.org",
-                                ]
-                            ),
+                            "connectDomains": app_connect_domains(),
                             "resourceDomains": ["data:", "blob:"],
                         },
                     }

@@ -1,23 +1,29 @@
 ---
 name: molview-spec
-description: Build or replace custom molecular views and guided molecular stories with PDBe evidence and MolViewSpec, or explore PDBe-reported ligand interactions in the Molecular Workspace. Use for explicit visualization, representation, coloring, highlighting, ligand-contact, or story requests.
+description: Build or replace custom molecular views and guided molecular stories from provider-supplied structure sources with MolViewSpec, or explore PDBe-reported ligand interactions in the Molecular Workspace. Use for explicit visualization, representation, coloring, highlighting, ligand-contact, or story requests.
 metadata:
-  version: "6"
+  version: "7"
 ---
 
 # Molecular views and stories
 
-Use the advertised `ebi-pdbe-build_mvs` tool for custom single scenes and
-`ebi-pdbe-build_mvs_story` for a guided story. Use their advertised legacy aliases
-only on servers that expose those names. Ordinary structure exploration uses
-`ebi-pdbe-open_structure`; aligned comparison uses `ebi-pdbe-compare_structures`.
-For any initial request to open, view, inspect, or show a structure or PDB entry—including
-a request that only supplies an entry ID—call `ebi-pdbe-open_structure`. Never call
+Prefer the advertised `ebi-pdbe-build_structure_scene` tool for custom single
+scenes and `ebi-pdbe-build_structure_story` for a guided story. The
+`ebi-pdbe-build_mvs` and `ebi-pdbe-build_mvs_story` names are compatibility
+aliases. Ordinary experimental PDB entry exploration uses
+`ebi-pdbe-open_structure`; open a provider-supplied coordinate URL with
+`ebi-pdbe-open_structure_url`. Aligned comparison uses
+`ebi-pdbe-compare_structures`.
+For any initial request to open, view, inspect, or show a PDBe entry—including
+a request that only supplies an entry ID—call `ebi-pdbe-open_structure`. For
+another provider, use that provider's guidance and pass its exact returned
+coordinate URL and format to `ebi-pdbe-open_structure_url` or the generic scene/story
+builder. Never call
 `ebi-pdbe-load_structure_annotations` for a user request: it is an App-only helper for
 loading optional annotations into a workspace that is already open and does not create a scene.
-A successful explorer result (`status: "prepared"`) completes that viewing
-request. Stop calling visualization tools; do not repeatedly reopen the entry
-or switch to another viewer tool to wait for browser rendering.
+A successful `prepared` or `compiled` result completes that viewing/build
+request. Stop calling visualization tools; do not repeatedly reopen a structure
+or switch tools to wait for browser rendering.
 
 Ordinary structure opening shows the deposited asymmetric unit unless a valid
 `assembly_id` is supplied; do not describe it as an assembly view by default.
@@ -37,7 +43,7 @@ annotations with provenance; if absent, report the annotation as unavailable.
 Coordinate loading and camera navigation do not establish new scientific results.
 
 Ground biological claims, residue mappings, ligand instances and scene choices
-in PDBe evidence. Read [scene guidance](references/scenes.md) when building or
+in evidence from the relevant provider. Read [scene guidance](references/scenes.md) when building or
 modifying a scene, and [story guidance](references/stories.md) for a tour or story.
 For every custom view or story, apply the default molecular styling and label
 readability rules in those references unless the user explicitly requests a
@@ -54,8 +60,8 @@ history and only the latest available visualization context. Use that context
 to build a complete new view; each chat visualization request opens a separate
 viewer and leaves existing viewers unchanged. Workspace IDs and revisions are
 internal App/server state and are omitted from model-facing context and tool results.
-`ebi-pdbe-update_workspace` is App-only for viewer controls and saved-workspace
-restore, not for chat responses. Do not claim to mutate an existing viewer or
+`ebi-pdbe-update_workspace` is App-only for in-view controls, not for chat
+responses. Do not claim to mutate an existing viewer or
 route a result by workspace ID.
 
 ## Ligand interaction workflow

@@ -1,14 +1,13 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>PDBe Molecular Workspace</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Molecular Structure Viewer</title></head>
 <body>
   <main>
     <header class="brand-header">
-      <img class="pdbe-logo" src="./src/assets/pdbe-letterhead-white.webp" alt="PDBe — Protein Data Bank in Europe" width="145" height="50" />
-      <div class="header-title"><span class="eyebrow">Structural evidence</span><h1>Molecular Workspace</h1></div>
+      <div class="header-title"><span class="eyebrow">Molecular visualization</span><h1>Structure Viewer</h1></div>
     </header>
     <section class="toolbar"><div><h1 id="title">Molecular view</h1><p id="pdb-ids" class="hint" hidden></p><p id="description"></p></div>
-      <button id="sequence-toggle" type="button" aria-pressed="true">Hide sequence</button>
+      <button id="sequence-toggle" type="button" aria-pressed="true" hidden>Hide sequence</button>
       <button id="reset" type="button" disabled>Reset view</button>
       <button id="download" type="button" disabled>Save MVSJ</button>
     </section>
@@ -49,8 +48,6 @@
         <h3>Ligands</h3><label><input id="show-ligands" type="checkbox" /> Show ligands</label>
         <p id="ligand-status" class="hint"></p><div id="ligand-layers"></div>
       </section>
-      <button id="save-workspace" disabled>Save workspace</button>
-      <label>Restore workspace <input id="restore-workspace" type="file" accept="application/json,.json" /></label>
     </aside></div>
     <section id="comparison-panel" class="scene-details" hidden><h2>Residue correspondence</h2><p id="comparison-summary"></p>
       <p class="hint">Residue mappings come from PDBe/SIFTS. The viewer applies supplied PDBe transforms and displays source annotations. No RMSD, displacement or distance-based binding sites are calculated.</p>

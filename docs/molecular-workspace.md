@@ -50,38 +50,62 @@ to `http://127.0.0.1:8000/apps/`. With `--all`, the app tool and its UI resource
 are also available at `/all/`. `ROOT_PREFIX` applies to both paths. For legacy
 SSE, use `--server-type pdbe_apps_server --transport sse` on the stdio executable.
 
-The model-visible tool is `pdbe_open_structure(pdb_id, assembly_id?, chain_id?)`.
-`chain_id` is a **label chain ID** (`struct_asym_id`); the UI shows both author
-and label identifiers. Omit `assembly_id` to view the deposited asymmetric unit.
-The first coordinate model is loaded. Assembly views may omit entry chains or
-show symmetry copies; list selections apply to all copies, while 3D clicks retain
-the clicked instance. Residue lists come from deposited-entry PDBe annotations,
-and unobserved residues cannot be highlighted. Non-polymer selections use author
-residue numbers and insertion codes rather than PDBe's internal residue index.
+The PDBe convenience tool is `pdbe_open_structure(pdb_id, assembly_id?,
+chain_id?)`. `chain_id` is a **label chain ID** (`struct_asym_id`); the UI shows
+both author and label identifiers. Omit `assembly_id` to view the deposited
+asymmetric unit. The first coordinate model is loaded. Assembly views may omit
+entry chains or show symmetry copies; list selections apply to all copies, while
+3D clicks retain the clicked instance. Residue lists come from deposited-entry
+PDBe annotations, and unobserved residues cannot be highlighted. Non-polymer
+selections use author residue numbers and insertion codes rather than PDBe's
+internal residue index.
 
-Only public PDBe endpoints on `https://www.ebi.ac.uk` are needed for browser
-network access. Their origin is declared in the UI resource CSP. The host needs
-MCP Apps support, WebGL, and network access to that origin. The evidence panel
-lists source endpoints and retrieval time. Missing optional annotations produce
-a warning; coordinate failures are reported in the viewer status.
+For coordinates from another provider, use `open_structure_url` with the exact
+HTTPS coordinate URL and supported `format` returned by that provider. Optional
+`model_id`, `source_name`, `model_kind`, and `display_name` are display metadata;
+the server does not construct URLs or fetch PDBe annotations for this source.
+Sequence is shown when Mol* can derive it from the loaded coordinates.
+Annotations and PDBe-specific panels are optional.
+
+Coordinate origins are restricted to an exact server-side allowlist. The
+built-in origins include PDBe and AlphaFold DB. To permit another provider,
+configure `PDBe_MCP_STRUCTURE_ORIGINS` as a comma-separated list of HTTPS
+origins, for example `https://models.example.org`. Do not use paths, wildcards,
+or HTTP origins. Coordinate URLs with credentials, query parameters, or
+fragments are rejected. The same configured origins are included in the MCP App
+CSP.
+
+PDBe workflows use public PDBe endpoints; URL-backed structures use their
+configured provider origin. Allowed origins are declared in the UI resource
+CSP. The host needs MCP Apps support, WebGL, and network access to the required
+origin. The evidence panel lists available source endpoints and retrieval time.
+Missing optional annotations do not prevent coordinate loading; coordinate
+failures are reported in the viewer status.
 
 Structure inspection, precomputed structure comparisons, and custom MVS scenes are available.
 
 ### Custom MolViewSpec scenes
 
-`ebi-pdbe-build_mvs` builds and displays a custom molecular scene in the
-MolViewSpec App (`ui://pdbe/mvs-viewer`). Supply a PDB entry and scene components,
-such as a cartoon representation for the polymer and ball-and-stick for a ligand:
+`build_structure_scene` builds and displays a custom molecular scene in the
+shared Mol* App. Supply either a PDB entry ID or a provider-returned coordinate
+URL and format, plus scene components. For example, a URL-backed source can be
+described as below; the URL is illustrative, so use the exact URL/version
+returned by the provider:
 
 ```json
 {
   "version": 1,
   "builder": {
-    "pdb_id": "1cbs",
-    "title": "Protein and ligand",
+    "title": "Predicted model",
+    "model_id": "AF-Q9I1F6-F1",
+    "source_name": "AlphaFold DB",
+    "model_kind": "predicted",
+    "structure": {
+      "url": "https://alphafold.ebi.ac.uk/files/AF-Q9I1F6-F1-model_v6.bcif",
+      "format": "bcif"
+    },
     "components": [
-      {"selector": "polymer", "representation": "cartoon"},
-      {"selector": "ligand", "representation": "ball_and_stick", "focus": true}
+      {"selector": "polymer", "representation": "cartoon"}
     ]
   }
 }
@@ -89,14 +113,19 @@ such as a cartoon representation for the polymer and ball-and-stick for a ligand
 
 Scenes support common molecular representations, selection and styling options,
 annotations, camera settings, and additional structures or primitives. The App
-can restore and export scenes as MVSJ. See the `molview-spec` skill for supported
-builder fields and examples.
+can restore and export scenes as MVSJ. Existing `pdbe_build_mvs` and
+`pdbe_build_mvs_story` names remain compatibility aliases. Each structure in a
+scene may use its own configured source. Density and annotation data retain
+their own source policies.
 
 ### Molecular stories
 
-`ebi-pdbe-build_mvs_story` creates a multi-scene molecular story in the same App.
-Provide a title and an ordered set of scenes, each with its own scene definition.
-Stories support playback, transitions, and MVSJ export.
+`build_structure_story` creates a multi-scene molecular story in the same App.
+Provide a title and an ordered set of scenes, each with its own source and scene
+definition. Stories may use different providers in different scenes and support
+playback, transitions, and MVSJ export. The builder does not imply alignment or
+biological correspondence between scenes unless evidence and transforms are
+supplied.
 
 ### Remote molecular visualization skill
 
@@ -187,7 +216,7 @@ existing validated MVS builder, preserving its selection, transform, annotation,
 primitive, density and story support.
 
 A workspace contains a stable ID, revision, scenes, structure definitions,
-visual layers, evidence sources, warnings, and saved camera/active-scene state.
+visual layers, evidence sources, warnings, and in-view camera/active-scene state.
 A layer references a structure ID and contains a component or annotation definition. Coordinates are not embedded in saved state; the App loads them for rendering.
 Residue mappings and source annotations are retained as supplied data.
 
@@ -201,22 +230,22 @@ additional story scenes through the same contract.
 The entire batch validates before a new revision is returned. Removing a
 structure removes dependent layers and its comparison. Replacing a structure
 also invalidates its comparison so stale correspondence cannot be reused. An empty operations list validates
-and restores a saved workspace without incrementing the revision.
+an existing workspace snapshot without incrementing the revision.
 
 The server is stateless: callers supply their base snapshot, and revision checks
 compare against that snapshot. They are not a distributed lock or a guarantee
 against concurrent writers. The App rejects older revisions and conflicting
 scientific state at the same revision for its current workspace. Matching-ID updates retain the existing viewer and camera; layer
-visibility persists in the workspace definitions. Explicit file restoration can
-restore an older saved revision and its camera. Save workspace exports editable
-JSON; Save MVSJ exports the compiled molecular visualization.
+visibility persists in the in-view workspace definitions. The viewer does not
+provide workspace JSON save or file-restore controls. **Save MVSJ** exports the
+compiled molecular visualization.
 
 **Host and tool boundary:** workspace IDs and revisions are internal to App/server
-state for validation, visibility updates, and saved-workspace restore. They are
-not included in model-facing context or tool results, and are not used for chat
+state for validation, visibility updates, and in-view workflows. They are not
+included in model-facing context or tool results, and are not used for chat
 result routing.
 `pdbe_update_workspace` is visible only to the interactive App; it remains
-available for viewer controls and restore workflows. Chat visualization follow-ups
+available for viewer controls and internal ligand-workflow rehydration. Chat visualization follow-ups
 use normal conversation history plus only the latest available app context, and
 each request opens a separate new viewer while existing viewers remain unchanged.
 No global process-wide workspace store or cross-user session state is introduced.

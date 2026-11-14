@@ -18,6 +18,7 @@ from pdbe_mcp_server.apps import (
     get_structure_data,
     normalize_annotations,
 )
+from pdbe_mcp_server.structure_sources import app_connect_domains
 
 
 def chain(label="X", author="A"):
@@ -337,15 +338,7 @@ async def test_display_preferences_over_http(
         assert f'data-bundle="{expected_bundle}"' in html
         assert '<div id="viewer">' in html
         assert resource["_meta"]["ui"]["csp"] == {
-            "connectDomains": (
-                [
-                    "https://www.ebi.ac.uk",
-                    "https://ebi.ac.uk",
-                    "https://*.ebi.ac.uk",
-                    "https://wwpdb.org",
-                    "https://*.wwpdb.org",
-                ]
-            ),
+            "connectDomains": app_connect_domains(),
             "resourceDomains": ["data:", "blob:"],
         }
 
@@ -452,15 +445,56 @@ async def test_structure_aliases_preserve_app_results(
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("endpoint", ["apps", "all"])
+async def test_open_structure_url_uses_provider_coordinates_without_pdbe_fetch(
+    app_client, endpoint
+):
+    path = f"/mcp/{endpoint}/"
+    await rpc(app_client, path, "tools/list")
+    url = "https://alphafold.ebi.ac.uk/files/AF-Q9I1F6-F1-model_v6.bcif"
+    response = await rpc(
+        app_client,
+        path,
+        "tools/call",
+        {
+            "name": "ebi-pdbe-open_structure_url",
+            "arguments": {
+                "coordinate_url": url,
+                "format": "bcif",
+                "model_id": "AF-Q9I1F6-F1",
+                "source_name": "AlphaFold DB",
+                "model_kind": "predicted",
+            },
+        },
+    )
+    result = response["result"]
+    assert not result.get("isError")
+    assert result["structuredContent"]["status"] == "compiled"
+    structure = result["_meta"]["workspace"]["scenes"][0]["structures"][0]
+    assert "pdb_id" not in structure
+    assert structure["options"]["url"] == url
+    assert structure["model_id"] == "AF-Q9I1F6-F1"
+    assert structure["model_kind"] == "predicted"
+    assert structure["data_status"] == {
+        "annotations": "unavailable",
+        "ligands": "unavailable",
+    }
+    assert app_client.pdbe_generator.execute_operation.call_count == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("endpoint", ["apps", "all"])
 async def test_removed_apps_are_unavailable(app_client, endpoint):
     path = f"/mcp/{endpoint}/?internal=true"
     tools = (await rpc(app_client, path, "tools/list"))["result"]["tools"]
     assert {tool["name"] for tool in tools} == {
         "ebi-pdbe-open_structure",
+        "ebi-pdbe-open_structure_url",
         "ebi-pdbe-compare_structures",
         "ebi-pdbe-ligand-interactions",
         "ebi-pdbe-build_mvs",
         "ebi-pdbe-build_mvs_story",
+        "ebi-pdbe-build_structure_scene",
+        "ebi-pdbe-build_structure_story",
         "ebi-pdbe-update_workspace",
         "ebi-pdbe-load_structure_annotations",
     }
@@ -480,7 +514,15 @@ async def test_removed_apps_are_unavailable(app_client, endpoint):
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("endpoint", ["apps", "all"])
-@pytest.mark.parametrize("name", ["pdbe_build_mvs", "ebi-pdbe-build_mvs"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "pdbe_build_mvs",
+        "ebi-pdbe-build_mvs",
+        "build_structure_scene",
+        "ebi-pdbe-build_structure_scene",
+    ],
+)
 async def test_mvs_scene_delivery_and_replacement(app_client, endpoint, name):
     path = f"/mcp/{endpoint}/"
     await rpc(app_client, path, "tools/list")
@@ -531,6 +573,53 @@ async def test_mvs_scene_delivery_and_replacement(app_client, endpoint, name):
     )["result"]
     assert failed["isError"]
     assert "include_water" in failed["content"][0]["text"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("endpoint", ["apps", "all"])
+async def test_generic_story_tool_accepts_distinct_provider_sources(app_client, endpoint):
+    path = f"/mcp/{endpoint}/"
+    await rpc(app_client, path, "tools/list")
+    url = "https://alphafold.ebi.ac.uk/files/AF-Q9I1F6-F1-model_v6.bcif"
+    result = (
+        await rpc(
+            app_client,
+            path,
+            "tools/call",
+            {
+                "name": "ebi-pdbe-build_structure_story",
+                "arguments": {
+                    "story": {
+                        "title": "Experimental and predicted models",
+                        "scenes": [
+                            {
+                                "id": "experimental",
+                                "title": "Experimental",
+                                "builder": {"pdb_id": "1cbs"},
+                            },
+                            {
+                                "id": "predicted",
+                                "title": "Predicted",
+                                "builder": {
+                                    "structure": {"url": url, "format": "bcif"},
+                                    "model_id": "AF-Q9I1F6-F1",
+                                    "source_name": "AlphaFold DB",
+                                    "model_kind": "predicted",
+                                },
+                            },
+                        ],
+                    }
+                },
+            },
+        )
+    )["result"]
+    assert not result.get("isError")
+    assert result["_meta"]["mvs"]["mvsj"]["kind"] == "multiple"
+    scenes = result["_meta"]["workspace"]["scenes"]
+    assert scenes[0]["structures"][0]["pdb_id"] == "1cbs"
+    assert "pdb_id" not in scenes[1]["structures"][0]
+    assert scenes[1]["structures"][0]["options"]["url"] == url
+    assert scenes[1]["structures"][0]["model_kind"] == "predicted"
 
 
 @pytest.mark.anyio

@@ -1,14 +1,38 @@
 # Scene specifications
 
-Call `ebi-pdbe-build_mvs` with `{"version": 1, "builder": {...}}`.
-The builder requires `pdb_id`; it accepts legacy and extended accessions intact.
-Do not include local-chat action fields such as `target`, `action`, or `type`.
+Prefer `ebi-pdbe-build_structure_scene` with
+`{"version": 1, "builder": {...}}`. The compatibility alias
+`ebi-pdbe-build_mvs` is also available. Supply either a PDBe `pdb_id` or a
+provider-returned `structure.url` with an explicit supported `structure.format`.
+PDBe IDs accept legacy and extended accessions intact. Do not include local-chat
+action fields such as `target`, `action`, or `type`.
 
 The default is the first deposited model, a polymer cartoon, and no water.
 Use `structure: {"type": "assembly", "assembly_id": "1"}` for a known assembly.
 If assembly_id is omitted, Mol* chooses the first available assembly; do not invent an ID.
-Coordinates default to PDBe BCIF. A custom coordinate URL must be HTTPS on
-`www.ebi.ac.uk`, matching the viewer's network policy.
+Coordinates default to PDBe BCIF when `pdb_id` is supplied. For other providers,
+pass the exact HTTPS URL and format from that provider's result; never construct
+a URL from a model identifier. Coordinate origins must be built in or explicitly
+configured with `PDBe_MCP_STRUCTURE_ORIGINS`. The viewer rejects unconfigured
+origins and the MCP App CSP allows only configured origins. URLs containing
+credentials, query parameters, or fragments are rejected.
+
+For a URL-backed predicted model, preserve provider metadata and omit `pdb_id`:
+
+```json
+{
+  "structure": {
+    "url": "https://alphafold.ebi.ac.uk/files/AF-Q9I1F6-F1-model_v6.bcif",
+    "format": "bcif"
+  },
+  "model_id": "AF-Q9I1F6-F1",
+  "source_name": "AlphaFold DB",
+  "model_kind": "predicted"
+}
+```
+
+The URL is illustrative; use the exact coordinate URL and version returned by
+the provider for the requested model.
 
 Components have a `selector`, `representation`, optional `color`/`colors`, `label`,
 `tooltip`, and `focus`. Representations are cartoon, ball_and_stick, surface,
@@ -71,9 +95,10 @@ Use only one of `relative_isovalue` and `absolute_isovalue`; `show_faces` and
 App CSP. Retrieve actual density URLs and channel identifiers; do not invent them.
 
 Custom structure formats include bcif/mmcif/pdb/pdbqt/gro/xyz/mol/sdf/mol2/lammpstrj.
-A custom URL is required except for default PDBe BCIF. Coordinate sources remain
-restricted to https://www.ebi.ac.uk. PQR, standalone trajectories/topologies and
-shape files are not structure sources supported by this viewer workflow.
+A custom URL is required except for default PDBe BCIF. Coordinate URLs may use
+the configured provider origins; density and annotation URL policies are
+separate. PQR, standalone trajectories/topologies and shape files are not
+structure sources supported by this viewer workflow.
 Typed primitives, structure transforms and instances, additional structures,
 annotation tables and serialized MolQL selectors are supported; consult
 [builder API reference](builder-api.md) for exact mappings and examples. PyMOL
@@ -122,8 +147,9 @@ Prefer the canonical schema. Compatibility input accepts `pdbId`, `entry_id` or
 `entryId` as `pdb_id` (also inside `structure`), `color: {"value": "blue"}` as
 `color: {"color": "blue"}`, case-insensitive representation/static selector
 names, `show_water` as `include_water`, and singular `component` as `components`.
-A recognizable PDBe coordinate filename can supply a missing entry ID. Empty
-components use the default polymer view. Conflicting aliases are errors, not
+A recognizable PDBe coordinate filename can supply a missing entry ID only for
+the PDBe coordinate endpoint. A URL from another provider never implies a PDB
+ID. Empty components use the default polymer view. Conflicting aliases are errors, not
 instructions to silently pick one. Unknown fields, invalid geometry and
 unsupported representations still fail; do not substitute cartoon for an
 unknown representation. Input normalization runs before MCP schema validation.

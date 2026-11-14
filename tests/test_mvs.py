@@ -424,6 +424,60 @@ def test_extended_pdb_ids_are_preserved():
     )
 
 
+def test_provider_coordinate_url_builds_without_a_pdb_id():
+    url = "https://alphafold.ebi.ac.uk/files/AF-Q9I1F6-F1-model_v6.bcif"
+    result = build_mvs(
+        {
+            "builder": {
+                "title": "Predicted structure",
+                "structure": {"url": url, "format": "bcif"},
+                "model_id": "AF-Q9I1F6-F1",
+                "source_name": "AlphaFold DB",
+                "model_kind": "predicted",
+                "display_name": "Q9I1F6 predicted model",
+            }
+        }
+    )
+    assert result["coordinate_url"] == url
+    assert "pdb_id" not in result["builder"]
+    assert result["builder"]["model_id"] == "AF-Q9I1F6-F1"
+    assert result["builder"]["model_kind"] == "predicted"
+    assert next(nodes(result["mvsj"], "download"))["params"]["url"] == url
+
+
+def test_non_pdbe_coordinate_filename_does_not_become_a_pdb_id():
+    result = build_mvs(
+        {
+            "builder": {
+                "structure": {
+                    "url": "https://alphafold.ebi.ac.uk/files/1cbs.bcif",
+                    "format": "bcif",
+                }
+            }
+        }
+    )
+    assert "pdb_id" not in result["builder"]
+
+
+def test_story_scenes_can_load_different_provider_sources():
+    data = story_input()
+    url = "https://alphafold.ebi.ac.uk/files/AF-Q9I1F6-F1-model_v6.bcif"
+    data["story"]["scenes"][1]["builder"] = {
+        "structure": {"url": url, "format": "bcif"},
+        "model_id": "AF-Q9I1F6-F1",
+        "source_name": "AlphaFold DB",
+        "model_kind": "predicted",
+    }
+    result = build_mvs_story(data)
+    assert next(nodes(result["mvsj"]["snapshots"][0]["root"], "download"))["params"][
+        "url"
+    ].endswith("/1cbs.bcif")
+    assert next(nodes(result["mvsj"]["snapshots"][1]["root"], "download"))["params"][
+        "url"
+    ] == url
+    assert result["story"]["scenes"][1]["builder"]["model_kind"] == "predicted"
+
+
 def test_schema_describes_nested_scene_and_forbids_unknown_fields():
     schema = BuildMvsInput.model_json_schema()
     assert schema["additionalProperties"] is False
