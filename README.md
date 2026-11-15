@@ -55,7 +55,7 @@ resources for scene-building guidance.
 | Server | Purpose |
 | --- | --- |
 | `all` | API, Search, Apps, and Graph tools through one server |
-| `pdbe_api_server` | Entries, assemblies, molecules, ligands, publications, and validation data, and predicted structure models from 3D-Beacons |
+| `pdbe_api_server` | Entries, assemblies, molecules, ligands, publications, validation data, and predicted structure models from 3D-Beacons |
 | `pdbe_search_server` | Solr searches with filtering, facets, grouping, and pagination |
 | `pdbe_apps_server` | Interactive structure and ligand exploration, comparison, and MolViewSpec workspaces |
 | `pdbe_graph_server` | PDBe-KB graph schema and queries against your local Neo4j database |
