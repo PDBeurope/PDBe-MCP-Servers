@@ -3,7 +3,7 @@
 import os
 from urllib.parse import urlsplit
 
-DEFAULT_COORDINATE_ORIGINS = (
+DEFAULT_COORDINATE_ORIGINS: tuple[str, ...] = (
     "https://www.ebi.ac.uk",
     "https://alphafold.ebi.ac.uk",
     # Production HTTPS base URLs from the 3D-Beacons registry. Genome-3D is http-only
@@ -51,7 +51,7 @@ def allowed_coordinate_origins() -> tuple[str, ...]:
     """
 
     configured = os.getenv("PDBe_MCP_STRUCTURE_ORIGINS", "")
-    origins = list(DEFAULT_COORDINATE_ORIGINS)
+    origins: list[str] = list(DEFAULT_COORDINATE_ORIGINS)
     if configured.strip():
         origins.extend(_origin(item) for item in configured.split(",") if item.strip())
     return tuple(dict.fromkeys(_origin(item) for item in origins))
