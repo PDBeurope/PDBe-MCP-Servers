@@ -1,6 +1,6 @@
 # Universal Mol* Viewer: Migration Plan
 
-**Status:** In progress in this repository; sibling-repository migrations remain planned  
+**Status:** In progress in this repository; sibling-repository migrations remain planned
 **Scope:** This repository's Molecular Workspace, the `pdbe-chat` worktree, and
 the `afdb-mcp-server` worktree
 
