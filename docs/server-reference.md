@@ -9,9 +9,31 @@
 
 The `pdbe_api_server` generates tools from the PDBe API OpenAPI specification. Use this server for core PDBe REST API data, such as entries, assemblies, molecules, ligands, publications, and validation information.
 
+`ebi-pdbe-get_ai_summary` returns the pre-generated AI summary for a four-character PDB entry ID. It is not available when the summary does not exist for that entry.
+
+#### 3D-Beacons tools
+
+The API server also exposes four tools for the [3D-Beacons Network](https://3dbeacons.org/), which covers predicted structure models as well as experimental ones. Use them to fill gaps when PDBe has no experimental structure for a protein. Predicted models are reported as predictions, with their confidence scores. The PDBe API tools remain the source for experimental structures.
+
+| Tool | Purpose |
+| --- | --- |
+| `ebi-pdbe-3dbeacons_uniprot_summary` | Structure models for one or more UniProt accessions. |
+| `ebi-pdbe-3dbeacons_ensembl_summary` | Structure models for an Ensembl gene or transcript ID. |
+| `ebi-pdbe-3dbeacons_sequence` | Structure models for a protein sequence, with `action` set to `submit`, `result`, or `summary`. |
+| `ebi-pdbe-3dbeacons_annotations` | Residue-level features (domains, binding sites, and so on) for a UniProt accession. |
+
+To choose the source of structures, use the filters on the structure tools:
+
+- `provider: "pdbe"` returns only PDBe experimental structures.
+- `exclude_provider: "pdbe"` omits PDBe experimental structures and returns predicted models, for example after the PDBe API tools have already returned experimental ones.
+
+`ebi-pdbe-3dbeacons_sequence` with `submit` waits for the search to finish. If it is still running when the tool budget runs out, the response includes a `job_id`, and `result` returns the results later.
+
+Structure data is from the 3D-Beacons Network, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
 ### Search Server Tools
 
-#### `get_pdbe_search_schema`
+#### `ebi-pdbe-search_schema`
 Retrieves the complete Solr search schema showing all available fields, data types, and descriptions. Use this to understand what fields you can search and filter on.
 
 **Example usage:**
@@ -19,7 +41,7 @@ Retrieves the complete Solr search schema showing all available fields, data typ
 "Show me the search schema for PDBe structures"
 ```
 
-#### `run_pdbe_search_query`
+#### `ebi-pdbe-search`
 Execute Solr-style search queries with flexible field selection, filter queries, facets, grouping, sorting, and pagination options.
 
 **Parameters:**
@@ -78,7 +100,7 @@ Common searchable fields include:
 - `ligand_name`: Bound ligands
 - `title`: Structure title/description
 
-Use `get_pdbe_search_schema` to discover all available fields and their descriptions.
+Use `ebi-pdbe-search_schema` to discover all available fields and their descriptions.
 
 ## Advanced Graph Server Configuration
 
@@ -169,7 +191,7 @@ uv run pdbe-mcp-server --server-type pdbe_graph_server --transport sse
 
 ### Graph Server Tools
 
-#### `pdbe_graph_nodes`
+#### `ebi-pdbe-graph_nodes`
 Retrieves metadata about all node types (labels) defined in the PDBe graph database schema. This uses the public graph schema and does not require local Neo4j credentials.
 
 **Example usage:**
@@ -177,7 +199,7 @@ Retrieves metadata about all node types (labels) defined in the PDBe graph datab
 "Show me all node types in the PDBe graph database"
 ```
 
-#### `pdbe_graph_edges`
+#### `ebi-pdbe-graph_edges`
 Retrieves metadata about all relationship types (edges) defined in the PDBe graph database schema. This uses the public graph schema and does not require local Neo4j credentials.
 
 **Example usage:**
@@ -185,7 +207,7 @@ Retrieves metadata about all relationship types (edges) defined in the PDBe grap
 "Show me all relationship types in the PDBe graph database"
 ```
 
-#### `pdbe_graph_node_relationships`
+#### `ebi-pdbe-graph_node_relationships`
 Verifies selected node labels and returns the incoming, outgoing, and self-loop relationship patterns defined for each label. This uses the public graph schema and does not require local Neo4j credentials.
 
 **Parameters:**
@@ -196,7 +218,7 @@ Verifies selected node labels and returns the incoming, outgoing, and self-loop 
 "Verify relationships for Entry, Entity, and UniProt"
 ```
 
-#### `pdbe_graph_example_queries`
+#### `ebi-pdbe-graph_example_queries`
 Retrieves example Cypher queries that demonstrate how to interact with the PDBe graph database. This uses the public graph schema and does not require local Neo4j credentials.
 
 **Example usage:**
@@ -204,7 +226,10 @@ Retrieves example Cypher queries that demonstrate how to interact with the PDBe 
 "Give me example Cypher queries for exploring the PDBe graph"
 ```
 
-#### `pdbe_run_cypher_query`
+#### `ebi-pdbe-graph_indexes`
+Retrieves the indexed node properties defined in the PDBe graph schema, so you can write Cypher queries that use them. This uses the public graph schema and does not require local Neo4j credentials.
+
+#### `ebi-pdbe-run_cypher_query`
 Execute custom read-only Cypher queries against your configured Neo4j graph database. This tool is only available when Neo4j environment variables are configured.
 
 **Parameters:**
@@ -218,7 +243,34 @@ Execute custom read-only Cypher queries against your configured Neo4j graph data
 
 **Security:** Only read-only queries are allowed (MATCH, OPTIONAL MATCH). Write operations (MERGE, CREATE, DELETE, REMOVE, SET, LOAD CSV, FOREACH) are blocked to prevent accidental data modification.
 
-Neo4j Cypher query results use TOON by default; set `TOON_ENABLED=false` to use JSON instead.
+The tool response is formatted as TOON by default. Set `TOON_ENABLED=false` to use JSON.
+
+## Apps server (Molecular Workspace)
+
+The `pdbe_apps_server` provides the interactive Molecular Workspace: a shared Mol* viewer for structures, comparisons, ligand interactions, and MolViewSpec scenes and stories. It needs an MCP Apps-capable client, WebGL, and network access to PDBe and to the configured coordinate origins. See the [molecular workspace guide](molecular-workspace.md) for usage and examples.
+
+```bash
+uvx pdbe-mcp-server --server-type pdbe_apps_server
+```
+
+For Streamable HTTP, connect to `/apps/`. The `--internal` flag hides the App header and entry search in stdio, the same as `?internal=true` over HTTP.
+
+Coordinate URLs must use HTTPS on a built-in origin or on an origin listed in `PDBe_MCP_STRUCTURE_ORIGINS` (comma-separated, exact origins).
+
+| Tool | Available to the model | Purpose |
+| --- | --- | --- |
+| `ebi-pdbe-open_structure` | Yes | Open a PDBe entry by PDB ID in the viewer. |
+| `ebi-pdbe-open_structure_url` | Yes | Open a provider-supplied coordinate URL with its format. |
+| `ebi-pdbe-build_structure_scene` | Yes | Build a custom single-scene MolViewSpec. Preferred name. |
+| `ebi-pdbe-build_mvs` | Yes | Compatibility alias for `build_structure_scene`. |
+| `ebi-pdbe-build_structure_story` | Yes | Build a guided story of 2 to 20 ordered scenes. Preferred name. |
+| `ebi-pdbe-build_mvs_story` | Yes | Compatibility alias for `build_structure_story`. |
+| `ebi-pdbe-compare_structures` | Yes | Compare two chains using PDBe's precomputed superpositions and residue correspondence. |
+| `ebi-pdbe-ligand-interactions` | Yes | Show PDBe-reported ligand interactions. |
+| `ebi-pdbe-update_workspace` | App only | Compose or restore the workspace in the viewer. |
+| `ebi-pdbe-load_structure_annotations` | App only | Load annotations for a structure in the viewer. |
+
+App-only tools are called by the viewer itself, not by the model.
 
 ## Transports and deployment
 
@@ -260,8 +312,8 @@ Use the HTTP endpoints above on port 8000.
 ## Output format
 
 
-PDBe API tool responses and Neo4j Cypher query results use TOON by default. Set
-the environment variable `TOON_ENABLED=false` to use JSON output instead.
+PDBe API tool responses and Neo4j Cypher query results use TOON-formatted output by
+default. Set the environment variable `TOON_ENABLED=false` to use JSON instead.
 See the TOON format specification at https://toonformat.dev/.
 
 - If TOON encoding fails for any reason, the server falls back to JSON output.
@@ -275,3 +327,6 @@ See the TOON format specification at https://toonformat.dev/.
   configuration JSON.
 - **Inspect tools:** run `npx @modelcontextprotocol/inspector` to browse tools
   and test responses.
+- **Viewer error after an update:** if the viewer shows an error that the source
+  has already fixed, rebuild the UI bundle with `make build-apps`, or run
+  `npm run build` in `apps/structure-explorer`, then reload the App.

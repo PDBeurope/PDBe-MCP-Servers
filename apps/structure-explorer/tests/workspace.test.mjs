@@ -26,12 +26,14 @@ test('workspace UI removes manual structure and superposition entry but retains 
   const html = await readFile(new URL('../workspace.html', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /id="(?:open-form|open-pdb|compare-form|reference_pdb_id|mobile_pdb_id)"/);
   assert.doesNotMatch(html, /Open structure|Compare structures|Reference PDB|Mobile PDB/);
+  assert.doesNotMatch(html, /id="(?:save-workspace|restore-workspace)"/);
+  assert.doesNotMatch(html, /Save workspace|Restore workspace/);
   assert.match(html, /id="ligand-explorer-form"/);
   assert.match(html, /id="ligand-pdb-id"/);
 });
 
 test('workspace revisions and references are checked before replacing the current view', () => {
-  const w = {version:1,id:'workspace-1',revision:2,scenes:[{id:'scene-1',structures:[{id:'protein'}],layers:[{id:'site',structure_id:'protein',kind:'component'}]}]};
+  const w = {version:1,id:'workspace-1',revision:2,scenes:[{id:'scene-1',structures:[{id:'protein',pdb_id:'1cbs',options:{}}],layers:[{id:'site',structure_id:'protein',kind:'component'}]}]};
   assert.equal(validateEnvelope(w),w);
   assert.throws(() => validateEnvelope({...w,version:2}));
   assert.throws(() => validateEnvelope({...w,scenes:[{...w.scenes[0],layers:[{id:'bad',structure_id:'missing',kind:'component'}]}]}));

@@ -79,13 +79,20 @@ async def test_all_builders_advertise_only_unique_namespaced_tools(servers):
     assert api_names == {
         "ebi-pdbe-" + generated_name,
         "ebi-pdbe-get_ai_summary",
+        "ebi-pdbe-3dbeacons_uniprot_summary",
+        "ebi-pdbe-3dbeacons_ensembl_summary",
+        "ebi-pdbe-3dbeacons_sequence",
+        "ebi-pdbe-3dbeacons_annotations",
     }
     assert {tool.name for tool in await tools(endpoints["apps"])} == {
         "ebi-pdbe-open_structure",
+        "ebi-pdbe-open_structure_url",
         "ebi-pdbe-compare_structures",
         "ebi-pdbe-ligand-interactions",
         "ebi-pdbe-build_mvs",
         "ebi-pdbe-build_mvs_story",
+        "ebi-pdbe-build_structure_scene",
+        "ebi-pdbe-build_structure_story",
         "ebi-pdbe-update_workspace",
         "ebi-pdbe-load_structure_annotations",
     }

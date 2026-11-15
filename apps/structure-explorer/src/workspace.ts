@@ -3,7 +3,8 @@ export interface LigandInstance {
   label_asym_id: string; auth_asym_id: string; auth_seq_id: number; insertion_code: string; comp_id: string;
 }
 export interface WorkspaceStructure {
-  id: string; pdb_id: string; options: Record<string, unknown>; ligands: LigandInstance[];
+  id: string; pdb_id?: string; options: Record<string, unknown>; ligands: LigandInstance[];
+  model_id?: string; source_name?: string; model_kind?: "experimental" | "predicted" | "other"; display_name?: string;
   chains?: { label_asym_id: string; auth_asym_id: string; entity_id: string; residues?: import("./comparison").ComparisonResidue[] }[];
   annotations?: import("./annotations").Annotation[];
   data_sources?: string[];
@@ -36,6 +37,7 @@ export function validateEnvelope(value: unknown): Workspace {
   for (const scene of w.scenes) {
     if (sceneIds.has(scene.id) || !Array.isArray(scene.structures) || !Array.isArray(scene.layers)) throw new Error("Invalid workspace scene");
     sceneIds.add(scene.id);
+    if (scene.structures.some(s => (!s.pdb_id && typeof s.options?.url !== "string") || !s.id)) throw new Error("Workspace structures require a PDB ID or coordinate URL");
     const structures = new Set(scene.structures.map(s => s.id));
     if (structures.size !== scene.structures.length || new Set(scene.layers.map(l => l.id)).size !== scene.layers.length
         || scene.layers.some(l => !structures.has(l.structure_id) || !["component", "annotation"].includes(l.kind))) throw new Error("Invalid workspace references");

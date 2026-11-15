@@ -1,23 +1,39 @@
 ---
 name: molview-spec
-description: Build or replace custom molecular views and guided molecular stories with PDBe evidence and MolViewSpec, or explore PDBe-reported ligand interactions in the Molecular Workspace. Use for explicit visualization, representation, coloring, highlighting, ligand-contact, or story requests.
+description: Build or replace custom molecular views and guided molecular stories from provider-supplied structure sources with MolViewSpec, or explore PDBe-reported ligand interactions in the Molecular Workspace. Use for explicit visualization, representation, coloring, highlighting, ligand-contact, or story requests.
 metadata:
-  version: "6"
+  version: "7"
 ---
 
 # Molecular views and stories
 
-Use the advertised `ebi-pdbe-build_mvs` tool for custom single scenes and
-`ebi-pdbe-build_mvs_story` for a guided story. Use their advertised legacy aliases
-only on servers that expose those names. Ordinary structure exploration uses
-`ebi-pdbe-open_structure`; aligned comparison uses `ebi-pdbe-compare_structures`.
-For any initial request to open, view, inspect, or show a structure or PDB entry—including
-a request that only supplies an entry ID—call `ebi-pdbe-open_structure`. Never call
+Prefer the advertised `ebi-pdbe-build_structure_scene` tool for custom single
+scenes and `ebi-pdbe-build_structure_story` for a guided story. The
+`ebi-pdbe-build_mvs` and `ebi-pdbe-build_mvs_story` names are compatibility
+aliases. Ordinary experimental PDB entry exploration uses
+`ebi-pdbe-open_structure`; open a provider-supplied coordinate URL with
+`ebi-pdbe-open_structure_url`. Aligned comparison uses
+`ebi-pdbe-compare_structures`.
+For any initial request to open, view, inspect, or show a PDBe entry—including
+a request that only supplies an entry ID—call `ebi-pdbe-open_structure`. For
+another provider, use that provider's guidance and pass its exact returned
+coordinate URL and format to `ebi-pdbe-open_structure_url` or the generic scene/story
+builder. Never call
 `ebi-pdbe-load_structure_annotations` for a user request: it is an App-only helper for
 loading optional annotations into a workspace that is already open and does not create a scene.
-A successful explorer result (`status: "prepared"`) completes that viewing
-request. Stop calling visualization tools; do not repeatedly reopen the entry
-or switch to another viewer tool to wait for browser rendering.
+A successful `prepared` or `compiled` result completes that viewing/build
+request. Stop calling visualization tools; do not repeatedly reopen a structure
+or switch tools to wait for browser rendering.
+
+Ordinary structure opening shows the deposited asymmetric unit unless a valid
+`assembly_id` is supplied; do not describe it as an assembly view by default.
+When an assembly-focused view is requested, use a known deposited assembly ID
+with `ebi-pdbe-open_structure`. For a custom MVS scene, set the structure type
+to `assembly`; use a known ID or omit it so Mol* selects the first available
+assembly—never invent an ID. The ordinary open tool does not expose a
+chain-instance coloring option. If chain-instance colors are requested, use a
+custom MVS scene and distinguish copies only with supported, evidence-backed
+`instance_id` selectors; do not claim ordinary opens are colored by instance.
 
 The App displays supplied scientific data. Preserve PDBe/SIFTS residue
 correspondence and supplied alignment transforms. Do not calculate RMSD,
@@ -27,7 +43,7 @@ annotations with provenance; if absent, report the annotation as unavailable.
 Coordinate loading and camera navigation do not establish new scientific results.
 
 Ground biological claims, residue mappings, ligand instances and scene choices
-in PDBe evidence. Read [scene guidance](references/scenes.md) when building or
+in evidence from the relevant provider. Read [scene guidance](references/scenes.md) when building or
 modifying a scene, and [story guidance](references/stories.md) for a tour or story.
 For every custom view or story, apply the default molecular styling and label
 readability rules in those references unless the user explicitly requests a
@@ -39,21 +55,14 @@ when exact field details are needed. Read the [builder API reference](references
 for transforms, instances, additional structures, primitives, annotation tables
 and serialized MolQL. The same operations work inside each story scene.
 
-On servers advertising `ebi-pdbe-update_workspace`, recover the latest complete
-workspace for the exact target viewer from App context or structured tool output.
-For follow-up changes, call that tool with the workspace, its revision as
-`expected_revision`, and a suitable operation batch. Preserve unrelated layers,
-structures, source annotations and transforms. Upserts replace complete named
-definitions. Use only component/annotation layers with explicit data selections;
-calculated `binding_site` layers and cutoff fields are unsupported. Use the
-source PDBe/SIFTS residue correspondence table and export without adding geometric
-measurements. A shared resource URI alone does not route results to an existing
-viewer: the host must match the target workspace ID.
-
-On older servers without workspace updates, recover the complete builder and
-use the established full-replacement builder workflow. Do not pass host routing
-fields such as `pdbe_visualization_request.mode` to PDBe tools. If the requested
-viewer state is unavailable, recover it before constructing the edit.
+Visualization follow-ups arrive through main chat with normal user/assistant
+history and only the latest available visualization context. Use that context
+to build a complete new view; each chat visualization request opens a separate
+viewer and leaves existing viewers unchanged. Workspace IDs and revisions are
+internal App/server state and are omitted from model-facing context and tool results.
+`ebi-pdbe-update_workspace` is App-only for in-view controls, not for chat
+responses. Do not claim to mutate an existing viewer or
+route a result by workspace ID.
 
 ## Ligand interaction workflow
 
