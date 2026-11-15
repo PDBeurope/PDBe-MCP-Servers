@@ -1,22 +1,46 @@
 # Scene specifications
 
-Call `ebi-pdbe-build_mvs` with `{"version": 1, "builder": {...}}`.
-The builder requires `pdb_id`; it accepts legacy and extended accessions intact.
-Do not include local-chat action fields such as `target`, `action`, or `type`.
+Prefer `ebi-pdbe-build_structure_scene` with
+`{"version": 1, "builder": {...}}`. The compatibility alias
+`ebi-pdbe-build_mvs` is also available. Supply either a PDBe `pdb_id` or a
+provider-returned `structure.url` with an explicit supported `structure.format`.
+PDBe IDs accept legacy and extended accessions intact. Do not include local-chat
+action fields such as `target`, `action`, or `type`.
 
 The default is the first deposited model, a polymer cartoon, and no water.
 Use `structure: {"type": "assembly", "assembly_id": "1"}` for a known assembly.
 If assembly_id is omitted, Mol* chooses the first available assembly; do not invent an ID.
-Coordinates default to PDBe BCIF. A custom coordinate URL must be HTTPS on
-`www.ebi.ac.uk`, matching the viewer's network policy.
+Coordinates default to PDBe BCIF when `pdb_id` is supplied. For other providers,
+pass the exact HTTPS URL and format from that provider's result; never construct
+a URL from a model identifier. Coordinate origins must be built in or explicitly
+configured with `PDBe_MCP_STRUCTURE_ORIGINS`. The viewer rejects unconfigured
+origins and the MCP App CSP allows only configured origins. URLs containing
+credentials, query parameters, or fragments are rejected.
 
-Structure models from the `pdbe_3dbeacons_*` tools: when a result's `model_url` is on
-`www.ebi.ac.uk` (PDBe entries), view it with `pdb_id` set to that entry's
-`model_identifier` and `structure: {"url": model_url, "format": model_format}`. Use the
-format in lowercase (for example `MMCIF` becomes `mmcif`). Predicted models on other hosts
-(AlphaFold DB, SWISS-MODEL, ModelArchive, Bindome, AlphaFill, PED) cannot be opened: the
-viewer rejects other origins, and `pdb_id` must be a PDB ID. Give the user the `model_url`
-as a link instead.
+For a URL-backed predicted model, preserve provider metadata and omit `pdb_id`:
+
+```json
+{
+  "structure": {
+    "url": "https://alphafold.ebi.ac.uk/files/AF-Q9I1F6-F1-model_v6.bcif",
+    "format": "bcif"
+  },
+  "model_id": "AF-Q9I1F6-F1",
+  "source_name": "AlphaFold DB",
+  "model_kind": "predicted"
+}
+```
+
+The URL is illustrative; use the exact coordinate URL and version returned by
+the provider for the requested model.
+
+Models from the `pdbe_3dbeacons_*` tools: for a PDBe entry, use `pdb_id` set to its
+`model_identifier` and `structure: {"url": model_url, "format": model_format}`, with the
+format in lowercase (`MMCIF` becomes `mmcif`). For any other provider, follow the URL-backed
+predicted model pattern above with the exact `model_url`, `model_format`, and provider
+metadata. If the model's host is not built in or configured with
+`PDBe_MCP_STRUCTURE_ORIGINS`, the viewer rejects it: give the user the `model_url` as a link
+instead.
 
 Components have a `selector`, `representation`, optional `color`/`colors`, `label`,
 `tooltip`, and `focus`. Representations are cartoon, ball_and_stick, surface,
@@ -35,7 +59,11 @@ Resolve author residue numbering to label numbering for polymer selections:
 `end_label_seq_id`; an array of expressions selects their union. Keep chain IDs
 case-sensitive. For a ligand instance, use its label chain, author residue ID,
 and insertion code when applicable; non-polymer label sequence IDs are undefined.
-`instance_id` identifies a particular assembly or crystal copy.
+`instance_id` identifies a particular assembly or crystal copy. For a requested
+chain-instance color scheme, use selector-specific colors that include the
+supported `instance_id` together with the chain selector, and use only IDs
+available from the structure/viewer context. Do not infer copy IDs or imply
+that ordinary structure opening applies these colors.
 
 Inline `annotations` accept component fields plus `group_id`. Related records
 with one label text and expression selectors can share a group label while
@@ -75,9 +103,10 @@ Use only one of `relative_isovalue` and `absolute_isovalue`; `show_faces` and
 App CSP. Retrieve actual density URLs and channel identifiers; do not invent them.
 
 Custom structure formats include bcif/mmcif/pdb/pdbqt/gro/xyz/mol/sdf/mol2/lammpstrj.
-A custom URL is required except for default PDBe BCIF. Coordinate sources remain
-restricted to https://www.ebi.ac.uk. PQR, standalone trajectories/topologies and
-shape files are not structure sources supported by this viewer workflow.
+A custom URL is required except for default PDBe BCIF. Coordinate URLs may use
+the configured provider origins; density and annotation URL policies are
+separate. PQR, standalone trajectories/topologies and shape files are not
+structure sources supported by this viewer workflow.
 Typed primitives, structure transforms and instances, additional structures,
 annotation tables and serialized MolQL selectors are supported; consult
 [builder API reference](builder-api.md) for exact mappings and examples. PyMOL
@@ -126,8 +155,9 @@ Prefer the canonical schema. Compatibility input accepts `pdbId`, `entry_id` or
 `entryId` as `pdb_id` (also inside `structure`), `color: {"value": "blue"}` as
 `color: {"color": "blue"}`, case-insensitive representation/static selector
 names, `show_water` as `include_water`, and singular `component` as `components`.
-A recognizable PDBe coordinate filename can supply a missing entry ID. Empty
-components use the default polymer view. Conflicting aliases are errors, not
+A recognizable PDBe coordinate filename can supply a missing entry ID only for
+the PDBe coordinate endpoint. A URL from another provider never implies a PDB
+ID. Empty components use the default polymer view. Conflicting aliases are errors, not
 instructions to silently pick one. Unknown fields, invalid geometry and
 unsupported representations still fail; do not substitute cartoon for an
 unknown representation. Input normalization runs before MCP schema validation.

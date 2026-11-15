@@ -42,6 +42,42 @@ def nodes(node):
         yield from nodes(child)
 
 
+def test_url_backed_workspace_roundtrips_without_pdbe_metadata():
+    url = "https://alphafold.ebi.ac.uk/files/AF-Q9I1F6-F1-model_v6.bcif"
+    result = build_mvs(
+        {
+            "builder": {
+                "structure": {"url": url, "format": "bcif"},
+                "model_id": "AF-Q9I1F6-F1",
+                "source_name": "AlphaFold DB",
+                "model_kind": "predicted",
+                "display_name": "Predicted model",
+            }
+        }
+    )
+    original = workspace_from_mvs(result)
+    structure = original.scenes[0].structures[0]
+    assert structure.pdb_id is None
+    assert structure.options.url == url
+    assert structure.model_id == "AF-Q9I1F6-F1"
+    assert structure.source_name == "AlphaFold DB"
+    assert structure.model_kind == "predicted"
+    assert structure.data_status == {
+        "annotations": "unavailable",
+        "ligands": "unavailable",
+    }
+
+    compiled = compile_workspace(original)
+    restored = workspace_from_mvs(compiled)
+    assert restored.scenes[0].structures[0].options.url == url
+    assert next(nodes(compiled["mvsj"]["root"]))["kind"] == "root"
+    assert any(
+        node.get("kind") == "download"
+        and node.get("params", {}).get("url") == url
+        for node in nodes(compiled["mvsj"]["root"])
+    )
+
+
 def test_visibility_updates_preserve_other_layers_sources_and_saved_view():
     original = workspace()
     original.sources = ["https://example.test/evidence"]

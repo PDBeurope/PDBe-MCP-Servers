@@ -410,7 +410,7 @@ async def test_sequence_result_accepts_blank_unused_fields(
 def test_structure_tools_explain_how_to_view_models(name):
     description = _tool(name).description
     assert "molview-spec" in description
-    assert "www.ebi.ac.uk" in description
+    assert "AlphaFold DB" in description
 
 
 def test_pdbe_model_url_from_beacons_builds_in_the_viewer():

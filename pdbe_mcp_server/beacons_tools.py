@@ -77,9 +77,9 @@ PROVIDER_PRECEDENCE = (
 
 
 VIEWER_GUIDANCE = (
-    " To show a model in MCP Apps, follow the molview-spec skill: PDBe entries whose "
-    "model_url is on www.ebi.ac.uk can be opened in the viewer; predicted models hosted "
-    "elsewhere can only be shared as links."
+    " To show a model in MCP Apps, follow the molview-spec skill: PDBe entries and "
+    "AlphaFold DB models can be opened in the viewer; models from other hosts can be "
+    "opened only if their origin is configured, and otherwise are shared as links."
 )
 
 
