@@ -8,8 +8,9 @@ from pdbe_mcp_server.structure_sources import (
 
 
 def test_builtin_coordinate_origins_include_pdbe_and_alphafold():
-    assert "https://www.ebi.ac.uk" in allowed_coordinate_origins()
-    assert "https://alphafold.ebi.ac.uk" in allowed_coordinate_origins()
+    assert {"https://www.ebi.ac.uk", "https://alphafold.ebi.ac.uk"} <= set(
+        allowed_coordinate_origins()
+    )
     assert validate_coordinate_url(
         "https://alphafold.ebi.ac.uk/files/model.bcif"
     ).endswith("model.bcif")
@@ -56,8 +57,9 @@ def test_custom_coordinate_origins_are_exact_and_used_in_app_csp(monkeypatch):
     )
     url = "https://models.example.org/path/model.cif"
     assert validate_coordinate_url(url) == url
-    assert "https://models.example.org" in app_connect_domains()
-    assert "https://coordinates.example.net" in app_connect_domains()
+    assert {"https://models.example.org", "https://coordinates.example.net"} <= set(
+        app_connect_domains()
+    )
     with pytest.raises(ValueError, match="not configured"):
         validate_coordinate_url("https://sub.models.example.org/model.cif")
 
