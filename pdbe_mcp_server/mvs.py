@@ -6,6 +6,7 @@ independent of LangChain, HTTP, artifact storage, and the viewer lifecycle.
 
 import json
 import math
+import posixpath
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -991,6 +992,27 @@ class Annotation(ComponentStyle):
     group_id: Text | None = None
 
 
+URL_FORMAT_EXTENSIONS = {
+    ".bcif": "bcif",
+    ".cif": "mmcif",
+    ".mmcif": "mmcif",
+    ".pdb": "pdb",
+    ".pdbqt": "pdbqt",
+    ".gro": "gro",
+    ".xyz": "xyz",
+    ".mol": "mol",
+    ".sdf": "sdf",
+    ".mol2": "mol2",
+    ".lammpstrj": "lammpstrj",
+}
+
+
+def _format_from_url(url: str) -> str | None:
+    """Return the coordinate format named by a URL's file extension, if any."""
+    extension = posixpath.splitext(urlsplit(url).path.lower())[1]
+    return URL_FORMAT_EXTENSIONS.get(extension)
+
+
 class Structure(Spec):
     source: Literal["pdbe_bcif", "url"] = "pdbe_bcif"
     type: Literal["model", "assembly", "symmetry", "symmetry_mates"] = "model"
@@ -1020,6 +1042,18 @@ class Structure(Spec):
                 value["type"] = "symmetry_mates" if kind == "symmetrymates" else kind
             if isinstance(value.get("format"), str):
                 value["format"] = value["format"].strip().lower()
+            url = value.get("url")
+            if isinstance(url, str):
+                inferred = _format_from_url(url)
+                declared = value.get("format")
+                if inferred is not None and declared is None:
+                    if inferred != "bcif":
+                        value["format"] = inferred
+                elif inferred is not None and declared != inferred:
+                    raise ValueError(
+                        f"The URL ends in .{inferred} but structure.format is "
+                        f"{declared!r}; set format to {inferred!r} or omit it"
+                    )
             if isinstance(value.get("assembly_id"), int) and not isinstance(
                 value["assembly_id"], bool
             ):
