@@ -23,3 +23,6 @@ htmlcov/
 # MCP App dependencies and generated HTML (build before packaging)
 apps/structure-explorer/node_modules/
 pdbe_mcp_server/ui/*.html
+
+# Local project context spec
+/SPEC.md
