@@ -23,8 +23,8 @@ In an MCP Apps client, the Apps server provides a shared Mol* workspace for:
 
 Use `pdbe_apps_server` for the dedicated server or the recommended `all`
 server; connection examples are below. The host needs MCP Apps support, WebGL,
-and network access to the configured coordinate origins. PDBe and AlphaFold DB
-origins are built in. Add other HTTPS origins with the
+and network access to the configured coordinate origins. The built-in origins are
+the production HTTPS hosts of the 3D-Beacons registry, plus PDBe. Add other HTTPS origins with the
 `PDBe_MCP_STRUCTURE_ORIGINS` environment variable (comma-separated exact
 origins; no wildcards).
 Clients without UI support receive text and structured data fallbacks.

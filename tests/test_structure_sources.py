@@ -15,6 +15,32 @@ def test_builtin_coordinate_origins_include_pdbe_and_alphafold():
     ).endswith("model.bcif")
 
 
+REGISTRY_PRODUCTION_ORIGINS = (
+    "https://www.ebi.ac.uk",
+    "https://alphafold.ebi.ac.uk",
+    "https://swissmodel.expasy.org",
+    "https://deposition.proteinensemble.org",
+    "https://www.sasbdb.org",
+    "https://alphafill.eu",
+    "https://3dbeacon.hegelab.org",
+    "https://modelarchive.org",
+    "https://data.isoform.io",
+    "https://levy.mocel.unige.ch",
+    "https://bfvd.steineggerlab.workers.dev",
+    "https://bindome.epfl.ch",
+)
+
+
+def test_builtin_origins_cover_3d_beacons_registry_production_hosts():
+    allowed = allowed_coordinate_origins()
+    for origin in REGISTRY_PRODUCTION_ORIGINS:
+        assert origin in allowed
+    assert "https://genome3d.eu" not in allowed
+    assert not any(
+        origin.startswith(("https://dev.", "https://wwwdev.")) for origin in allowed
+    )
+
+
 def test_custom_coordinate_origins_are_exact_and_used_in_app_csp(monkeypatch):
     monkeypatch.setenv(
         "PDBe_MCP_STRUCTURE_ORIGINS",

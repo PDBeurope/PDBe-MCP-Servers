@@ -6,6 +6,18 @@ from urllib.parse import urlsplit
 DEFAULT_COORDINATE_ORIGINS = (
     "https://www.ebi.ac.uk",
     "https://alphafold.ebi.ac.uk",
+    # Production HTTPS base URLs from the 3D-Beacons registry. Genome-3D is http-only
+    # and dev hosts are excluded.
+    "https://swissmodel.expasy.org",
+    "https://deposition.proteinensemble.org",
+    "https://www.sasbdb.org",
+    "https://alphafill.eu",
+    "https://3dbeacon.hegelab.org",
+    "https://modelarchive.org",
+    "https://data.isoform.io",
+    "https://levy.mocel.unige.ch",
+    "https://bfvd.steineggerlab.workers.dev",
+    "https://bindome.epfl.ch",
 )
 
 

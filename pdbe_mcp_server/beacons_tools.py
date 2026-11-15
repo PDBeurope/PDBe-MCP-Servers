@@ -77,9 +77,9 @@ PROVIDER_PRECEDENCE = (
 
 
 VIEWER_GUIDANCE = (
-    " To show a model in MCP Apps, follow the molview-spec skill: PDBe entries and "
-    "AlphaFold DB models can be opened in the viewer; models from other hosts can be "
-    "opened only if their origin is configured, and otherwise are shared as links."
+    " To show a model in MCP Apps, follow the molview-spec skill: models whose host is "
+    "an allowed coordinate origin (PDBe, AlphaFold DB, and other 3D-Beacons providers) "
+    "can be opened in the viewer; otherwise share the model_url as a link."
 )
 
 

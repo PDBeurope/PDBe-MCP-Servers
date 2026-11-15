@@ -68,7 +68,8 @@ Sequence is shown when Mol* can derive it from the loaded coordinates.
 Annotations and PDBe-specific panels are optional.
 
 Coordinate origins are restricted to an exact server-side allowlist. The
-built-in origins include PDBe and AlphaFold DB. To permit another provider,
+built-in origins are the production HTTPS hosts of the 3D-Beacons registry, plus
+PDBe. To permit another host,
 configure `PDBe_MCP_STRUCTURE_ORIGINS` as a comma-separated list of HTTPS
 origins, for example `https://models.example.org`. Do not use paths, wildcards,
 or HTTP origins. Coordinate URLs with credentials, query parameters, or
