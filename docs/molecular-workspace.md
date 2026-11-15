@@ -72,8 +72,8 @@ built-in origins are the production HTTPS hosts of the 3D-Beacons registry, plus
 PDBe. To permit another host,
 configure `PDBe_MCP_STRUCTURE_ORIGINS` as a comma-separated list of HTTPS
 origins, for example `https://models.example.org`. Do not use paths, wildcards,
-or HTTP origins. Coordinate URLs with credentials, query parameters, or
-fragments are rejected. The same configured origins are included in the MCP App
+or HTTP origins. Coordinate URLs with credentials or fragments are rejected;
+query parameters are allowed on allowed origins. The same configured origins are included in the MCP App
 CSP.
 
 PDBe workflows use public PDBe endpoints; URL-backed structures use their

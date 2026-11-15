@@ -72,11 +72,10 @@ def validate_coordinate_url(value: str) -> str:
         or parts.username is not None
         or parts.password is not None
         or port not in (None, 443)
-        or parts.query
         or parts.fragment
     ):
         raise ValueError(
-            "Coordinate URL must be HTTPS without credentials, query parameters, or a fragment"
+            "Coordinate URL must be HTTPS without credentials or a fragment"
         )
     origin = _origin(f"https://{parts.hostname}")
     if origin not in allowed_coordinate_origins():

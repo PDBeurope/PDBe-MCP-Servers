@@ -15,7 +15,8 @@ pass the exact HTTPS URL and format from that provider's result; never construct
 a URL from a model identifier. Coordinate origins must be built in or explicitly
 configured with `PDBe_MCP_STRUCTURE_ORIGINS`. The viewer rejects unconfigured
 origins and the MCP App CSP allows only configured origins. URLs containing
-credentials, query parameters, or fragments are rejected.
+credentials or fragments are rejected. Query parameters are allowed on allowed origins,
+so provider URLs such as `?range=...&template=...` can be used as returned.
 
 For a URL-backed predicted model, preserve provider metadata and omit `pdb_id`:
 

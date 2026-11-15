@@ -31,6 +31,14 @@ REGISTRY_PRODUCTION_ORIGINS = (
 )
 
 
+def test_provider_coordinate_urls_with_query_parameters_are_accepted():
+    url = (
+        "https://swissmodel.expasy.org/3d-beacons/uniprot/P38398.cif"
+        "?range=1-103&template=1jm7.1.A&provider=swissmodel"
+    )
+    assert validate_coordinate_url(url) == url
+
+
 def test_builtin_origins_cover_3d_beacons_registry_production_hosts():
     allowed = allowed_coordinate_origins()
     for origin in REGISTRY_PRODUCTION_ORIGINS:
@@ -60,7 +68,6 @@ def test_custom_coordinate_origins_are_exact_and_used_in_app_csp(monkeypatch):
         "http://alphafold.ebi.ac.uk/model.bcif",
         "https://user@alphafold.ebi.ac.uk/model.bcif",
         "https://alphafold.ebi.ac.uk:8443/model.bcif",
-        "https://alphafold.ebi.ac.uk/model.bcif?token=secret",
         "https://alphafold.ebi.ac.uk/model.bcif#fragment",
         "https://alphafold.ebi.ac.uk.evil.example/model.bcif",
     ],
