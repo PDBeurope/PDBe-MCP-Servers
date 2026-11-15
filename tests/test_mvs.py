@@ -472,9 +472,10 @@ def test_story_scenes_can_load_different_provider_sources():
     assert next(nodes(result["mvsj"]["snapshots"][0]["root"], "download"))["params"][
         "url"
     ].endswith("/1cbs.bcif")
-    assert next(nodes(result["mvsj"]["snapshots"][1]["root"], "download"))["params"][
-        "url"
-    ] == url
+    assert (
+        next(nodes(result["mvsj"]["snapshots"][1]["root"], "download"))["params"]["url"]
+        == url
+    )
     assert result["story"]["scenes"][1]["builder"]["model_kind"] == "predicted"
 
 

@@ -72,8 +72,7 @@ def test_url_backed_workspace_roundtrips_without_pdbe_metadata():
     assert restored.scenes[0].structures[0].options.url == url
     assert next(nodes(compiled["mvsj"]["root"]))["kind"] == "root"
     assert any(
-        node.get("kind") == "download"
-        and node.get("params", {}).get("url") == url
+        node.get("kind") == "download" and node.get("params", {}).get("url") == url
         for node in nodes(compiled["mvsj"]["root"])
     )
 

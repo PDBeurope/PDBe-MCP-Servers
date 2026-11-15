@@ -1081,9 +1081,7 @@ def build_pdbe_apps_server(generator: OpenAPIToMCPGenerator | None = None) -> Se
                     )
                 )
                 workspace = workspace_from_mvs(data)
-                data = await run_blocking_tool(
-                    lambda: compile_workspace(workspace)
-                )
+                data = await run_blocking_tool(lambda: compile_workspace(workspace))
             except ValueError as error:
                 return mvs_validation_failure(error)
             compact = {

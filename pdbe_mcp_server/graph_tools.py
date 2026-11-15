@@ -66,8 +66,8 @@ def _neo4j_enabled() -> bool:
 
 
 def _toon_enabled() -> bool:
-    """Check if TOON output is enabled."""
-    return os.getenv("TOON_ENABLED", "").lower() in ("true", "1", "yes")
+    """Check whether TOON output is enabled (the default unless explicitly disabled)."""
+    return os.getenv("TOON_ENABLED", "true").strip().lower() in ("true", "1", "yes")
 
 
 def _validate_cypher_query(query: str) -> tuple[bool, str | None]:
@@ -352,9 +352,9 @@ class GraphTools:
     Parameters:
         cypher_query (required): The Cypher query to execute. Example: "MATCH (s:Structure) WHERE s.PDB_ID = '1abc' RETURN s"
 
-    Expected Output Format:
-        JSON array of result objects, or in TOON format if TOON_ENABLED is set.
-        Each object represents a row in the result set with column names as keys.
+        Expected Output Format:
+            TOON array of result objects by default. Set TOON_ENABLED=false to use JSON.
+            Each object represents a row in the result set with column names as keys.
 
     Example queries:
         MATCH (s:Structure) WHERE s.PDB_ID = '1abc' RETURN s.PDB_ID as id, s.TITLE as title

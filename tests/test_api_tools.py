@@ -148,9 +148,13 @@ class TestOpenAPIToMCPGenerator:
 
     @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
     def test_call_tool_success(
-        self, mock_get: MagicMock, mock_openapi_spec: dict[str, Any]
+        self,
+        mock_get: MagicMock,
+        mock_openapi_spec: dict[str, Any],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test successful tool call."""
+        monkeypatch.setenv("TOON_ENABLED", "false")
         # First call loads spec, second call executes the tool
         mock_get.side_effect = [
             mock_openapi_spec,
@@ -176,9 +180,13 @@ class TestOpenAPIToMCPGenerator:
 
     @patch("pdbe_mcp_server.api_tools.HTTPClient.get")
     def test_call_tool_omits_absent_query_params(
-        self, mock_get: MagicMock, mock_openapi_spec: dict[str, Any]
+        self,
+        mock_get: MagicMock,
+        mock_openapi_spec: dict[str, Any],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that missing optional query parameters are not sent."""
+        monkeypatch.setenv("TOON_ENABLED", "false")
         mock_get.side_effect = [
             mock_openapi_spec,
             {"result": "success", "data": "test_data"},
@@ -205,8 +213,10 @@ class TestOpenAPIToMCPGenerator:
         mock_get: MagicMock,
         mock_encode: MagicMock,
         mock_openapi_spec: dict[str, Any],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test TOON encoding success path."""
+        """TOON encoding is the default when no override is configured."""
+        monkeypatch.delenv("TOON_ENABLED", raising=False)
         mock_get.side_effect = [mock_openapi_spec, {"result": "success"}]
         mock_encode.return_value = "TOON_DATA"
 
@@ -214,8 +224,7 @@ class TestOpenAPIToMCPGenerator:
         generator.list_tools()
 
         tool_name = get_expected_shortened_name("get_test")
-        with patch.dict("os.environ", {"TOON_ENABLED": "true"}):
-            result = generator.call_tool(tool_name, {"id": "test123"})
+        result = generator.call_tool(tool_name, {"id": "test123"})
 
         assert len(result) == 1
         assert result[0].type == "text"

@@ -1,7 +1,10 @@
 """Tests for graph_tools module."""
 
+import json
 from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from pdbe_mcp_server.graph_tools import GraphTools
 
@@ -622,3 +625,79 @@ class TestGraphTools:
         indexes = tools.get_indexes()
 
         assert indexes == []
+
+
+@pytest.mark.asyncio
+async def test_cypher_results_use_toon_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cypher query results are encoded as TOON unless explicitly disabled."""
+
+    class Result:
+        def keys(self) -> list[str]:
+            return ["pdb_id"]
+
+        async def data(self) -> list[dict[str, str]]:
+            return [{"pdb_id": "1abc"}]
+
+    class Session:
+        async def __aenter__(self) -> "Session":
+            return self
+
+        async def __aexit__(self, *args: Any) -> None:
+            return None
+
+        async def run(self, query: str) -> Result:
+            return Result()
+
+    class Driver:
+        def session(self) -> Session:
+            return Session()
+
+    tools = GraphTools.__new__(GraphTools)
+    monkeypatch.setattr(tools, "_get_neo4j_driver", lambda: Driver())
+    monkeypatch.delenv("TOON_ENABLED", raising=False)
+
+    with patch("toon_format.encode", return_value="TOON_DATA") as encode:
+        result = await tools.execute_cypher_query("MATCH (s:Structure) RETURN s.PDB_ID")
+
+    assert result == "TOON_DATA"
+    encode.assert_called_once_with([{"pdb_id": "1abc"}])
+
+
+@pytest.mark.asyncio
+async def test_cypher_results_can_opt_out_of_toon(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Setting TOON_ENABLED=false keeps Cypher results as JSON."""
+
+    class Result:
+        def keys(self) -> list[str]:
+            return ["pdb_id"]
+
+        async def data(self) -> list[dict[str, str]]:
+            return [{"pdb_id": "1abc"}]
+
+    class Session:
+        async def __aenter__(self) -> "Session":
+            return self
+
+        async def __aexit__(self, *args: Any) -> None:
+            return None
+
+        async def run(self, query: str) -> Result:
+            return Result()
+
+    class Driver:
+        def session(self) -> Session:
+            return Session()
+
+    tools = GraphTools.__new__(GraphTools)
+    monkeypatch.setattr(tools, "_get_neo4j_driver", lambda: Driver())
+    monkeypatch.setenv("TOON_ENABLED", "false")
+
+    with patch("toon_format.encode") as encode:
+        result = await tools.execute_cypher_query("MATCH (s:Structure) RETURN s.PDB_ID")
+
+    assert json.loads(result) == [{"pdb_id": "1abc"}]
+    encode.assert_not_called()

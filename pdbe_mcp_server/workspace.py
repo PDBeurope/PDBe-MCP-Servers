@@ -60,7 +60,9 @@ class WorkspaceStructure(Spec):
     @model_validator(mode="after")
     def coordinate_source(self):
         if self.pdb_id is None and self.options.url is None:
-            raise ValueError("A workspace structure requires pdb_id or a coordinate URL")
+            raise ValueError(
+                "A workspace structure requires pdb_id or a coordinate URL"
+            )
         return self
 
     @field_serializer("options")
@@ -469,11 +471,7 @@ def workspace_from_mvs(data: dict[str, Any]) -> Workspace:
                 {
                     "id": sid,
                     "options": options,
-                    **(
-                        {"pdb_id": source["pdb_id"]}
-                        if source.get("pdb_id")
-                        else {}
-                    ),
+                    **({"pdb_id": source["pdb_id"]} if source.get("pdb_id") else {}),
                     **{
                         k: source[k]
                         for k in (
