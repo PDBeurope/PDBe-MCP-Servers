@@ -20,11 +20,17 @@ from pdbe_mcp_server.apps import (
     app_resource_base_uri,
     build_pdbe_apps_server,
 )
+from pdbe_mcp_server.beacons_tools import (
+    BEACONS_TOOL_NAMES,
+    beacons_tools,
+    call_beacons_tool,
+    normalize_arguments,
+)
 from pdbe_mcp_server.execution import run_blocking_tool
 from pdbe_mcp_server.graph_tools import GraphTools
 from pdbe_mcp_server.search_tools import SearchTools
 from pdbe_mcp_server.skills import add_skill_result_metadata
-from pdbe_mcp_server.tool_names import PDBeServer
+from pdbe_mcp_server.tool_names import PDBeServer, public_tool_name
 
 search_tools: SearchTools = SearchTools()
 
@@ -63,7 +69,10 @@ def build_pdbe_api_server(generator: OpenAPIToMCPGenerator | None = None) -> Ser
         generator, available_tools = create_mcp_tools_from_openapi(conf.api.openapi_url)
     else:
         available_tools = generator.list_tools()
-    available_tools = [*available_tools, ai_summary_tool()]
+    available_tools = [*available_tools, ai_summary_tool(), *beacons_tools()]
+    api_server.tool_input_normalizers.update(
+        {public_tool_name(name): normalize_arguments for name in BEACONS_TOOL_NAMES}
+    )
 
     @api_server.list_tools()
     async def list_tools() -> list[types.Tool]:
@@ -80,6 +89,13 @@ def build_pdbe_api_server(generator: OpenAPIToMCPGenerator | None = None) -> Ser
                 types.TextContent(
                     type="text",
                     text=await run_blocking_tool(get_ai_summary, arguments),
+                )
+            ]
+        if name in BEACONS_TOOL_NAMES:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=await run_blocking_tool(call_beacons_tool, name, arguments),
                 )
             ]
         # These tools use requests (including synchronous retries). Keep the

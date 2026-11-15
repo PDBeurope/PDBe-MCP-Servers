@@ -10,6 +10,14 @@ If assembly_id is omitted, Mol* chooses the first available assembly; do not inv
 Coordinates default to PDBe BCIF. A custom coordinate URL must be HTTPS on
 `www.ebi.ac.uk`, matching the viewer's network policy.
 
+Structure models from the `pdbe_3dbeacons_*` tools: when a result's `model_url` is on
+`www.ebi.ac.uk` (PDBe entries), view it with `pdb_id` set to that entry's
+`model_identifier` and `structure: {"url": model_url, "format": model_format}`. Use the
+format in lowercase (for example `MMCIF` becomes `mmcif`). Predicted models on other hosts
+(AlphaFold DB, SWISS-MODEL, ModelArchive, Bindome, AlphaFill, PED) cannot be opened: the
+viewer rejects other origins, and `pdb_id` must be a PDB ID. Give the user the `model_url`
+as a link instead.
+
 Components have a `selector`, `representation`, optional `color`/`colors`, `label`,
 `tooltip`, and `focus`. Representations are cartoon, ball_and_stick, surface,
 spacefill, carbohydrate, backbone, line, and putty. Opacity belongs inside

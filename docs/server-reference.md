@@ -9,6 +9,26 @@
 
 The `pdbe_api_server` generates tools from the PDBe API OpenAPI specification. Use this server for core PDBe REST API data, such as entries, assemblies, molecules, ligands, publications, and validation information.
 
+#### 3D-Beacons tools
+
+The API server also exposes four tools for the [3D-Beacons Network](https://3dbeacons.org/), which covers predicted structure models as well as experimental ones. Use them to fill gaps when PDBe has no experimental structure for a protein. Predicted models are reported as predictions, with their confidence scores. The PDBe API tools remain the source for experimental structures.
+
+| Tool | Purpose |
+| --- | --- |
+| `pdbe_3dbeacons_uniprot_summary` | Structure models for one or more UniProt accessions. |
+| `pdbe_3dbeacons_ensembl_summary` | Structure models for an Ensembl gene or transcript ID. |
+| `pdbe_3dbeacons_sequence` | Structure models for a protein sequence, with `action` set to `submit`, `result`, or `summary`. |
+| `pdbe_3dbeacons_annotations` | Residue-level features (domains, binding sites, and so on) for a UniProt accession. |
+
+To choose the source of structures, use the filters on the structure tools:
+
+- `provider: "pdbe"` returns only PDBe experimental structures.
+- `exclude_provider: "pdbe"` omits PDBe experimental structures and returns predicted models, for example after the PDBe API tools have already returned experimental ones.
+
+`pdbe_3dbeacons_sequence` with `submit` waits for the search to finish. If it is still running when the tool budget runs out, the response includes a `job_id`, and `result` returns the results later.
+
+Structure data is from the 3D-Beacons Network, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
 ### Search Server Tools
 
 #### `get_pdbe_search_schema`

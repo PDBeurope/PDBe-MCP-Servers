@@ -421,21 +421,23 @@ class OpenAPIToMCPGenerator:
                 error_message += f"\nResponse: {error.response.text}"
             return [types.TextContent(type="text", text=error_message)]
 
-        if _toon_enabled():
-            try:
-                import toon_format
+        return [types.TextContent(type="text", text=format_result_text(data))]
 
-                result_text = toon_format.encode(data)
-                if not isinstance(result_text, str):
-                    result_text = str(result_text)
-            except Exception as e:
-                logger.warning("TOON encoding failed, falling back to JSON: %s", e)
-                result_text = "TOON failed; JSON fallback:\n" + json.dumps(
-                    data, indent=2
-                )
-        else:
-            result_text = json.dumps(data, indent=2)
-        return [types.TextContent(type="text", text=result_text)]
+
+def format_result_text(data: Any) -> str:
+    """Encode tool data as TOON when enabled, falling back to JSON."""
+    if _toon_enabled():
+        try:
+            import toon_format
+
+            result_text = toon_format.encode(data)
+            if not isinstance(result_text, str):
+                result_text = str(result_text)
+            return result_text
+        except Exception as e:
+            logger.warning("TOON encoding failed, falling back to JSON: %s", e)
+            return "TOON failed; JSON fallback:\n" + json.dumps(data, indent=2)
+    return json.dumps(data, indent=2)
 
 
 def create_mcp_tools_from_openapi(
